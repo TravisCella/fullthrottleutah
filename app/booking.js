@@ -235,6 +235,7 @@ export default function JetSkiBooking() {
     if (step === 1) return loc;
     if (step === 2) return dates.length >= 1;
     if (step === 3) return info.name && info.email && info.phone && info.experience;
+    if (step === 4) return true;
     return false;
   };
 
@@ -666,8 +667,8 @@ export default function JetSkiBooking() {
               disabled={!canNext() || paying}
               style={{
                 ...btnPrimary, flex: 1,
-                opacity: canNext() ? 1 : 0.35,
-                cursor: canNext() ? "pointer" : "not-allowed",
+                opacity: (canNext() && !paying) ? 1 : 0.35,
+                cursor: (canNext() && !paying) ? "pointer" : "not-allowed",
                 background: step === 4 ? "linear-gradient(135deg, #16A34A, #15803D)" : "linear-gradient(135deg, #0EA5E9, #0284C7)",
                 boxShadow: step === 4 ? "0 4px 20px rgba(22,163,74,0.3)" : "0 4px 20px rgba(14,165,233,0.25)",
               }}>
