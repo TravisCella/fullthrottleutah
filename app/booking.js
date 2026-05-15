@@ -174,6 +174,8 @@ export default function JetSkiBooking() {
   const [yr, setYr] = useState(new Date().getFullYear());
   const [info, setInfo] = useState({ name: "", email: "", phone: "", experience: "" });
   const [done, setDone] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState(null);
   const [fadeIn, setFadeIn] = useState(true);
 
   useEffect(() => { setFadeIn(false); const t = setTimeout(() => setFadeIn(true), 20); return () => clearTimeout(t); }, [step]);
@@ -187,6 +189,42 @@ export default function JetSkiBooking() {
     let m = mo + dir, y = yr;
     if (m > 11) { m = 0; y++; } if (m < 0) { m = 11; y--; }
     setMo(m); setYr(y);
+  };
+
+  const handleCheckout = async () => {
+    setPaying(true);
+    setPayError(null);
+    try {
+      const depositAmt = Math.round(price / 2);
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          packageName: pkg.name,
+          packageTagline: pkg.tagline,
+          totalPrice: price,
+          depositAmount: depositAmt,
+          days: days,
+          startDate: formatDate(dates[0]),
+          endDate: dates.length === 2 ? formatDate(dates[1]) : formatDate(dates[0]),
+          location: loc.name,
+          renterName: info.name,
+          renterEmail: info.email,
+          renterPhone: info.phone,
+          experience: info.experience,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setPayError(data.error || 'Something went wrong. Please try again.');
+        setPaying(false);
+      }
+    } catch (err) {
+      setPayError('Connection error. Please try again.');
+      setPaying(false);
+    }
   };
 
   const days = dates.length === 2 ? daysBetween(dates[0], dates[1]) : dates.length === 1 ? 1 : 0;
@@ -581,6 +619,11 @@ export default function JetSkiBooking() {
             <div style={{ marginTop: 12, fontSize: 11, color: "#94A3B8", textAlign: "center", lineHeight: 1.6 }}>
               By booking you agree to our rental terms. Cancellations 72+ hours out receive a full deposit refund.
             </div>
+            {payError && (
+              <div style={{ marginTop: 12, padding: 12, background: "#FEE2E2", borderRadius: 10, fontSize: 13, color: "#991B1B", textAlign: "center" }}>
+                {payError}
+              </div>
+            )}
           </div>
         )}
 
@@ -619,8 +662,8 @@ export default function JetSkiBooking() {
         {!done && (
           <div style={{ display: "flex", gap: 10, marginTop: 24, position: "sticky", bottom: 16, zIndex: 10 }}>
             <button
-              onClick={() => step === 4 ? setDone(true) : setStep(step + 1)}
-              disabled={!canNext()}
+              onClick={() => step === 4 ? handleCheckout() : setStep(step + 1)}
+              disabled={!canNext() || paying}
               style={{
                 ...btnPrimary, flex: 1,
                 opacity: canNext() ? 1 : 0.35,
@@ -628,7 +671,7 @@ export default function JetSkiBooking() {
                 background: step === 4 ? "linear-gradient(135deg, #16A34A, #15803D)" : "linear-gradient(135deg, #0EA5E9, #0284C7)",
                 boxShadow: step === 4 ? "0 4px 20px rgba(22,163,74,0.3)" : "0 4px 20px rgba(14,165,233,0.25)",
               }}>
-              {step === 4 ? `Pay $${Math.round(price / 2).toLocaleString()} Deposit →` : "Continue →"}
+              {step === 4 ? (paying ? "Redirecting to Stripe..." : `Pay $${Math.round(price / 2).toLocaleString()} Deposit →`) : "Continue →"}
             </button>
           </div>
         )}
