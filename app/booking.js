@@ -17,8 +17,8 @@ const PACKAGES = [
   {
     id: "spark-duo",
     name: "Spark Duo",
-    tagline: "2 \u00d7 2014 Sea-Doo Spark 900 ACE HO",
-    description: "Two nimble, lightweight Sparks on a single trailer. Quick, fun, and easy to ride \u2014 perfect for cruising any Utah reservoir.",
+    tagline: "2 × 2014 Sea-Doo Spark 900 ACE HO",
+    description: "Two nimble, lightweight Sparks on a single trailer. Quick, fun, and easy to ride — perfect for cruising any Utah reservoir.",
     includes: ["2 Sea-Doo Spark 900 ACE HO", "Single trailer", "4 life preservers", "2 anchoring systems", "Safety flags"],
     weekday: 375,
     weekend: 425,
@@ -32,7 +32,7 @@ const PACKAGES = [
   {
     id: "gtx-duo",
     name: "GTX Limited Duo",
-    tagline: "2 \u00d7 2026 Sea-Doo GTX Limited 325",
+    tagline: "2 × 2026 Sea-Doo GTX Limited 325",
     description: "The ultimate luxury ride. 325 HP, 10.25\" touchscreen, premium Bluetooth audio, massive swim platform. This is first class on the water.",
     includes: ["2 Sea-Doo GTX Limited 325 HP", "Single trailer", "4 life preservers", "2 anchoring systems", "Safety flags", "Bluetooth audio"],
     weekday: 625,
@@ -47,11 +47,11 @@ const PACKAGES = [
 ];
 
 const LOCATIONS = [
-  { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "\ud83c\udfd4\ufe0f" },
-  { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "\ud83c\udf32" },
-  { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "\ud83e\udd8c" },
-  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "\ud83d\udc8e" },
-  { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "\ud83c\udfdc\ufe0f" },
+  { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️" },
+  { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲" },
+  { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌" },
+  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎" },
+  { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️" },
 ];
 
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
@@ -128,11 +128,11 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth }) {
   return (
     <div style={{ userSelect: "none" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <button onClick={() => onChangeMonth(-1)} style={navBtn}>{"\u2039"}</button>
+        <button onClick={() => onChangeMonth(-1)} style={navBtn}>{"‹"}</button>
         <span style={{ fontFamily: "var(--font-heading)", fontSize: 17, fontWeight: 600, letterSpacing: "-0.02em" }}>
           {MONTHS[month]} {year}
         </span>
-        <button onClick={() => onChangeMonth(1)} style={navBtn}>{"\u203a"}</button>
+        <button onClick={() => onChangeMonth(1)} style={navBtn}>{"›"}</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center" }}>
         {DAYS_HDR.map(d => (
@@ -227,7 +227,7 @@ export default function JetSkiBooking() {
           }} />
           <div style={{ position: "absolute", bottom: 32, left: 0, right: 0, padding: "0 24px", zIndex: 2 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.25em", textTransform: "uppercase", color: "#60A5FA", marginBottom: 10, opacity: 0.9 }}>
-              Full Throttle Utah \u00b7 Farmington, UT
+              Full Throttle Utah · Farmington, UT
             </div>
             <h1 style={{
               fontFamily: "var(--font-heading)", fontSize: 38, fontWeight: 800, margin: 0,
@@ -283,15 +283,15 @@ export default function JetSkiBooking() {
             boxShadow: "0 4px 24px rgba(14,165,233,0.3)",
             marginTop: 8,
           }}>
-            Book Your Ride \u2192
+            Book Your Ride →
           </button>
 
           <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 28 }}>
             {[
-              { icon: "\ud83d\udee1\ufe0f", label: "Insured" },
-              { icon: "\ud83d\udccb", label: "Digital Waiver" },
-              { icon: "\ud83d\udcb3", label: "Pay Online" },
-              { icon: "\ud83d\ude9b", label: "You Tow" },
+              { icon: "🛡️", label: "Insured" },
+              { icon: "📋", label: "Digital Waiver" },
+              { icon: "💳", label: "Pay Online" },
+              { icon: "🚛", label: "You Tow" },
             ].map(t => (
               <div key={t.label} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 20 }}>{t.icon}</div>
@@ -319,9 +319,9 @@ export default function JetSkiBooking() {
 
           <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.06)", textAlign: "center" }}>
             <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.6 }}>
-              Pickup from Farmington, UT \u00b7 8 AM \u2013 8 PM<br/>
+              Pickup from Farmington, UT · 8 AM – 8 PM<br/>
               2" ball hitch + valid ID required<br/>
-              <span style={{ color: "#64748B" }}>\u00a9 {new Date().getFullYear()} Full Throttle Utah</span>
+              <span style={{ color: "#64748B" }}>© {new Date().getFullYear()} Full Throttle Utah</span>
             </div>
           </div>
         </div>
@@ -344,7 +344,7 @@ export default function JetSkiBooking() {
       <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
         <button onClick={() => step === 0 ? setStep(-1) : setStep(step - 1)} style={{
           background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#64748B", padding: "4px 8px",
-        }}>\u2190</button>
+        }}>←</button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#94A3B8" }}>Full Throttle</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A", letterSpacing: "-0.01em" }}>{stepLabels[step] || "Confirm"}</div>
@@ -398,12 +398,12 @@ export default function JetSkiBooking() {
                     <p style={{ fontSize: 13, color: "#64748B", lineHeight: 1.55, margin: "12px 0 16px" }}>{p.description}</p>
                     <div style={{ display: "flex", gap: 16 }}>
                       <div>
-                        <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Mon\u2013Thu</div>
+                        <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Mon–Thu</div>
                         <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.03em", color: "#0F172A" }}>${p.weekday}</div>
                       </div>
                       <div style={{ width: 1, background: "#E2E8F0" }} />
                       <div>
-                        <div style={{ fontSize: 9, color: "#D97706", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Fri\u2013Sun</div>
+                        <div style={{ fontSize: 9, color: "#D97706", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Fri–Sun</div>
                         <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.03em", color: "#0F172A" }}>${p.weekend}</div>
                       </div>
                     </div>
@@ -412,7 +412,7 @@ export default function JetSkiBooking() {
                         <span key={i} style={{
                           fontSize: 10, background: "rgba(0,0,0,0.03)", padding: "4px 10px",
                           borderRadius: 20, color: "#64748B", fontWeight: 500,
-                        }}>\u2713 {item}</span>
+                        }}>✓ {item}</span>
                       ))}
                     </div>
                   </div>
@@ -459,7 +459,7 @@ export default function JetSkiBooking() {
             ))}
             <div style={{ marginTop: 16, padding: 14, background: "#F0F9FF", borderRadius: 12, border: "1px solid #DBEAFE" }}>
               <div style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.5 }}>
-                <strong>Pickup:</strong> Farmington, UT \u2014 you tow to the lake with your own vehicle. 2" ball hitch and flat 4-prong light hookup required.
+                <strong>Pickup:</strong> Farmington, UT — you tow to the lake with your own vehicle. 2" ball hitch and flat 4-prong light hookup required.
               </div>
             </div>
           </div>
@@ -479,7 +479,7 @@ export default function JetSkiBooking() {
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>{days} day{days > 1 ? "s" : ""}</div>
                   <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
-                    {formatDate(dates[0])}{dates.length === 2 ? ` \u2192 ${formatDate(dates[1])}` : ""}
+                    {formatDate(dates[0])}{dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -489,8 +489,8 @@ export default function JetSkiBooking() {
               </div>
             )}
             <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 16 }}>
-              <span style={{ fontSize: 11, color: "#94A3B8" }}>Tap start \u2192 end for multi-day</span>
-              <span style={{ fontSize: 11, color: "#D97706", fontWeight: 600 }}>\u25cf = Weekend rate</span>
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>Tap start → end for multi-day</span>
+              <span style={{ fontSize: 11, color: "#D97706", fontWeight: 600 }}>● = Weekend rate</span>
             </div>
           </div>
         )}
@@ -528,7 +528,7 @@ export default function JetSkiBooking() {
               </div>
             </div>
             <div style={{ background: "#FEF3C7", borderRadius: 12, padding: 14, display: "flex", gap: 10 }}>
-              <span style={{ fontSize: 18 }}>{"\ud83d\udccb"}</span>
+              <span style={{ fontSize: 18 }}>"📋"</span>
               <div style={{ fontSize: 12, color: "#92400E", lineHeight: 1.5 }}>
                 <strong>Digital waiver required.</strong> After booking you'll receive a Smartwaiver link. All riders must sign before pickup.
               </div>
@@ -551,8 +551,8 @@ export default function JetSkiBooking() {
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, overflow: "hidden" }}>
               {[
                 { label: "Location", value: `${loc?.emoji} ${loc?.name}`, sub: loc?.drive + " from SLC" },
-                { label: "Dates", value: `${formatDate(dates[0])}${dates.length === 2 ? ` \u2192 ${formatDate(dates[1])}` : ""}`, sub: `${days} day${days > 1 ? "s" : ""} \u00b7 Pickup 8AM \u00b7 Return 8PM` },
-                { label: "Renter", value: info.name, sub: `${info.email} \u00b7 ${info.phone} \u00b7 ${info.experience}` },
+                { label: "Dates", value: `${formatDate(dates[0])}${dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}`, sub: `${days} day${days > 1 ? "s" : ""} · Pickup 8AM · Return 8PM` },
+                { label: "Renter", value: info.name, sub: `${info.email} · ${info.phone} · ${info.experience}` },
               ].map((row, i) => (
                 <div key={i} style={{ padding: "14px 18px", borderBottom: "1px solid #F1F5F9" }}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{row.label}</div>
@@ -586,7 +586,7 @@ export default function JetSkiBooking() {
 
         {done && (
           <div style={{ textAlign: "center", padding: "32px 0" }}>
-            <div style={{ fontSize: 56, marginBottom: 12 }}>{"\ud83c\udf0a"}</div>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>"🌊"</div>
             <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 28, fontWeight: 700, margin: 0 }}>Booking Confirmed!</h2>
             <p style={{ fontSize: 14, color: "#64748B", marginTop: 10, lineHeight: 1.6 }}>
               Check <strong>{info.email}</strong> for your confirmation and waiver link.
@@ -628,7 +628,7 @@ export default function JetSkiBooking() {
                 background: step === 4 ? "linear-gradient(135deg, #16A34A, #15803D)" : "linear-gradient(135deg, #0EA5E9, #0284C7)",
                 boxShadow: step === 4 ? "0 4px 20px rgba(22,163,74,0.3)" : "0 4px 20px rgba(14,165,233,0.25)",
               }}>
-              {step === 4 ? `Pay $${Math.round(price / 2).toLocaleString()} Deposit \u2192` : "Continue \u2192"}
+              {step === 4 ? `Pay $${Math.round(price / 2).toLocaleString()} Deposit →` : "Continue →"}
             </button>
           </div>
         )}
