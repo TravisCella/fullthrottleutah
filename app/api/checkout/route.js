@@ -6,7 +6,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { packageName, packageTagline, totalPrice, depositAmount, days, startDate, endDate, location, renterName, renterEmail, renterPhone, experience } = body;
+    const { packageName, packageTagline, totalPrice, depositAmount, days, startDate, endDate, location, renterName, renterEmail, renterPhone, experience, waiverSigned, waiverDate } = body;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -37,6 +37,8 @@ export async function POST(request) {
         renter_email: renterEmail,
         renter_phone: renterPhone,
         experience: experience,
+        waiver_signed: waiverSigned || 'false',
+        waiver_signed_date: waiverDate || '',
       },
       success_url: `${request.headers.get('origin')}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.headers.get('origin')}`,
