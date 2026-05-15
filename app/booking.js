@@ -212,6 +212,8 @@ export default function JetSkiBooking() {
           renterEmail: info.email,
           renterPhone: info.phone,
           experience: info.experience,
+          waiverSigned: 'true',
+          waiverDate: new Date().toISOString(),
         }),
       });
       const data = await res.json();
@@ -235,7 +237,8 @@ export default function JetSkiBooking() {
     if (step === 1) return loc;
     if (step === 2) return dates.length >= 1;
     if (step === 3) return info.name && info.email && info.phone && info.experience;
-    if (step === 4) return true;
+    if (step === 4) return Object.values(waiverChecks).every(Boolean) && signature;
+    if (step === 5) return true;
     return false;
   };
 
@@ -575,7 +578,149 @@ export default function JetSkiBooking() {
           </div>
         )}
 
+
+        {/* ── STEP 4: WAIVER ── */}
         {step === 4 && !done && (
+          <div>
+            <h2 style={secTitle}>Liability Waiver</h2>
+            <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5, marginBottom: 16 }}>
+              Please read each section carefully and check each box to acknowledge you understand and agree.
+            </div>
+
+            {[
+              { key: "risks", title: "Acknowledgment of Risks",
+                text: "I understand that operating a personal watercraft involves serious risks including collision, capsizing, drowning, equipment malfunction, and injuries from jet propulsion systems. These risks can result in bodily injury, permanent disability, or death." },
+              { key: "release", title: "Waiver & Release of Liability",
+                text: "To the fullest extent permitted by Utah law, I forever release, waive, and discharge TW Assets LLC, its members, managers, employees, and agents from any and all liability, claims, damages, and costs arising from the rental and use of the PWC and equipment, including claims arising from the negligence of TW Assets LLC. This release does not apply to willful misconduct or gross negligence." },
+              { key: "indemnify", title: "Indemnification",
+                text: "I agree to indemnify, defend, and hold harmless TW Assets LLC from any claims, damages, or expenses brought by any person arising from my rental, use, or transport of the PWC and equipment." },
+              { key: "rules", title: "Renter Obligations",
+                text: "I confirm that: I am at least 18 years old with valid ID. All operators will be 16+ per Utah Code §73-18-15.1. All riders will wear USCG-approved life vests at all times. I will not operate under the influence of alcohol or drugs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable boating laws." },
+              { key: "damage", title: "Damage & Security Deposit",
+                text: "I accept financial responsibility for all damage to, loss of, or theft of the PWC and equipment during the rental period, regardless of fault. A $1,000 security deposit will be collected and refunded upon satisfactory return." },
+              { key: "noInsurance", title: "No Insurance Provided",
+                text: "I understand that TW Assets LLC does not provide collision, liability, or personal injury insurance for renters, passengers, or third parties. I assume all financial risk for any uninsured loss." },
+            ].map(section => (
+              <div key={section.key} style={{
+                marginBottom: 12,
+                border: waiverChecks[section.key] ? "2px solid #16A34A" : "2px solid #E2E8F0",
+                borderRadius: 14, overflow: "hidden",
+                background: waiverChecks[section.key] ? "rgba(22,163,74,0.04)" : "#fff",
+                transition: "all 0.2s",
+              }}>
+                <div style={{ padding: "14px 16px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 6 }}>{section.title}</div>
+                  <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.55 }}>{section.text}</div>
+                  <label style={{
+                    display: "flex", alignItems: "center", gap: 10, marginTop: 10,
+                    cursor: "pointer", fontSize: 13, fontWeight: 600,
+                    color: waiverChecks[section.key] ? "#16A34A" : "#64748B",
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={waiverChecks[section.key]}
+                      onChange={() => setWaiverChecks(prev => ({...prev, [section.key]: !prev[section.key]}))}
+                      style={{ width: 20, height: 20, accentColor: "#16A34A", cursor: "pointer" }}
+                    />
+                    I understand and agree
+                  </label>
+                </div>
+              </div>
+            ))}
+
+            {/* Signature Pad */}
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 8 }}>Your Signature</div>
+              <div style={{ fontSize: 12, color: "#64748B", marginBottom: 10 }}>
+                Draw your signature below using your finger or mouse.
+              </div>
+              <div style={{ position: "relative" }}>
+                <canvas
+                  ref={sigCanvasRef}
+                  width={440}
+                  height={140}
+                  style={{
+                    border: signature ? "2px solid #16A34A" : "2px solid #CBD5E1",
+                    borderRadius: 12, width: "100%", height: 140,
+                    background: "#FAFBFC", cursor: "crosshair",
+                    touchAction: "none",
+                  }}
+                  onPointerDown={(e) => {
+                    const canvas = sigCanvasRef.current;
+                    const rect = canvas.getBoundingClientRect();
+                    const ctx = canvas.getContext("2d");
+                    ctx.beginPath();
+                    ctx.moveTo(
+                      (e.clientX - rect.left) * (canvas.width / rect.width),
+                      (e.clientY - rect.top) * (canvas.height / rect.height)
+                    );
+                    setIsDrawing(true);
+                    canvas.setPointerCapture(e.pointerId);
+                  }}
+                  onPointerMove={(e) => {
+                    if (!isDrawing) return;
+                    const canvas = sigCanvasRef.current;
+                    const rect = canvas.getBoundingClientRect();
+                    const ctx = canvas.getContext("2d");
+                    ctx.strokeStyle = "#0F172A";
+                    ctx.lineWidth = 2.5;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    ctx.lineTo(
+                      (e.clientX - rect.left) * (canvas.width / rect.width),
+                      (e.clientY - rect.top) * (canvas.height / rect.height)
+                    );
+                    ctx.stroke();
+                  }}
+                  onPointerUp={() => {
+                    setIsDrawing(false);
+                    setSignature(sigCanvasRef.current.toDataURL());
+                  }}
+                />
+                {!signature && (
+                  <div style={{
+                    position: "absolute", top: "50%", left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    fontSize: 13, color: "#CBD5E1", fontWeight: 500,
+                    pointerEvents: "none",
+                  }}>
+                    Sign here
+                  </div>
+                )}
+              </div>
+              {signature && (
+                <button
+                  onClick={() => {
+                    const canvas = sigCanvasRef.current;
+                    const ctx = canvas.getContext("2d");
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    setSignature(null);
+                  }}
+                  style={{
+                    marginTop: 8, background: "none", border: "none",
+                    color: "#EF4444", fontSize: 12, fontWeight: 600,
+                    cursor: "pointer", padding: "4px 0",
+                  }}
+                >
+                  Clear signature
+                </button>
+              )}
+            </div>
+
+            <div style={{
+              marginTop: 16, padding: 14, background: "#F0F9FF",
+              borderRadius: 12, border: "1px solid #DBEAFE",
+            }}>
+              <div style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.5 }}>
+                <strong>Signed by:</strong> {info.name} · {info.email}<br/>
+                <strong>Date:</strong> {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}<br/>
+                <strong>IP address and timestamp</strong> will be recorded with this agreement.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 5 && !done && (
           <div>
             <h2 style={secTitle}>Review & Book</h2>
             <div style={{ borderRadius: 14, overflow: "hidden", marginBottom: 16, position: "relative" }}>
@@ -653,7 +798,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setDone(false); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false}); setSignature(null); setDone(false); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
@@ -663,16 +808,16 @@ export default function JetSkiBooking() {
         {!done && (
           <div style={{ display: "flex", gap: 10, marginTop: 24, position: "sticky", bottom: 16, zIndex: 10 }}>
             <button
-              onClick={() => step === 4 ? handleCheckout() : setStep(step + 1)}
+              onClick={() => step === 5 ? handleCheckout() : setStep(step + 1)}
               disabled={!canNext() || paying}
               style={{
                 ...btnPrimary, flex: 1,
                 opacity: (canNext() && !paying) ? 1 : 0.35,
                 cursor: (canNext() && !paying) ? "pointer" : "not-allowed",
-                background: step === 4 ? "linear-gradient(135deg, #16A34A, #15803D)" : "linear-gradient(135deg, #0EA5E9, #0284C7)",
-                boxShadow: step === 4 ? "0 4px 20px rgba(22,163,74,0.3)" : "0 4px 20px rgba(14,165,233,0.25)",
+                background: step === 5 ? "linear-gradient(135deg, #16A34A, #15803D)" : "linear-gradient(135deg, #0EA5E9, #0284C7)",
+                boxShadow: step === 5 ? "0 4px 20px rgba(22,163,74,0.3)" : "0 4px 20px rgba(14,165,233,0.25)",
               }}>
-              {step === 4 ? (paying ? "Redirecting to Stripe..." : `Pay $${Math.round(price / 2).toLocaleString()} Deposit →`) : "Continue →"}
+              {step === 5 ? (paying ? "Redirecting to Stripe..." : `Pay $${Math.round(price / 2).toLocaleString()} Deposit →`) : step === 4 ? "I Agree — Continue →" : "Continue →"}
             </button>
           </div>
         )}
