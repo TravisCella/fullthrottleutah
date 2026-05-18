@@ -194,7 +194,7 @@ export default function JetSkiBooking() {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState(null);
   const [fadeIn, setFadeIn] = useState(true);
-  const [waiverChecks, setWaiverChecks] = useState({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false});
+  const [waiverChecks, setWaiverChecks] = useState({risks: false, release: false, indemnify: false, rules: false, damage: false, fuel: false, noInsurance: false});
   const [signature, setSignature] = useState(null);
   const sigCanvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -659,6 +659,8 @@ export default function JetSkiBooking() {
                 text: "I confirm that: I am at least 18 years old with valid ID. All operators will be 16+ per Utah Code §73-18-15.1. All riders will wear USCG-approved life vests at all times. I will not operate under the influence of alcohol or drugs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable boating laws." },
               { key: "damage", title: "Damage & Security Deposit",
                 text: "I accept financial responsibility for all damage to, loss of, or theft of the PWC and equipment during the rental period, regardless of fault. A $1,000 security deposit will be collected and refunded upon satisfactory return." },
+              { key: "fuel", title: "Fuel Policy",
+                text: "I understand that I am responsible for fueling the watercraft and must return all equipment with a FULL tank of 91-octane gasoline. If equipment is returned with less than a full tank, or fueled with anything other than 91-octane gasoline, I authorize Full Throttle Utah to deduct the actual refueling cost plus a 20% service premium from my security deposit." },
               { key: "noInsurance", title: "No Insurance Provided",
                 text: "I understand that TW Assets LLC does not provide collision, liability, or personal injury insurance for renters, passengers, or third parties. I assume all financial risk for any uninsured loss." },
             ].map(section => (
@@ -847,6 +849,7 @@ export default function JetSkiBooking() {
                 "Arrive at Farmington pickup by 8:00 AM",
                 "Bring valid ID, proof of insurance, 2\" ball hitch",
                 `Pay remaining $${(Math.round(price/2) + pkg.deposit).toLocaleString()} at pickup`,
+                "Return with FULL tank of 91-octane gas (+20% premium if not full)",
               ].map((s, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                   <div style={{
@@ -858,7 +861,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setSmsConsent(false); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false}); setSignature(null); setDone(false); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setSmsConsent(false); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, fuel: false, noInsurance: false}); setSignature(null); setDone(false); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
@@ -896,7 +899,7 @@ const labelSt = {
 };
 const inputSt = {
   width: "100%", padding: "14px 16px", borderRadius: 10,
-  border: "2px solid #E2E8F0", fontSize: 14, color: "#0F172A",
+  border: "2px solid #E2E8F0", fontSize: 16, color: "#0F172A",
   background: "#fff", outline: "none", boxSizing: "border-box",
   fontFamily: "'Outfit', sans-serif",
 };
