@@ -55,6 +55,42 @@ const LOCATIONS = [
   { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️" },
 ];
 
+// ── Holiday surcharges ──
+const HOLIDAYS = [
+  { start: "07-01", end: "07-05", name: "July 4th", premium: 75 },
+  { start: "07-20", end: "07-25", name: "Pioneer Day", premium: 75 },
+  { start: "08-29", end: "09-02", name: "Labor Day", premium: 75 },
+  { start: "05-23", end: "05-27", name: "Memorial Day", premium: 75 },
+];
+
+function getHolidaySurcharge(startDate, endDate) {
+  if (!startDate) return { total: 0, holidays: [] };
+  const end = endDate || startDate;
+  const matched = [];
+  let totalSurcharge = 0;
+
+  const current = new Date(startDate);
+  current.setHours(0,0,0,0);
+  const last = new Date(end);
+  last.setHours(0,0,0,0);
+
+  while (current <= last) {
+    const mmdd = `${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+    for (const h of HOLIDAYS) {
+      if (mmdd >= h.start && mmdd <= h.end) {
+        if (!matched.find(m => m.name === h.name)) {
+          matched.push(h);
+        }
+        totalSurcharge += h.premium;
+        break;
+      }
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return { total: totalSurcharge, holidays: matched };
+}
+
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDayOfMonth(y, m) { return new Date(y, m, 1).getDay(); }
 function isWeekend(d) { const day = new Date(d).getDay(); return day === 0 || day === 5 || day === 6; }
@@ -65,7 +101,7 @@ function calculatePrice(pkg, start, end) {
   const days = daysBetween(start, end);
   if (days === 1) return isWeekend(start) ? pkg.weekend : pkg.weekday;
   let rate;
-  if (days >= 6) rate = pkg.multiDay[6];
+  if (days >= 5) rate = pkg.multiDay[5];
   else if (days >= 4) rate = pkg.multiDay[4];
   else if (days >= 3) rate = pkg.multiDay[3];
   else rate = pkg.multiDay[2];
@@ -138,6 +174,13 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
   const isEnd = (day) => day && selectedDates.length === 2 && new Date(year, month, day).getTime() === selectedDates[1].getTime();
   const isPast = (day) => day && new Date(year, month, day) < today;
 
+  // Check if a day falls on a holiday
+  const isHoliday = (day) => {
+    if (!day) return false;
+    const mmdd = `${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return HOLIDAYS.some(h => mmdd >= h.start && mmdd <= h.end);
+  };
+
   return (
     <div style={{ userSelect: "none" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -158,22 +201,31 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
           const end = isEnd(day);
           const wknd = day ? isWeekend(new Date(year, month, day)) : false;
           const booked = isBooked(day);
+          const holiday = isHoliday(day);
           const unavailable = past || booked;
           return (
             <div key={i} onClick={() => day && !unavailable && onSelectDate(new Date(year, month, day))}
               style={{
                 padding: "10px 0", fontSize: 13, fontWeight: sel ? 700 : 400,
                 cursor: day && !unavailable ? "pointer" : "default",
-                color: !day ? "transparent" : booked ? "#EF4444" : past ? "#D1D5DB" : sel ? "#fff" : wknd ? "#D97706" : "#1E293B",
-                background: sel ? (start || end ? "#0C4A6E" : "rgba(12,74,110,0.12)") : booked ? "rgba(239,68,68,0.06)" : "transparent",
+                color: !day ? "transparent" : booked ? "#EF4444" : past ? "#D1D5DB" : sel ? "#fff" : holiday ? "#DC2626" : wknd ? "#D97706" : "#1E293B",
+                background: sel ? (start || end ? "#0C4A6E" : "rgba(12,74,110,0.12)") : booked ? "rgba(239,68,68,0.06)" : holiday && !past ? "rgba(220,38,38,0.06)" : "transparent",
                 borderRadius: start && end ? 8 : start ? "8px 0 0 8px" : end ? "0 8px 8px 0" : sel ? 0 : 8,
                 transition: "all 0.15s",
                 textDecoration: booked ? "line-through" : "none",
+                position: "relative",
               }}>
               {day || ""}
+              {holiday && day && !past && !booked && (
+                <div style={{ position: "absolute", bottom: 2, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "#DC2626" }} />
+              )}
             </div>
           );
         })}
+      </div>
+      <div style={{ marginTop: 8, display: "flex", gap: 12, justifyContent: "center" }}>
+        <span style={{ fontSize: 10, color: "#D97706", fontWeight: 600 }}>● Weekend (+$50)</span>
+        <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 600 }}>● Holiday (+$75)</span>
       </div>
     </div>
   );
@@ -198,6 +250,7 @@ export default function JetSkiBooking() {
   const sigCanvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [bookedDates, setBookedDates] = useState([]);
+  const [whiteGlove, setWhiteGlove] = useState(false);
 
   useEffect(() => { setFadeIn(false); const t = setTimeout(() => setFadeIn(true), 20); return () => clearTimeout(t); }, [step]);
 
@@ -226,14 +279,14 @@ export default function JetSkiBooking() {
     setPaying(true);
     setPayError(null);
     try {
-      const depositAmt = Math.round(price / 2);
+      const depositAmt = Math.round(totalPrice / 2);
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           packageName: pkg.name,
           packageTagline: pkg.tagline,
-          totalPrice: price,
+          totalPrice: totalPrice,
           depositAmount: depositAmt,
           days: days,
           startDate: formatDate(dates[0]),
@@ -243,6 +296,8 @@ export default function JetSkiBooking() {
           renterEmail: info.email,
           renterPhone: info.phone,
           experience: info.experience,
+          whiteGlove: whiteGlove,
+          holidaySurcharge: holidayInfo.total,
           waiverSigned: 'true',
           waiverDate: new Date().toISOString(),
         }),
@@ -261,7 +316,10 @@ export default function JetSkiBooking() {
   };
 
   const days = dates.length === 2 ? daysBetween(dates[0], dates[1]) : dates.length === 1 ? 1 : 0;
-  const price = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0]) : 0;
+  const basePrice = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0]) : 0;
+  const holidayInfo = dates.length > 0 ? getHolidaySurcharge(dates[0], dates.length === 2 ? dates[1] : dates[0]) : { total: 0, holidays: [] };
+  const whiteGloveFee = whiteGlove ? 200 : 0;
+  const totalPrice = basePrice + holidayInfo.total + whiteGloveFee;
 
   const canNext = () => {
     if (step === 0) return pkg;
@@ -340,6 +398,25 @@ export default function JetSkiBooking() {
               </div>
             </div>
           ))}
+
+          {/* White Glove promo on landing page */}
+          <div style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 16, padding: "16px 20px", marginBottom: 16,
+            backdropFilter: "blur(20px)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <span style={{ fontSize: 20 }}>🤝</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>White Glove Delivery</div>
+                <div style={{ fontSize: 11, color: "#94A3B8" }}>We deliver, launch, and retrieve — $200</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
+              Skip the towing. We bring the watercraft to your lake, launch it, and pick it up when you're done.
+            </div>
+          </div>
 
           <button onClick={() => setStep(0)} style={{
             width: "100%", padding: "18px 24px", borderRadius: 14, border: "none",
@@ -526,9 +603,52 @@ export default function JetSkiBooking() {
                 <div style={{ fontSize: 12, color: "#94A3B8", fontWeight: 600 }}>{l.drive}</div>
               </div>
             ))}
+
+            {/* White Glove Delivery Option */}
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Add-On Service</div>
+              <div
+                onClick={() => setWhiteGlove(!whiteGlove)}
+                style={{
+                  border: whiteGlove ? "2px solid #16A34A" : "2px solid #E2E8F0",
+                  borderRadius: 14, padding: "16px 18px", cursor: "pointer",
+                  background: whiteGlove ? "rgba(22,163,74,0.04)" : "#fff",
+                  transition: "all 0.15s",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 22 }}>🤝</span>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 600 }}>White Glove Delivery</div>
+                      <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>We deliver, launch & retrieve your watercraft</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: whiteGlove ? "#16A34A" : "#0F172A" }}>+$200</div>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: 6,
+                      border: whiteGlove ? "2px solid #16A34A" : "2px solid #CBD5E1",
+                      background: whiteGlove ? "#16A34A" : "#fff",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 14, color: "#fff", fontWeight: 700,
+                      transition: "all 0.15s",
+                    }}>
+                      {whiteGlove ? "✓" : ""}
+                    </div>
+                  </div>
+                </div>
+                {whiteGlove && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(22,163,74,0.15)", fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
+                    We'll deliver your watercraft to the ramp, launch it, and pick it up when you're done. No towing needed — just show up and ride. Available within 45 min of Farmington.
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div style={{ marginTop: 16, padding: 14, background: "#F0F9FF", borderRadius: 12, border: "1px solid #DBEAFE" }}>
               <div style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.5 }}>
-                <strong>Pickup:</strong> Farmington, UT — you tow to the lake with your own vehicle. 2" ball hitch and flat 4-prong light hookup required.
+                <strong>{whiteGlove ? "We deliver to the lake!" : "Pickup:"}</strong> {whiteGlove ? "We'll bring the watercraft to your chosen lake and launch it for you." : "Farmington, UT — you tow to the lake with your own vehicle. 2\" ball hitch and flat 4-prong light hookup required."}
               </div>
             </div>
           </div>
@@ -543,23 +663,42 @@ export default function JetSkiBooking() {
             {days > 0 && (
               <div style={{
                 marginTop: 14, background: "#0C4A6E", borderRadius: 14, padding: "16px 18px",
-                display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff",
+                color: "#fff",
               }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>{days} day{days > 1 ? "s" : ""}</div>
-                  <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
-                    {formatDate(dates[0])}{dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>{days} day{days > 1 ? "s" : ""}</div>
+                    <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
+                      {formatDate(dates[0])}{dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em" }}>${totalPrice.toLocaleString()}</div>
+                    {days > 1 && <div style={{ fontSize: 11, opacity: 0.6 }}>${Math.round(totalPrice/days)}/day avg</div>}
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em" }}>${price.toLocaleString()}</div>
-                  {days > 1 && <div style={{ fontSize: 11, opacity: 0.6 }}>${Math.round(price/days)}/day avg</div>}
-                </div>
+                {/* Price breakdown */}
+                {(holidayInfo.total > 0 || whiteGlove) && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.15)", fontSize: 11, opacity: 0.7 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                      <span>Base rental</span><span>${basePrice.toLocaleString()}</span>
+                    </div>
+                    {holidayInfo.holidays.map(h => (
+                      <div key={h.name} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#FCA5A5" }}>
+                        <span>🎆 {h.name} surcharge</span><span>+${h.premium}/day</span>
+                      </div>
+                    ))}
+                    {whiteGlove && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#86EFAC" }}>
+                        <span>🤝 White glove delivery</span><span>+$200</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 16 }}>
               <span style={{ fontSize: 11, color: "#94A3B8" }}>Tap start → end for multi-day</span>
-              <span style={{ fontSize: 11, color: "#D97706", fontWeight: 600 }}>● = Weekend rate</span>
             </div>
           </div>
         )}
@@ -761,7 +900,7 @@ export default function JetSkiBooking() {
             </div>
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, overflow: "hidden" }}>
               {[
-                { label: "Location", value: `${loc?.emoji} ${loc?.name}`, sub: loc?.drive + " from SLC" },
+                { label: "Location", value: `${loc?.emoji} ${loc?.name}`, sub: whiteGlove ? "🤝 White glove delivery included" : loc?.drive + " from SLC" },
                 { label: "Dates", value: `${formatDate(dates[0])}${dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}`, sub: `${days} day${days > 1 ? "s" : ""} · Pickup 8AM · Return 8PM` },
                 { label: "Renter", value: info.name, sub: `${info.email} · ${info.phone} · ${info.experience}` },
               ].map((row, i) => (
@@ -773,18 +912,20 @@ export default function JetSkiBooking() {
               ))}
               <div style={{ padding: "16px 18px", background: "#F8FAFC" }}>
                 {[
-                  { l: `Rental (${days} day${days > 1 ? "s" : ""})`, v: `$${price.toLocaleString()}` },
+                  { l: `Rental (${days} day${days > 1 ? "s" : ""})`, v: `$${basePrice.toLocaleString()}` },
+                  ...(holidayInfo.holidays.map(h => ({ l: `🎆 ${h.name} surcharge`, v: `+$${h.premium}/day`, color: "#DC2626" }))),
+                  ...(whiteGlove ? [{ l: "🤝 White glove delivery", v: "+$200", color: "#16A34A" }] : []),
                   { l: "Security deposit (refundable)", v: `$${pkg.deposit.toLocaleString()}` },
-                  { l: "Due today (50% booking deposit)", v: `$${Math.round(price / 2).toLocaleString()}`, bold: true },
+                  { l: "Due today (50% booking deposit)", v: `$${Math.round(totalPrice / 2).toLocaleString()}`, bold: true },
                 ].map((r, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: r.bold ? 14 : 13, fontWeight: r.bold ? 700 : 400, color: r.bold ? "#0F172A" : "#64748B" }}>
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: r.bold ? 14 : 13, fontWeight: r.bold ? 700 : 400, color: r.color || (r.bold ? "#0F172A" : "#64748B") }}>
                     <span>{r.l}</span><span style={{ fontWeight: 600 }}>{r.v}</span>
                   </div>
                 ))}
                 <div style={{ borderTop: "2px solid #CBD5E1", paddingTop: 12, marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 14, fontWeight: 700 }}>Due at pickup</span>
                   <span style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                    ${(Math.round(price / 2) + pkg.deposit).toLocaleString()}
+                    ${(Math.round(totalPrice / 2) + pkg.deposit).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -811,9 +952,9 @@ export default function JetSkiBooking() {
               <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Next Steps</div>
               {[
                 "Sign the digital waiver (link in your email)",
-                "Arrive at Farmington pickup by 8:00 AM",
-                "Bring valid ID, proof of insurance, 2\" ball hitch",
-                `Pay remaining $${(Math.round(price/2) + pkg.deposit).toLocaleString()} at pickup`,
+                whiteGlove ? "We'll deliver to the lake — just show up and ride!" : "Arrive at Farmington pickup by 8:00 AM",
+                "Bring valid ID" + (whiteGlove ? "" : ", proof of insurance, 2\" ball hitch"),
+                `Pay remaining $${(Math.round(totalPrice/2) + pkg.deposit).toLocaleString()} at ${whiteGlove ? "delivery" : "pickup"}`,
               ].map((s, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                   <div style={{
@@ -825,7 +966,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false}); setSignature(null); setDone(false); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false}); setSignature(null); setDone(false); setWhiteGlove(false); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
@@ -844,7 +985,7 @@ export default function JetSkiBooking() {
                 background: step === 5 ? "linear-gradient(135deg, #16A34A, #15803D)" : "linear-gradient(135deg, #0EA5E9, #0284C7)",
                 boxShadow: step === 5 ? "0 4px 20px rgba(22,163,74,0.3)" : "0 4px 20px rgba(14,165,233,0.25)",
               }}>
-              {step === 5 ? (paying ? "Redirecting to Stripe..." : `Pay $${Math.round(price / 2).toLocaleString()} Deposit →`) : step === 4 ? "I Agree — Continue →" : "Continue →"}
+              {step === 5 ? (paying ? "Redirecting to Stripe..." : `Pay $${Math.round(totalPrice / 2).toLocaleString()} Deposit →`) : step === 4 ? "I Agree — Continue →" : "Continue →"}
             </button>
           </div>
         )}
