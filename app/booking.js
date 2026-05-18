@@ -633,7 +633,7 @@ export default function JetSkiBooking() {
             <div style={{ marginTop: 14, background: "#FEF3C7", borderRadius: 12, padding: 14, display: "flex", gap: 10 }}>
               <span style={{ fontSize: 18 }}>📋</span>
               <div style={{ fontSize: 12, color: "#92400E", lineHeight: 1.5 }}>
-                <strong>Digital waiver required.</strong> After booking you'll receive a Smartwaiver link. All riders must sign before pickup.
+                <strong>Digital waiver next.</strong> You'll review and sign the rental waiver in the next step. Additional riders must also sign at pickup.
               </div>
             </div>
           </div>
@@ -839,12 +839,11 @@ export default function JetSkiBooking() {
             <div style={{ fontSize: 56, marginBottom: 12 }}>🌊</div>
             <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 28, fontWeight: 700, margin: 0 }}>Booking Confirmed!</h2>
             <p style={{ fontSize: 14, color: "#64748B", marginTop: 10, lineHeight: 1.6 }}>
-              Check <strong>{info.email}</strong> for your confirmation and waiver link.
+              Confirmation sent to <strong>{info.email}</strong> and a text to your phone.
             </p>
             <div style={{ marginTop: 24, background: "#F8FAFC", borderRadius: 14, padding: 20, textAlign: "left" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Next Steps</div>
               {[
-                "Sign the digital waiver (link in your email)",
                 "Arrive at Farmington pickup by 8:00 AM",
                 "Bring valid ID, proof of insurance, 2\" ball hitch",
                 `Pay remaining $${(Math.round(price/2) + pkg.deposit).toLocaleString()} at pickup`,
