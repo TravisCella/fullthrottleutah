@@ -23,7 +23,7 @@ export default function SuccessPage() {
           Booking Confirmed!
         </h1>
         <p style={{ fontSize: 15, color: '#64748B', marginTop: 12, lineHeight: 1.6 }}>
-          Your deposit has been received. Check your email for a confirmation and your digital waiver link.
+          Your deposit has been received and your waiver is signed. A confirmation email and SMS are on the way with all your rental details.
         </p>
 
         <div style={{
@@ -36,9 +36,9 @@ export default function SuccessPage() {
             Before Your Rental
           </div>
           {[
-            { num: '1', text: 'Sign the digital waiver (link in your confirmation email)' },
-            { num: '2', text: 'Arrive at Farmington pickup point by 8:00 AM on your rental day' },
-            { num: '3', text: "Bring valid driver's license, proof of insurance, and a 2\" ball hitch" },
+            { num: '1', text: 'Arrive at Farmington pickup point by 8:00 AM on your rental day' },
+            { num: '2', text: "Bring valid driver's license, proof of insurance, and a 2\" ball hitch" },
+            { num: '3', text: 'Bring a vehicle with flat 4-prong light hookup for the trailer' },
             { num: '4', text: 'Pay remaining balance + $1,000 security deposit at pickup' },
           ].map(s => (
             <div key={s.num} style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
