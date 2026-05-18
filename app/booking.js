@@ -12,12 +12,17 @@ const IMAGES = {
   sparkOverhead: "/images/spark-overhead.png",
   sparkProfile: "/images/spark-profile.png",
   gtxHero: "/images/gtx-hero.png",
+  rzrHero: "/images/rzr-hero.jpg",
+  rzrSide: "/images/rzr-side.jpg",
+  rzrInterior: "/images/rzr-interior.jpg",
+  rzrAction: "/images/rzr-action.jpg",
 };
 
 const PACKAGES = [
   {
     id: "spark-duo",
     name: "Spark Duo",
+    type: "pwc",
     tagline: "2 × 2014 Sea-Doo Spark 900 ACE HO",
     description: "Two nimble, lightweight Sparks on a single trailer. Quick, fun, and easy to ride — perfect for cruising any Utah reservoir.",
     includes: ["2 Sea-Doo Spark 900 ACE HO", "Single trailer", "4 life preservers", "2 anchoring systems", "Safety flags"],
@@ -33,6 +38,7 @@ const PACKAGES = [
   {
     id: "gtx-duo",
     name: "GTX Limited Duo",
+    type: "pwc",
     tagline: "2 × 2026 Sea-Doo GTX Limited 325",
     description: "The ultimate luxury ride. 325 HP, 10.25\" touchscreen, premium Bluetooth audio, massive swim platform. This is first class on the water.",
     includes: ["2 Sea-Doo GTX Limited 325 HP", "Single trailer", "4 life preservers", "2 anchoring systems", "Safety flags", "Bluetooth audio"],
@@ -45,14 +51,39 @@ const PACKAGES = [
     accent: "#B8860B",
     accentLight: "rgba(184,134,11,0.08)",
   },
+  {
+    id: "rzr-premium",
+    name: "RZR Premium 4-Seater",
+    type: "utv",
+    tagline: "2017 Polaris RZR EPS 1000 — Premium Equipped",
+    description: "Premium 4-seater UTV loaded with upgrades. Harman Kardon Stage 5 audio, full doors, windshield, aftermarket tires, roof rack, toolbox. Hauled on a double-axle trailer.",
+    includes: ["2017 Polaris RZR EPS 1000 4-seater", "Big Bubba double-axle trailer", "Harman Kardon Stage 5 audio", "Full doors + windshield", "Aftermarket tires", "Roof rack + toolbox", "4 helmets"],
+    weekday: 425,
+    weekend: 495,
+    multiDay: { 2: 395, 3: 365, 4: 325, 6: 295 },
+    deposit: 1500,
+    heroImg: "rzrHero",
+    galleryImgs: ["rzrSide", "rzrInterior", "rzrAction"],
+    accent: "#EA580C",
+    accentLight: "rgba(234,88,12,0.08)",
+  },
 ];
 
-const LOCATIONS = [
+const LOCATIONS_PWC = [
   { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️" },
   { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲" },
   { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌" },
   { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎" },
   { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️" },
+];
+
+const LOCATIONS_UTV = [
+  { id: "moab", name: "Moab Trail System", region: "Southeast Utah", drive: "~4hr", emoji: "🪨" },
+  { id: "sand-hollow", name: "Sand Hollow State Park", region: "Southwest Utah", drive: "~4.5hr", emoji: "🏜️" },
+  { id: "american-fork", name: "American Fork Canyon", region: "Wasatch Front", drive: "~45min", emoji: "🌲" },
+  { id: "wasatch", name: "Wasatch Mountain Trails", region: "Heber Valley", drive: "~1hr", emoji: "⛰️" },
+  { id: "five-mile", name: "Five Mile Pass / Cedar Fort", region: "West Desert", drive: "~1hr", emoji: "🏞️" },
+  { id: "knolls", name: "Knolls Recreation Area", region: "West Desert", drive: "~1.5hr", emoji: "🏝️" },
 ];
 
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
@@ -372,7 +403,7 @@ export default function JetSkiBooking() {
               We Serve
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {LOCATIONS.map(l => (
+              {[...LOCATIONS_PWC, ...LOCATIONS_UTV].map(l => (
                 <span key={l.id} style={{
                   fontSize: 12, color: "#94A3B8", background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20,
@@ -512,8 +543,8 @@ export default function JetSkiBooking() {
 
         {step === 1 && !done && (
           <div>
-            <h2 style={secTitle}>Pick Your Lake</h2>
-            {LOCATIONS.map(l => (
+            <h2 style={secTitle}>{pkg?.type === "utv" ? "Pick Your Trail" : "Pick Your Lake"}</h2>
+            {(pkg?.type === "utv" ? LOCATIONS_UTV : LOCATIONS_PWC).map(l => (
               <div key={l.id} onClick={() => setLoc(l)} style={{
                 border: loc?.id === l.id ? "2px solid #0C4A6E" : "2px solid #E2E8F0",
                 borderRadius: 14, padding: "16px 18px", marginBottom: 10, cursor: "pointer",
@@ -533,7 +564,7 @@ export default function JetSkiBooking() {
             ))}
             <div style={{ marginTop: 16, padding: 14, background: "#F0F9FF", borderRadius: 12, border: "1px solid #DBEAFE" }}>
               <div style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.5 }}>
-                <strong>Pickup:</strong> Farmington, UT — you tow to the lake with your own vehicle. 2" ball hitch and flat 4-prong light hookup required.
+                <strong>Pickup:</strong> Farmington, UT — you tow to the {pkg?.type === "utv" ? "trailhead" : "lake"} with your own vehicle. 2" ball hitch and flat 4-prong light hookup required.
               </div>
             </div>
           </div>
@@ -586,7 +617,7 @@ export default function JetSkiBooking() {
               </div>
             ))}
             <div style={{ marginBottom: 14 }}>
-              <label style={labelSt}>Jet Ski Experience</label>
+              <label style={labelSt}>{pkg?.type === "utv" ? "UTV / Off-Road Experience" : "Jet Ski Experience"}</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {["First timer", "A few times", "Experienced", "Expert"].map(lv => (
                   <div key={lv} onClick={() => setInfo({ ...info, experience: lv })} style={{
@@ -648,7 +679,22 @@ export default function JetSkiBooking() {
               Please read each section carefully and check each box to acknowledge you understand and agree.
             </div>
 
-            {[
+            {(pkg?.type === "utv" ? [
+              { key: "risks", title: "Acknowledgment of Risks",
+                text: "I understand that operating a UTV/side-by-side off-road vehicle involves serious risks including rollover, collision, ejection, mechanical failure, terrain hazards, dust inhalation, and injuries from rocks, debris, and other vehicles. These risks can result in bodily injury, permanent disability, or death. I acknowledge that off-road driving carries greater inherent risk than on-road driving." },
+              { key: "release", title: "Waiver & Release of Liability",
+                text: "To the fullest extent permitted by Utah law, I forever release, waive, and discharge TW Assets LLC, its members, managers, employees, and agents from any and all liability, claims, damages, and costs arising from the rental and use of the UTV and equipment, including claims arising from the negligence of TW Assets LLC. This release does not apply to willful misconduct or gross negligence." },
+              { key: "indemnify", title: "Indemnification",
+                text: "I agree to indemnify, defend, and hold harmless TW Assets LLC from any claims, damages, or expenses brought by any person arising from my rental, use, or transport of the UTV and equipment." },
+              { key: "rules", title: "Renter Obligations",
+                text: "I confirm that: I am at least 25 years old with a valid driver's license. All operators must be 18+ with valid driver's license. All occupants will wear seatbelts and DOT-approved helmets at all times. I will not operate under the influence of alcohol or drugs. I will stay on designated trails and obey all posted speed limits and signs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable OHV laws and Utah State Parks regulations." },
+              { key: "damage", title: "Damage & Security Deposit",
+                text: "I accept financial responsibility for all damage to, loss of, or theft of the UTV and equipment during the rental period, regardless of fault. A $1,500 security deposit will be collected and refunded upon satisfactory return. Damage from rollovers, suspension stress, frame damage, clutch wear from improper use, and aftermarket component damage (tires, audio, doors, windshield) is renter's responsibility." },
+              { key: "fuel", title: "Fuel Policy",
+                text: "I understand that I am responsible for fueling the UTV and must return it with a FULL tank of 91-octane gasoline. If returned with less than a full tank, or fueled with anything other than 91-octane gasoline, I authorize Full Throttle Utah to deduct the actual refueling cost plus a 20% service premium from my security deposit." },
+              { key: "noInsurance", title: "No Insurance Provided",
+                text: "I understand that TW Assets LLC does not provide collision, liability, or personal injury insurance for renters, passengers, or third parties. I assume all financial risk for any uninsured loss. UTVs are typically not covered by standard auto policies — I am responsible for understanding my own coverage." },
+            ] : [
               { key: "risks", title: "Acknowledgment of Risks",
                 text: "I understand that operating a personal watercraft involves serious risks including collision, capsizing, drowning, equipment malfunction, and injuries from jet propulsion systems. These risks can result in bodily injury, permanent disability, or death." },
               { key: "release", title: "Waiver & Release of Liability",
@@ -663,7 +709,7 @@ export default function JetSkiBooking() {
                 text: "I understand that I am responsible for fueling the watercraft and must return all equipment with a FULL tank of 91-octane gasoline. If equipment is returned with less than a full tank, or fueled with anything other than 91-octane gasoline, I authorize Full Throttle Utah to deduct the actual refueling cost plus a 20% service premium from my security deposit." },
               { key: "noInsurance", title: "No Insurance Provided",
                 text: "I understand that TW Assets LLC does not provide collision, liability, or personal injury insurance for renters, passengers, or third parties. I assume all financial risk for any uninsured loss." },
-            ].map(section => (
+            ]).map(section => (
               <div key={section.key} style={{
                 marginBottom: 12,
                 border: waiverChecks[section.key] ? "2px solid #16A34A" : "2px solid #E2E8F0",
