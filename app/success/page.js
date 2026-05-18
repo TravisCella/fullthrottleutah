@@ -39,7 +39,8 @@ export default function SuccessPage() {
             { num: '1', text: 'Arrive at Farmington pickup point by 8:00 AM on your rental day' },
             { num: '2', text: "Bring valid driver's license, proof of insurance, and a 2\" ball hitch" },
             { num: '3', text: 'Bring a vehicle with flat 4-prong light hookup for the trailer' },
-            { num: '4', text: 'Pay remaining balance + $1,000 security deposit at pickup' },
+            { num: '4', text: 'Pay remaining balance + security deposit at pickup (see confirmation email)' },
+            { num: '5', text: 'Return equipment with a FULL tank of 91-octane gas (+20% premium if not full)' },
           ].map(s => (
             <div key={s.num} style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
               <div style={{
