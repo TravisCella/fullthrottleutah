@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { addBooking } from '../../../lib/sheets';
 import { createBookingEvent } from '../../../lib/calendar';
+import { sendSMS, buildBookingConfirmationSMS } from '../../../lib/sms';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -113,6 +114,29 @@ export async function POST(request) {
         console.log('Calendar event created:', booking.booking_id);
       } catch (calErr) {
         console.error('Calendar error (non-fatal):', calErr.message);
+      }
+
+      // Send SMS confirmation to renter
+      try {
+        if (booking.renter_phone) {
+          const smsBody = buildBookingConfirmationSMS(booking);
+          await sendSMS(booking.renter_phone, smsBody);
+          console.log('SMS sent to renter:', booking.renter_phone);
+        }
+      } catch (smsErr) {
+        console.error('SMS error (non-fatal):', smsErr.message);
+      }
+
+      // Send SMS alert to owner
+      try {
+        const ownerPhone = process.env.OWNER_PHONE_NUMBER;
+        if (ownerPhone) {
+          const ownerMsg = `🛎️ New booking!\n${booking.package}\n${booking.location}\n${booking.start_date}\nRenter: ${booking.renter_name} (${booking.renter_phone})\nDeposit: $${booking.deposit_paid}`;
+          await sendSMS(ownerPhone, ownerMsg);
+          console.log('SMS sent to owner:', ownerPhone);
+        }
+      } catch (smsErr) {
+        console.error('Owner SMS error (non-fatal):', smsErr.message);
       }
 
       // Send confirmation email
