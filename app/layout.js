@@ -1,3 +1,5 @@
+import { Analytics } from '@vercel/analytics/react'
+
 export const metadata = {
   title: 'Full Throttle Utah | Premium Jet Ski & Powersport Rentals',
   description: 'Premium Sea-Doo jet ski, UTV, and powersport rentals across every major Utah destination. Book online in 2 minutes. Pickup from Farmington, UT.',
@@ -9,7 +11,7 @@ export const metadata = {
     siteName: 'Full Throttle Utah',
     images: [
       {
-        url: '/icon-512.png',
+        url: '/images/icon-512.png',
         width: 512,
         height: 512,
         alt: 'Full Throttle Utah',
@@ -22,17 +24,17 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'Full Throttle Utah | Premium Jet Ski Rentals',
     description: 'Premium Sea-Doo jet ski rentals across Utah. Pickup from Farmington.',
-    images: ['/icon-512.png'],
+    images: ['/images/icon-512.png'],
   },
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
-      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/images/favicon.ico', sizes: 'any' },
+      { url: '/images/icon.png', type: 'image/png', sizes: '32x32' },
+      { url: '/images/icon-192.png', type: 'image/png', sizes: '192x192' },
     ],
-    apple: '/apple-icon.png',
+    apple: '/images/apple-icon.png',
   },
-  manifest: '/manifest.json',
+  manifest: '/images/manifest.json',
 }
 
 export const viewport = {
@@ -46,7 +48,10 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, padding: 0, WebkitTextSizeAdjust: '100%' }}>{children}</body>
+      <body style={{ margin: 0, padding: 0, WebkitTextSizeAdjust: '100%' }}>
+        {children}
+        <Analytics />
+      </body>
     </html>
   )
 }
