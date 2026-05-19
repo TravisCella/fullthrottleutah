@@ -27,11 +27,8 @@ export const metadata = {
     images: ['/images/icon-512.png'],
   },
   icons: {
-    icon: [
-      { url: '/images/favicon.ico', sizes: 'any' },
-      { url: '/images/icon.png', type: 'image/png', sizes: '32x32' },
-      { url: '/images/icon-192.png', type: 'image/png', sizes: '192x192' },
-    ],
+    icon: '/images/favicon.ico',
+    shortcut: '/images/favicon.ico',
     apple: '/images/apple-icon.png',
   },
   manifest: '/images/manifest.json',
@@ -48,6 +45,14 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        {/* Explicit favicon links for maximum browser compatibility */}
+        <link rel="icon" href="/images/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/images/icon.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/images/icon-192.png" />
+        <link rel="apple-touch-icon" href="/images/apple-icon.png" />
+        <link rel="manifest" href="/images/manifest.json" />
+      </head>
       <body style={{ margin: 0, padding: 0, WebkitTextSizeAdjust: '100%' }}>
         {children}
         <Analytics />
