@@ -92,15 +92,58 @@ function isWeekend(d) { const day = new Date(d).getDay(); return day === 0 || da
 function formatDate(d) { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
 function daysBetween(a, b) { return Math.round((b - a) / 864e5) + 1; }
 
-function calculatePrice(pkg, start, end) {
+// Find any premium that applies to a given date. Returns null if no premium applies.
+function getPremiumForDate(date, premiums) {
+  if (!premiums || premiums.length === 0) return null;
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  for (const p of premiums) {
+    const start = new Date(p.start); start.setHours(0, 0, 0, 0);
+    const end = new Date(p.end || p.start); end.setHours(0, 0, 0, 0);
+    if (d >= start && d <= end) return p;
+  }
+  return null;
+}
+
+// Apply a premium (if any) to a base rate. Multiplier and flatAdd are combined.
+function applyPremium(baseRate, premium) {
+  if (!premium) return baseRate;
+  const multiplier = premium.multiplier || 1;
+  const flatAdd = premium.flatAdd || 0;
+  return Math.round(baseRate * multiplier + flatAdd);
+}
+
+// Compute the price for a specific day, factoring in:
+// - Whether it's weekday vs weekend
+// - Multi-day base rate (depends on TOTAL trip length)
+// - Any holiday/event premium applied to that specific date
+function priceForDay(date, totalDays, pkg, premiums) {
+  let base;
+  if (totalDays === 1) {
+    base = isWeekend(date) ? pkg.weekend : pkg.weekday;
+  } else if (totalDays >= 6) {
+    base = pkg.multiDay[6];
+  } else if (totalDays >= 4) {
+    base = pkg.multiDay[4];
+  } else if (totalDays >= 3) {
+    base = pkg.multiDay[3];
+  } else {
+    base = pkg.multiDay[2];
+  }
+  const premium = getPremiumForDate(date, premiums);
+  return applyPremium(base, premium);
+}
+
+function calculatePrice(pkg, start, end, premiums = []) {
   const days = daysBetween(start, end);
-  if (days === 1) return isWeekend(start) ? pkg.weekend : pkg.weekday;
-  let rate;
-  if (days >= 6) rate = pkg.multiDay[6];
-  else if (days >= 4) rate = pkg.multiDay[4];
-  else if (days >= 3) rate = pkg.multiDay[3];
-  else rate = pkg.multiDay[2];
-  return rate * days;
+  // Walk each day of the trip and sum the day rates (with premiums applied per-day)
+  let total = 0;
+  const startMs = new Date(start).getTime();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(startMs + i * 864e5);
+    total += priceForDay(d, days, pkg, premiums);
+  }
+  return total;
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -139,7 +182,7 @@ function ImageGallery({ images: imgKeys }) {
   );
 }
 
-function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates, pkg }) {
+function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates, pkg, premiumDates }) {
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
   const today = new Date(); today.setHours(0,0,0,0);
@@ -169,11 +212,16 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
   const isEnd = (day) => day && selectedDates.length === 2 && new Date(year, month, day).getTime() === selectedDates[1].getTime();
   const isPast = (day) => day && new Date(year, month, day) < today;
 
-  // Base rate for a given day: weekend gets weekend rate, weekday gets weekday rate
-  const baseRate = (day) => {
-    if (!day || !pkg) return null;
+  // Day rate with premium applied if any premium matches
+  const dayRate = (day) => {
+    if (!day || !pkg) return { rate: null, hasPremium: false };
     const date = new Date(year, month, day);
-    return isWeekend(date) ? pkg.weekend : pkg.weekday;
+    const base = isWeekend(date) ? pkg.weekend : pkg.weekday;
+    const premium = getPremiumForDate(date, premiumDates);
+    if (premium) {
+      return { rate: applyPremium(base, premium), hasPremium: true };
+    }
+    return { rate: base, hasPremium: false };
   };
 
   return (
@@ -197,29 +245,48 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
           const wknd = day ? isWeekend(new Date(year, month, day)) : false;
           const booked = isBooked(day);
           const unavailable = past || booked;
-          const rate = baseRate(day);
+          const { rate, hasPremium } = dayRate(day);
           const showPrice = day && !past && !booked && rate;
+          // Color: selected = white; booked = red; premium = bold red; weekend = orange; weekday = gray
+          const priceColor = sel
+            ? "rgba(255,255,255,0.95)"
+            : hasPremium ? "#DC2626"
+            : wknd ? "#D97706"
+            : "#94A3B8";
+          const dateColor = !day ? "transparent"
+            : booked ? "#EF4444"
+            : past ? "#D1D5DB"
+            : sel ? "#fff"
+            : hasPremium ? "#DC2626"
+            : wknd ? "#D97706"
+            : "#1E293B";
           return (
             <div key={i} onClick={() => day && !unavailable && onSelectDate(new Date(year, month, day))}
               style={{
-                padding: "6px 0 5px", minHeight: 52,
+                padding: "6px 0 5px", minHeight: 52, position: "relative",
                 cursor: day && !unavailable ? "pointer" : "default",
-                color: !day ? "transparent" : booked ? "#EF4444" : past ? "#D1D5DB" : sel ? "#fff" : wknd ? "#D97706" : "#1E293B",
+                color: dateColor,
                 background: sel ? (start || end ? "#0C4A6E" : "rgba(12,74,110,0.12)") : booked ? "rgba(239,68,68,0.06)" : "transparent",
                 borderRadius: start && end ? 8 : start ? "8px 0 0 8px" : end ? "0 8px 8px 0" : sel ? 0 : 8,
                 transition: "all 0.15s",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
               }}>
+              {hasPremium && !booked && !past && (
+                <div style={{
+                  position: "absolute", top: 2, right: 4, fontSize: 8, lineHeight: 1,
+                  color: sel ? "rgba(255,255,255,0.9)" : "#DC2626",
+                }}>★</div>
+              )}
               <div style={{
-                fontSize: 14, fontWeight: sel ? 700 : 500, lineHeight: 1,
+                fontSize: 14, fontWeight: sel ? 700 : (hasPremium ? 600 : 500), lineHeight: 1,
                 textDecoration: booked ? "line-through" : "none",
               }}>
                 {day || ""}
               </div>
               {showPrice && (
                 <div style={{
-                  fontSize: 10, fontWeight: 600,
-                  color: sel ? "rgba(255,255,255,0.95)" : wknd ? "#D97706" : "#94A3B8",
+                  fontSize: 10, fontWeight: hasPremium ? 700 : 600,
+                  color: priceColor,
                   letterSpacing: "-0.02em", lineHeight: 1,
                 }}>
                   ${rate}
@@ -253,16 +320,23 @@ export default function JetSkiBooking() {
   const sigCanvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [bookedDates, setBookedDates] = useState([]);
+  const [premiumDates, setPremiumDates] = useState([]);
 
   useEffect(() => { setFadeIn(false); const t = setTimeout(() => setFadeIn(true), 20); return () => clearTimeout(t); }, [step]);
 
-  // Fetch booked dates when package is selected
+  // Fetch booked dates and premium dates when package is selected
   useEffect(() => {
     if (pkg) {
       fetch(`/api/bookings?package=${encodeURIComponent(pkg.name)}`)
         .then(r => r.json())
-        .then(data => setBookedDates(data.bookedDates || []))
-        .catch(() => setBookedDates([]));
+        .then(data => {
+          setBookedDates(data.bookedDates || []);
+          setPremiumDates(data.premiumDates || []);
+        })
+        .catch(() => {
+          setBookedDates([]);
+          setPremiumDates([]);
+        });
     }
   }, [pkg]);
 
@@ -316,7 +390,7 @@ export default function JetSkiBooking() {
   };
 
   const days = dates.length === 2 ? daysBetween(dates[0], dates[1]) : dates.length === 1 ? 1 : 0;
-  const price = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0]) : 0;
+  const price = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0], premiumDates) : 0;
 
   const canNext = () => {
     if (step === 0) return pkg;
@@ -597,7 +671,7 @@ export default function JetSkiBooking() {
           <div>
             <h2 style={secTitle}>Select Your Dates</h2>
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
-              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} />
+              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} premiumDates={premiumDates} />
             </div>
             {days > 0 && (
               <div style={{
@@ -620,6 +694,11 @@ export default function JetSkiBooking() {
               <div style={{ fontSize: 11, color: "#64748B", textAlign: "center" }}>
                 <span style={{ color: "#1E293B", fontWeight: 600 }}>${pkg?.weekday}</span> weekday · <span style={{ color: "#D97706", fontWeight: 600 }}>${pkg?.weekend}</span> weekend · Multi-day discounts apply automatically
               </div>
+              {premiumDates.length > 0 && (
+                <div style={{ fontSize: 10, color: "#DC2626", textAlign: "center", fontWeight: 500 }}>
+                  ★ = Holiday/premium pricing
+                </div>
+              )}
               <div style={{ fontSize: 10, color: "#94A3B8", textAlign: "center" }}>
                 Tap start → end for multi-day rentals
               </div>
