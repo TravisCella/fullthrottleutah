@@ -139,7 +139,7 @@ function ImageGallery({ images: imgKeys }) {
   );
 }
 
-function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates }) {
+function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates, pkg }) {
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
   const today = new Date(); today.setHours(0,0,0,0);
@@ -169,6 +169,13 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
   const isEnd = (day) => day && selectedDates.length === 2 && new Date(year, month, day).getTime() === selectedDates[1].getTime();
   const isPast = (day) => day && new Date(year, month, day) < today;
 
+  // Base rate for a given day: weekend gets weekend rate, weekday gets weekday rate
+  const baseRate = (day) => {
+    if (!day || !pkg) return null;
+    const date = new Date(year, month, day);
+    return isWeekend(date) ? pkg.weekend : pkg.weekday;
+  };
+
   return (
     <div style={{ userSelect: "none" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -190,18 +197,34 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
           const wknd = day ? isWeekend(new Date(year, month, day)) : false;
           const booked = isBooked(day);
           const unavailable = past || booked;
+          const rate = baseRate(day);
+          const showPrice = day && !past && !booked && rate;
           return (
             <div key={i} onClick={() => day && !unavailable && onSelectDate(new Date(year, month, day))}
               style={{
-                padding: "10px 0", fontSize: 13, fontWeight: sel ? 700 : 400,
+                padding: "6px 0 5px", minHeight: 52,
                 cursor: day && !unavailable ? "pointer" : "default",
                 color: !day ? "transparent" : booked ? "#EF4444" : past ? "#D1D5DB" : sel ? "#fff" : wknd ? "#D97706" : "#1E293B",
                 background: sel ? (start || end ? "#0C4A6E" : "rgba(12,74,110,0.12)") : booked ? "rgba(239,68,68,0.06)" : "transparent",
                 borderRadius: start && end ? 8 : start ? "8px 0 0 8px" : end ? "0 8px 8px 0" : sel ? 0 : 8,
                 transition: "all 0.15s",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+              }}>
+              <div style={{
+                fontSize: 14, fontWeight: sel ? 700 : 500, lineHeight: 1,
                 textDecoration: booked ? "line-through" : "none",
               }}>
-              {day || ""}
+                {day || ""}
+              </div>
+              {showPrice && (
+                <div style={{
+                  fontSize: 10, fontWeight: 600,
+                  color: sel ? "rgba(255,255,255,0.95)" : wknd ? "#D97706" : "#94A3B8",
+                  letterSpacing: "-0.02em", lineHeight: 1,
+                }}>
+                  ${rate}
+                </div>
+              )}
             </div>
           );
         })}
@@ -574,7 +597,7 @@ export default function JetSkiBooking() {
           <div>
             <h2 style={secTitle}>Select Your Dates</h2>
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
-              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} />
+              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} />
             </div>
             {days > 0 && (
               <div style={{
@@ -593,9 +616,13 @@ export default function JetSkiBooking() {
                 </div>
               </div>
             )}
-            <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 16 }}>
-              <span style={{ fontSize: 11, color: "#94A3B8" }}>Tap start → end for multi-day</span>
-              <span style={{ fontSize: 11, color: "#D97706", fontWeight: 600 }}>● = Weekend rate</span>
+            <div style={{ marginTop: 10, padding: "10px 12px", background: "#F8FAFC", borderRadius: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ fontSize: 11, color: "#64748B", textAlign: "center" }}>
+                <span style={{ color: "#1E293B", fontWeight: 600 }}>${pkg?.weekday}</span> weekday · <span style={{ color: "#D97706", fontWeight: 600 }}>${pkg?.weekend}</span> weekend · Multi-day discounts apply automatically
+              </div>
+              <div style={{ fontSize: 10, color: "#94A3B8", textAlign: "center" }}>
+                Tap start → end for multi-day rentals
+              </div>
             </div>
           </div>
         )}
