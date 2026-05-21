@@ -1,6 +1,7 @@
 'use client';
 
-import FullThrottleChat from './chat';
+import FullThrottleChat from './Chat';
+
 
 export default function ChatWrapper() {
   return <FullThrottleChat />;
