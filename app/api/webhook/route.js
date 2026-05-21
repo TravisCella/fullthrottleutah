@@ -52,6 +52,13 @@ async function sendConfirmationEmail(booking) {
                 </ol>
               </div>
 
+              <div style="background: #FEE2E2; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <strong style="color: #991B1B;">⛽ Fuel Policy:</strong>
+                <p style="color: #991B1B; margin: 8px 0 0 0; font-size: 14px; line-height: 1.5;">
+                  Watercraft must be returned with a <strong>FULL tank of 91-octane gasoline</strong>. If returned with less than full, or fueled with lower octane, we will charge the actual refueling cost plus a 20% service premium, deducted from your security deposit.
+                </p>
+              </div>
+
               <p style="font-size: 13px; color: #64748b;">Questions? Reply to this email or call/text us.</p>
               <p style="font-size: 13px; color: #64748b;">See you on the water!</p>
               <p><strong>Full Throttle Utah</strong><br/>TW Assets LLC · Farmington, UT</p>
@@ -102,6 +109,7 @@ export async function POST(request) {
         renter_email: meta.renter_email || session.customer_email || '',
         renter_phone: meta.renter_phone || '',
         experience: meta.experience || '',
+        sms_consent: meta.sms_consent === 'true',
       };
 
       // Write to Google Sheets
@@ -116,12 +124,14 @@ export async function POST(request) {
         console.error('Calendar error (non-fatal):', calErr.message);
       }
 
-      // Send SMS confirmation to renter
+      // Send SMS confirmation to renter — only if they opted in (TCR compliance)
       try {
-        if (booking.renter_phone) {
+        if (booking.renter_phone && booking.sms_consent) {
           const smsBody = buildBookingConfirmationSMS(booking);
           await sendSMS(booking.renter_phone, smsBody);
           console.log('SMS sent to renter:', booking.renter_phone);
+        } else if (booking.renter_phone) {
+          console.log('SMS not sent — renter did not opt in:', booking.renter_phone);
         }
       } catch (smsErr) {
         console.error('SMS error (non-fatal):', smsErr.message);
