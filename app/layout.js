@@ -57,6 +57,10 @@ export default function RootLayout({ children }) {
       <body style={{ margin: 0, padding: 0, WebkitTextSizeAdjust: '100%' }}>
         {children}
         <Analytics />
+                  {children}
+        <FullThrottleChat />
+        <Analytics />
+
       </body>
     </html>
   )
