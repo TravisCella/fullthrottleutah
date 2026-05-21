@@ -374,6 +374,7 @@ export default function JetSkiBooking() {
           experience: info.experience,
           waiverSigned: 'true',
           waiverDate: new Date().toISOString(),
+          smsConsent: smsConsent,
         }),
       });
       const data = await res.json();
@@ -396,7 +397,7 @@ export default function JetSkiBooking() {
     if (step === 0) return pkg;
     if (step === 1) return loc;
     if (step === 2) return dates.length >= 1;
-    if (step === 3) return info.name && info.email && info.phone && info.experience && smsConsent;
+    if (step === 3) return info.name && info.email && info.phone && info.experience;
     if (step === 4) return Object.values(waiverChecks).every(Boolean) && signature;
     if (step === 5) return true;
     return false;
@@ -759,12 +760,20 @@ export default function JetSkiBooking() {
                   {smsConsent && <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>✓</span>}
                 </div>
                 <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.55 }}>
-                  <strong style={{ color: "#0F172A" }}>I agree to receive SMS notifications</strong> from Full Throttle Utah about my reservation (booking confirmation, pickup/return reminders, and follow-up). Message frequency varies. Msg & data rates may apply. Reply STOP to opt out. By booking, I also agree to the{" "}
-                  <a href="/terms" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "#0C4A6E", textDecoration: "underline" }}>Terms & Conditions</a>
-                  {" "}and{" "}
-                  <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "#0C4A6E", textDecoration: "underline" }}>Privacy Policy</a>.
+                  <div style={{ marginBottom: 4 }}>
+                    <strong style={{ color: "#0F172A" }}>Send me SMS notifications</strong>
+                    <span style={{ color: "#94A3B8", marginLeft: 6, fontSize: 11, fontWeight: 600 }}>(OPTIONAL)</span>
+                  </div>
+                  I agree to receive SMS notifications from Full Throttle Utah about my reservation (booking confirmation, pickup/return reminders, and follow-up). Message frequency varies. Msg & data rates may apply. Reply STOP to opt out. <strong>Consent is not required to complete your booking</strong> — you'll still receive email confirmations.
                 </div>
               </div>
+            </div>
+
+            <div style={{ marginTop: 12, fontSize: 11, color: "#64748B", lineHeight: 1.5, padding: "0 4px" }}>
+              By continuing, you agree to our{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#0C4A6E", textDecoration: "underline" }}>Terms & Conditions</a>
+              {" "}and{" "}
+              <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#0C4A6E", textDecoration: "underline" }}>Privacy Policy</a>.
             </div>
 
             <div style={{ marginTop: 14, background: "#FEF3C7", borderRadius: 12, padding: 14, display: "flex", gap: 10 }}>
