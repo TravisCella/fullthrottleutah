@@ -1,4 +1,5 @@
 import { Analytics } from '@vercel/analytics/react'
+import FullThrottleChat from './chat'
 
 export const metadata = {
   title: 'Full Throttle Utah | Premium Jet Ski & Powersport Rentals',
