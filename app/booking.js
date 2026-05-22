@@ -12,17 +12,12 @@ const IMAGES = {
   sparkOverhead: "/images/spark-overhead.png",
   sparkProfile: "/images/spark-profile.png",
   gtxHero: "/images/gtx-hero.png",
-  rzrHero: "/images/rzr-hero.jpg",
-  rzrSide: "/images/rzr-side.jpg",
-  rzrInterior: "/images/rzr-interior.jpg",
-  rzrAction: "/images/rzr-action.jpg",
 };
 
 const PACKAGES = [
   {
     id: "spark-duo",
     name: "Spark Duo",
-    type: "pwc",
     tagline: "2 × 2014 Sea-Doo Spark 900 ACE HO",
     description: "Two nimble, lightweight Sparks on a single trailer. Quick, fun, and easy to ride — perfect for cruising any Utah reservoir.",
     includes: ["2 Sea-Doo Spark 900 ACE HO", "Single trailer", "4 life preservers", "2 anchoring systems", "Safety flags"],
@@ -38,7 +33,6 @@ const PACKAGES = [
   {
     id: "gtx-duo",
     name: "GTX Limited Duo",
-    type: "pwc",
     tagline: "2 × 2026 Sea-Doo GTX Limited 325",
     description: "The ultimate luxury ride. 325 HP, 10.25\" touchscreen, premium Bluetooth audio, massive swim platform. This is first class on the water.",
     includes: ["2 Sea-Doo GTX Limited 325 HP", "Single trailer", "4 life preservers", "2 anchoring systems", "Safety flags", "Bluetooth audio"],
@@ -51,40 +45,51 @@ const PACKAGES = [
     accent: "#B8860B",
     accentLight: "rgba(184,134,11,0.08)",
   },
-  {
-    id: "rzr-premium",
-    name: "RZR Premium 4-Seater",
-    type: "utv",
-    tagline: "2017 Polaris RZR EPS 1000 — Premium Equipped",
-    description: "Premium 4-seater UTV loaded with upgrades. Harman Kardon Stage 5 audio, full doors, windshield, aftermarket tires, roof rack, toolbox. Hauled on a double-axle trailer.",
-    includes: ["2017 Polaris RZR EPS 1000 4-seater", "Big Bubba double-axle trailer", "Harman Kardon Stage 5 audio", "Full doors + windshield", "Aftermarket tires", "Roof rack + toolbox", "4 helmets"],
-    weekday: 425,
-    weekend: 495,
-    multiDay: { 2: 395, 3: 365, 4: 325, 6: 295 },
-    deposit: 1500,
-    heroImg: "rzrHero",
-    galleryImgs: ["rzrSide", "rzrInterior", "rzrAction"],
-    accent: "#EA580C",
-    accentLight: "rgba(234,88,12,0.08)",
-  },
 ];
 
-const LOCATIONS_PWC = [
-  { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️" },
-  { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲" },
-  { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌" },
-  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎" },
-  { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️" },
+const LOCATIONS = [
+  { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️", aisStatus: "clean" },
+  { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲", aisStatus: "clean" },
+  { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌", aisStatus: "clean" },
+  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean" },
+  { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️", aisStatus: "infested", minDays: 3, deconFee: 200 },
 ];
 
-const LOCATIONS_UTV = [
-  { id: "moab", name: "Moab Trail System", region: "Southeast Utah", drive: "~4hr", emoji: "🪨" },
-  { id: "sand-hollow", name: "Sand Hollow State Park", region: "Southwest Utah", drive: "~4.5hr", emoji: "🏜️" },
-  { id: "american-fork", name: "American Fork Canyon", region: "Wasatch Front", drive: "~45min", emoji: "🌲" },
-  { id: "wasatch", name: "Wasatch Mountain Trails", region: "Heber Valley", drive: "~1hr", emoji: "⛰️" },
-  { id: "five-mile", name: "Five Mile Pass / Cedar Fort", region: "West Desert", drive: "~1hr", emoji: "🏞️" },
-  { id: "knolls", name: "Knolls Recreation Area", region: "West Desert", drive: "~1.5hr", emoji: "🏝️" },
+// ── Holiday surcharges ──
+const HOLIDAYS = [
+  { start: "07-01", end: "07-05", name: "July 4th", premium: 75 },
+  { start: "07-20", end: "07-25", name: "Pioneer Day", premium: 75 },
+  { start: "08-29", end: "09-02", name: "Labor Day", premium: 75 },
+  { start: "05-23", end: "05-27", name: "Memorial Day", premium: 75 },
 ];
+
+function getHolidaySurcharge(startDate, endDate) {
+  if (!startDate) return { total: 0, holidays: [] };
+  const end = endDate || startDate;
+  const matched = [];
+  let totalSurcharge = 0;
+
+  const current = new Date(startDate);
+  current.setHours(0,0,0,0);
+  const last = new Date(end);
+  last.setHours(0,0,0,0);
+
+  while (current <= last) {
+    const mmdd = `${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+    for (const h of HOLIDAYS) {
+      if (mmdd >= h.start && mmdd <= h.end) {
+        if (!matched.find(m => m.name === h.name)) {
+          matched.push(h);
+        }
+        totalSurcharge += h.premium;
+        break;
+      }
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return { total: totalSurcharge, holidays: matched };
+}
 
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDayOfMonth(y, m) { return new Date(y, m, 1).getDay(); }
@@ -92,58 +97,15 @@ function isWeekend(d) { const day = new Date(d).getDay(); return day === 0 || da
 function formatDate(d) { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
 function daysBetween(a, b) { return Math.round((b - a) / 864e5) + 1; }
 
-// Find any premium that applies to a given date. Returns null if no premium applies.
-function getPremiumForDate(date, premiums) {
-  if (!premiums || premiums.length === 0) return null;
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  for (const p of premiums) {
-    const start = new Date(p.start); start.setHours(0, 0, 0, 0);
-    const end = new Date(p.end || p.start); end.setHours(0, 0, 0, 0);
-    if (d >= start && d <= end) return p;
-  }
-  return null;
-}
-
-// Apply a premium (if any) to a base rate. Multiplier and flatAdd are combined.
-function applyPremium(baseRate, premium) {
-  if (!premium) return baseRate;
-  const multiplier = premium.multiplier || 1;
-  const flatAdd = premium.flatAdd || 0;
-  return Math.round(baseRate * multiplier + flatAdd);
-}
-
-// Compute the price for a specific day, factoring in:
-// - Whether it's weekday vs weekend
-// - Multi-day base rate (depends on TOTAL trip length)
-// - Any holiday/event premium applied to that specific date
-function priceForDay(date, totalDays, pkg, premiums) {
-  let base;
-  if (totalDays === 1) {
-    base = isWeekend(date) ? pkg.weekend : pkg.weekday;
-  } else if (totalDays >= 6) {
-    base = pkg.multiDay[6];
-  } else if (totalDays >= 4) {
-    base = pkg.multiDay[4];
-  } else if (totalDays >= 3) {
-    base = pkg.multiDay[3];
-  } else {
-    base = pkg.multiDay[2];
-  }
-  const premium = getPremiumForDate(date, premiums);
-  return applyPremium(base, premium);
-}
-
-function calculatePrice(pkg, start, end, premiums = []) {
+function calculatePrice(pkg, start, end) {
   const days = daysBetween(start, end);
-  // Walk each day of the trip and sum the day rates (with premiums applied per-day)
-  let total = 0;
-  const startMs = new Date(start).getTime();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(startMs + i * 864e5);
-    total += priceForDay(d, days, pkg, premiums);
-  }
-  return total;
+  if (days === 1) return isWeekend(start) ? pkg.weekend : pkg.weekday;
+  let rate;
+  if (days >= 5) rate = pkg.multiDay[5];
+  else if (days >= 4) rate = pkg.multiDay[4];
+  else if (days >= 3) rate = pkg.multiDay[3];
+  else rate = pkg.multiDay[2];
+  return rate * days;
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -182,7 +144,7 @@ function ImageGallery({ images: imgKeys }) {
   );
 }
 
-function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates, pkg, premiumDates }) {
+function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates }) {
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
   const today = new Date(); today.setHours(0,0,0,0);
@@ -212,16 +174,10 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
   const isEnd = (day) => day && selectedDates.length === 2 && new Date(year, month, day).getTime() === selectedDates[1].getTime();
   const isPast = (day) => day && new Date(year, month, day) < today;
 
-  // Day rate with premium applied if any premium matches
-  const dayRate = (day) => {
-    if (!day || !pkg) return { rate: null, hasPremium: false };
-    const date = new Date(year, month, day);
-    const base = isWeekend(date) ? pkg.weekend : pkg.weekday;
-    const premium = getPremiumForDate(date, premiumDates);
-    if (premium) {
-      return { rate: applyPremium(base, premium), hasPremium: true };
-    }
-    return { rate: base, hasPremium: false };
+  const isHoliday = (day) => {
+    if (!day) return false;
+    const mmdd = `${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return HOLIDAYS.some(h => mmdd >= h.start && mmdd <= h.end);
   };
 
   return (
@@ -244,57 +200,31 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
           const end = isEnd(day);
           const wknd = day ? isWeekend(new Date(year, month, day)) : false;
           const booked = isBooked(day);
+          const holiday = isHoliday(day);
           const unavailable = past || booked;
-          const { rate, hasPremium } = dayRate(day);
-          const showPrice = day && !past && !booked && rate;
-          // Color: selected = white; booked = red; premium = bold red; weekend = orange; weekday = gray
-          const priceColor = sel
-            ? "rgba(255,255,255,0.95)"
-            : hasPremium ? "#DC2626"
-            : wknd ? "#D97706"
-            : "#94A3B8";
-          const dateColor = !day ? "transparent"
-            : booked ? "#EF4444"
-            : past ? "#D1D5DB"
-            : sel ? "#fff"
-            : hasPremium ? "#DC2626"
-            : wknd ? "#D97706"
-            : "#1E293B";
           return (
             <div key={i} onClick={() => day && !unavailable && onSelectDate(new Date(year, month, day))}
               style={{
-                padding: "6px 0 5px", minHeight: 52, position: "relative",
+                padding: "10px 0", fontSize: 13, fontWeight: sel ? 700 : 400,
                 cursor: day && !unavailable ? "pointer" : "default",
-                color: dateColor,
-                background: sel ? (start || end ? "#0C4A6E" : "rgba(12,74,110,0.12)") : booked ? "rgba(239,68,68,0.06)" : "transparent",
+                color: !day ? "transparent" : booked ? "#EF4444" : past ? "#D1D5DB" : sel ? "#fff" : holiday ? "#DC2626" : wknd ? "#D97706" : "#1E293B",
+                background: sel ? (start || end ? "#0C4A6E" : "rgba(12,74,110,0.12)") : booked ? "rgba(239,68,68,0.06)" : holiday && !past ? "rgba(220,38,38,0.06)" : "transparent",
                 borderRadius: start && end ? 8 : start ? "8px 0 0 8px" : end ? "0 8px 8px 0" : sel ? 0 : 8,
                 transition: "all 0.15s",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
-              }}>
-              {hasPremium && !booked && !past && (
-                <div style={{
-                  position: "absolute", top: 2, right: 4, fontSize: 8, lineHeight: 1,
-                  color: sel ? "rgba(255,255,255,0.9)" : "#DC2626",
-                }}>★</div>
-              )}
-              <div style={{
-                fontSize: 14, fontWeight: sel ? 700 : (hasPremium ? 600 : 500), lineHeight: 1,
                 textDecoration: booked ? "line-through" : "none",
+                position: "relative",
               }}>
-                {day || ""}
-              </div>
-              {showPrice && (
-                <div style={{
-                  fontSize: 10, fontWeight: hasPremium ? 700 : 600,
-                  color: priceColor,
-                  letterSpacing: "-0.02em", lineHeight: 1,
-                }}>
-                  ${rate}
-                </div>
+              {day || ""}
+              {holiday && day && !past && !booked && (
+                <div style={{ position: "absolute", bottom: 2, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "#DC2626" }} />
               )}
             </div>
           );
         })}
+      </div>
+      <div style={{ marginTop: 8, display: "flex", gap: 12, justifyContent: "center" }}>
+        <span style={{ fontSize: 10, color: "#D97706", fontWeight: 600 }}>● Weekend (+$50)</span>
+        <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 600 }}>● Holiday (+$75)</span>
       </div>
     </div>
   );
@@ -310,33 +240,25 @@ export default function JetSkiBooking() {
   const [mo, setMo] = useState(new Date().getMonth());
   const [yr, setYr] = useState(new Date().getFullYear());
   const [info, setInfo] = useState({ name: "", email: "", phone: "", experience: "" });
-  const [smsConsent, setSmsConsent] = useState(false);
   const [done, setDone] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState(null);
   const [fadeIn, setFadeIn] = useState(true);
-  const [waiverChecks, setWaiverChecks] = useState({risks: false, release: false, indemnify: false, rules: false, damage: false, fuel: false, noInsurance: false});
+  const [waiverChecks, setWaiverChecks] = useState({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false});
   const [signature, setSignature] = useState(null);
   const sigCanvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [bookedDates, setBookedDates] = useState([]);
-  const [premiumDates, setPremiumDates] = useState([]);
+  const [whiteGlove, setWhiteGlove] = useState(false);
 
   useEffect(() => { setFadeIn(false); const t = setTimeout(() => setFadeIn(true), 20); return () => clearTimeout(t); }, [step]);
 
-  // Fetch booked dates and premium dates when package is selected
   useEffect(() => {
     if (pkg) {
       fetch(`/api/bookings?package=${encodeURIComponent(pkg.name)}`)
         .then(r => r.json())
-        .then(data => {
-          setBookedDates(data.bookedDates || []);
-          setPremiumDates(data.premiumDates || []);
-        })
-        .catch(() => {
-          setBookedDates([]);
-          setPremiumDates([]);
-        });
+        .then(data => setBookedDates(data.bookedDates || []))
+        .catch(() => setBookedDates([]));
     }
   }, [pkg]);
 
@@ -355,14 +277,14 @@ export default function JetSkiBooking() {
     setPaying(true);
     setPayError(null);
     try {
-      const depositAmt = Math.round(price / 2);
+      const depositAmt = Math.round(totalPrice / 2);
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           packageName: pkg.name,
           packageTagline: pkg.tagline,
-          totalPrice: price,
+          totalPrice: totalPrice,
           depositAmount: depositAmt,
           days: days,
           startDate: formatDate(dates[0]),
@@ -372,9 +294,12 @@ export default function JetSkiBooking() {
           renterEmail: info.email,
           renterPhone: info.phone,
           experience: info.experience,
+          whiteGlove: whiteGlove,
+          holidaySurcharge: holidayInfo.total,
+          deconFee: deconFee,
+          isLakePowell: isLakePowell,
           waiverSigned: 'true',
           waiverDate: new Date().toISOString(),
-          smsConsent: smsConsent,
         }),
       });
       const data = await res.json();
@@ -391,12 +316,18 @@ export default function JetSkiBooking() {
   };
 
   const days = dates.length === 2 ? daysBetween(dates[0], dates[1]) : dates.length === 1 ? 1 : 0;
-  const price = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0], premiumDates) : 0;
+  const basePrice = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0]) : 0;
+  const holidayInfo = dates.length > 0 ? getHolidaySurcharge(dates[0], dates.length === 2 ? dates[1] : dates[0]) : { total: 0, holidays: [] };
+  const whiteGloveFee = whiteGlove ? 200 : 0;
+  const isLakePowell = loc?.id === "lake-powell";
+  const deconFee = isLakePowell ? 200 : 0;
+  const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee;
+  const meetsLakePowellMinimum = !isLakePowell || days >= 3;
 
   const canNext = () => {
     if (step === 0) return pkg;
     if (step === 1) return loc;
-    if (step === 2) return dates.length >= 1;
+    if (step === 2) return dates.length >= 1 && meetsLakePowellMinimum;
     if (step === 3) return info.name && info.email && info.phone && info.experience;
     if (step === 4) return Object.values(waiverChecks).every(Boolean) && signature;
     if (step === 5) return true;
@@ -405,7 +336,6 @@ export default function JetSkiBooking() {
 
   const stepLabels = ["Package", "Location", "Dates", "Info", "Waiver", "Confirm"];
 
-  // LANDING PAGE
   if (step === -1) {
     return (
       <div style={{
@@ -471,6 +401,24 @@ export default function JetSkiBooking() {
             </div>
           ))}
 
+          <div style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 16, padding: "16px 20px", marginBottom: 16,
+            backdropFilter: "blur(20px)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <span style={{ fontSize: 20 }}>🤝</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>White Glove Delivery</div>
+                <div style={{ fontSize: 11, color: "#94A3B8" }}>We deliver, launch, and retrieve — $200</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
+              Skip the towing. We bring the watercraft to your lake, launch it, and pick it up when you're done.
+            </div>
+          </div>
+
           <button onClick={() => setStep(0)} style={{
             width: "100%", padding: "18px 24px", borderRadius: 14, border: "none",
             background: "linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)",
@@ -501,7 +449,7 @@ export default function JetSkiBooking() {
               We Serve
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {[...LOCATIONS_PWC, ...LOCATIONS_UTV].map(l => (
+              {LOCATIONS.map(l => (
                 <span key={l.id} style={{
                   fontSize: 12, color: "#94A3B8", background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20,
@@ -520,17 +468,12 @@ export default function JetSkiBooking() {
               2" ball hitch + valid ID required<br/>
               <span style={{ color: "#64748B" }}>© {new Date().getFullYear()} TW Assets LLC d/b/a Full Throttle Utah</span>
             </div>
-            <div style={{ marginTop: 12, fontSize: 11 }}>
-              <a href="/privacy-policy" style={{ color: "#64748B", textDecoration: "underline", marginRight: 16 }}>Privacy Policy</a>
-              <a href="/terms" style={{ color: "#64748B", textDecoration: "underline" }}>Terms & Conditions</a>
-            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // BOOKING FLOW
   return (
     <div style={{
       "--font-body": "'Outfit', sans-serif",
@@ -641,8 +584,8 @@ export default function JetSkiBooking() {
 
         {step === 1 && !done && (
           <div>
-            <h2 style={secTitle}>{pkg?.type === "utv" ? "Pick Your Trail" : "Pick Your Lake"}</h2>
-            {(pkg?.type === "utv" ? LOCATIONS_UTV : LOCATIONS_PWC).map(l => (
+            <h2 style={secTitle}>Pick Your Lake</h2>
+            {LOCATIONS.map(l => (
               <div key={l.id} onClick={() => setLoc(l)} style={{
                 border: loc?.id === l.id ? "2px solid #0C4A6E" : "2px solid #E2E8F0",
                 borderRadius: 14, padding: "16px 18px", marginBottom: 10, cursor: "pointer",
@@ -653,16 +596,81 @@ export default function JetSkiBooking() {
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 22 }}>{l.emoji}</span>
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 600 }}>{l.name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>
+                      {l.name}
+                      {l.aisStatus === "infested" && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "#D97706", background: "#FEF3C7", padding: "2px 6px", borderRadius: 4, marginLeft: 6, letterSpacing: "0.05em" }}>AIS</span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>{l.region}</div>
                   </div>
                 </div>
                 <div style={{ fontSize: 12, color: "#94A3B8", fontWeight: 600 }}>{l.drive}</div>
               </div>
             ))}
+
+            {loc?.aisStatus === "infested" && (
+              <div style={{ marginTop: 12, padding: 14, background: "#FEF3C7", borderRadius: 14, border: "2px solid #D97706" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 18 }}>⚠️</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 2 }}>Lake Powell Special Requirements</div>
+                    <div style={{ fontSize: 11, color: "#92400E", lineHeight: 1.5 }}>Quagga mussel-infested waterbody. Per Utah DWR:</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: "#92400E", lineHeight: 1.7, paddingLeft: 26 }}>
+                  • <strong>3-day minimum</strong> rental required<br/>
+                  • <strong>$200 decontamination fee</strong> auto-added<br/>
+                  • Professional decon performed at return<br/>
+                  • Machine quarantined 30 days after use
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Add-On Service</div>
+              <div
+                onClick={() => setWhiteGlove(!whiteGlove)}
+                style={{
+                  border: whiteGlove ? "2px solid #16A34A" : "2px solid #E2E8F0",
+                  borderRadius: 14, padding: "16px 18px", cursor: "pointer",
+                  background: whiteGlove ? "rgba(22,163,74,0.04)" : "#fff",
+                  transition: "all 0.15s",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 22 }}>🤝</span>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 600 }}>White Glove Delivery</div>
+                      <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>We deliver, launch & retrieve your watercraft</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: whiteGlove ? "#16A34A" : "#0F172A" }}>+$200</div>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: 6,
+                      border: whiteGlove ? "2px solid #16A34A" : "2px solid #CBD5E1",
+                      background: whiteGlove ? "#16A34A" : "#fff",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 14, color: "#fff", fontWeight: 700,
+                      transition: "all 0.15s",
+                    }}>
+                      {whiteGlove ? "✓" : ""}
+                    </div>
+                  </div>
+                </div>
+                {whiteGlove && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(22,163,74,0.15)", fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
+                    We'll deliver your watercraft to the ramp, launch it, and pick it up when you're done. No towing needed — just show up and ride. Available within 45 min of Farmington.
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div style={{ marginTop: 16, padding: 14, background: "#F0F9FF", borderRadius: 12, border: "1px solid #DBEAFE" }}>
               <div style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.5 }}>
-                <strong>Pickup:</strong> Farmington, UT — you tow to the {pkg?.type === "utv" ? "trailhead" : "lake"} with your own vehicle. 2" ball hitch and flat 4-prong light hookup required.
+                <strong>{whiteGlove ? "We deliver to the lake!" : "Pickup:"}</strong> {whiteGlove ? "We'll bring the watercraft to your chosen lake and launch it for you." : "Farmington, UT — you tow to the lake with your own vehicle. 2\" ball hitch and flat 4-prong light hookup required."}
               </div>
             </div>
           </div>
@@ -672,37 +680,63 @@ export default function JetSkiBooking() {
           <div>
             <h2 style={secTitle}>Select Your Dates</h2>
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
-              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} premiumDates={premiumDates} />
+              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} />
             </div>
-            {days > 0 && (
-              <div style={{
-                marginTop: 14, background: "#0C4A6E", borderRadius: 14, padding: "16px 18px",
-                display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff",
-              }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>{days} day{days > 1 ? "s" : ""}</div>
-                  <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
-                    {formatDate(dates[0])}{dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}
-                  </div>
+
+            {isLakePowell && days > 0 && days < 3 && (
+              <div style={{ marginTop: 14, padding: 14, background: "#FEE2E2", borderRadius: 12, border: "2px solid #DC2626" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B", marginBottom: 4 }}>
+                  ⚠️ Lake Powell requires 3+ day rental
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em" }}>${price.toLocaleString()}</div>
-                  {days > 1 && <div style={{ fontSize: 11, opacity: 0.6 }}>${Math.round(price/days)}/day avg</div>}
+                <div style={{ fontSize: 12, color: "#991B1B", lineHeight: 1.5 }}>
+                  Due to mandatory 30-day machine quarantine after Lake Powell use, we require a minimum 3-day booking. Please extend your date range.
                 </div>
               </div>
             )}
-            <div style={{ marginTop: 10, padding: "10px 12px", background: "#F8FAFC", borderRadius: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ fontSize: 11, color: "#64748B", textAlign: "center" }}>
-                <span style={{ color: "#1E293B", fontWeight: 600 }}>${pkg?.weekday}</span> weekday · <span style={{ color: "#D97706", fontWeight: 600 }}>${pkg?.weekend}</span> weekend · Multi-day discounts apply automatically
-              </div>
-              {premiumDates.length > 0 && (
-                <div style={{ fontSize: 10, color: "#DC2626", textAlign: "center", fontWeight: 500 }}>
-                  ★ = Holiday/premium pricing
+
+            {days > 0 && meetsLakePowellMinimum && (
+              <div style={{
+                marginTop: 14, background: "#0C4A6E", borderRadius: 14, padding: "16px 18px",
+                color: "#fff",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>{days} day{days > 1 ? "s" : ""}</div>
+                    <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
+                      {formatDate(dates[0])}{dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em" }}>${totalPrice.toLocaleString()}</div>
+                    {days > 1 && <div style={{ fontSize: 11, opacity: 0.6 }}>${Math.round(totalPrice/days)}/day avg</div>}
+                  </div>
                 </div>
-              )}
-              <div style={{ fontSize: 10, color: "#94A3B8", textAlign: "center" }}>
-                Tap start → end for multi-day rentals
+                {(holidayInfo.total > 0 || whiteGlove || deconFee > 0) && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.15)", fontSize: 11, opacity: 0.7 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                      <span>Base rental</span><span>${basePrice.toLocaleString()}</span>
+                    </div>
+                    {holidayInfo.holidays.map(h => (
+                      <div key={h.name} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#FCA5A5" }}>
+                        <span>🎆 {h.name} surcharge</span><span>+${h.premium}/day</span>
+                      </div>
+                    ))}
+                    {whiteGlove && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#86EFAC" }}>
+                        <span>🤝 White glove delivery</span><span>+$200</span>
+                      </div>
+                    )}
+                    {deconFee > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#FCD34D" }}>
+                        <span>🦠 Lake Powell decontamination</span><span>+${deconFee}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+            )}
+            <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 16 }}>
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>Tap start → end for multi-day</span>
             </div>
           </div>
         )}
@@ -724,7 +758,7 @@ export default function JetSkiBooking() {
               </div>
             ))}
             <div style={{ marginBottom: 14 }}>
-              <label style={labelSt}>{pkg?.type === "utv" ? "UTV / Off-Road Experience" : "Jet Ski Experience"}</label>
+              <label style={labelSt}>Jet Ski Experience</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {["First timer", "A few times", "Experienced", "Expert"].map(lv => (
                   <div key={lv} onClick={() => setInfo({ ...info, experience: lv })} style={{
@@ -739,54 +773,15 @@ export default function JetSkiBooking() {
                 ))}
               </div>
             </div>
-            <div style={{
-              marginTop: 8,
-              padding: 14,
-              borderRadius: 12,
-              border: smsConsent ? "2px solid #0C4A6E" : "2px solid #E2E8F0",
-              background: smsConsent ? "#F0F9FF" : "#fff",
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }} onClick={() => setSmsConsent(!smsConsent)}>
-              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                <div style={{
-                  flexShrink: 0,
-                  width: 22, height: 22, borderRadius: 6,
-                  border: smsConsent ? "2px solid #0C4A6E" : "2px solid #CBD5E1",
-                  background: smsConsent ? "#0C4A6E" : "#fff",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  marginTop: 1,
-                }}>
-                  {smsConsent && <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>✓</span>}
-                </div>
-                <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.55 }}>
-                  <div style={{ marginBottom: 4 }}>
-                    <strong style={{ color: "#0F172A" }}>Send me SMS notifications</strong>
-                    <span style={{ color: "#94A3B8", marginLeft: 6, fontSize: 11, fontWeight: 600 }}>(OPTIONAL)</span>
-                  </div>
-                  I agree to receive SMS notifications from Full Throttle Utah about my reservation (booking confirmation, pickup/return reminders, and follow-up). Message frequency varies. Msg & data rates may apply. Reply STOP to opt out. <strong>Consent is not required to complete your booking</strong> — you'll still receive email confirmations.
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, fontSize: 11, color: "#64748B", lineHeight: 1.5, padding: "0 4px" }}>
-              By continuing, you agree to our{" "}
-              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#0C4A6E", textDecoration: "underline" }}>Terms & Conditions</a>
-              {" "}and{" "}
-              <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#0C4A6E", textDecoration: "underline" }}>Privacy Policy</a>.
-            </div>
-
-            <div style={{ marginTop: 14, background: "#FEF3C7", borderRadius: 12, padding: 14, display: "flex", gap: 10 }}>
+            <div style={{ background: "#FEF3C7", borderRadius: 12, padding: 14, display: "flex", gap: 10 }}>
               <span style={{ fontSize: 18 }}>📋</span>
               <div style={{ fontSize: 12, color: "#92400E", lineHeight: 1.5 }}>
-                <strong>Digital waiver next.</strong> You'll review and sign the rental waiver in the next step. Additional riders must also sign at pickup.
+                <strong>Digital waiver required.</strong> After booking you'll receive a Smartwaiver link. All riders must sign before pickup.
               </div>
             </div>
           </div>
         )}
 
-
-        {/* ── STEP 4: WAIVER ── */}
         {step === 4 && !done && (
           <div>
             <h2 style={secTitle}>Liability Waiver</h2>
@@ -794,22 +789,7 @@ export default function JetSkiBooking() {
               Please read each section carefully and check each box to acknowledge you understand and agree.
             </div>
 
-            {(pkg?.type === "utv" ? [
-              { key: "risks", title: "Acknowledgment of Risks",
-                text: "I understand that operating a UTV/side-by-side off-road vehicle involves serious risks including rollover, collision, ejection, mechanical failure, terrain hazards, dust inhalation, and injuries from rocks, debris, and other vehicles. These risks can result in bodily injury, permanent disability, or death. I acknowledge that off-road driving carries greater inherent risk than on-road driving." },
-              { key: "release", title: "Waiver & Release of Liability",
-                text: "To the fullest extent permitted by Utah law, I forever release, waive, and discharge TW Assets LLC, its members, managers, employees, and agents from any and all liability, claims, damages, and costs arising from the rental and use of the UTV and equipment, including claims arising from the negligence of TW Assets LLC. This release does not apply to willful misconduct or gross negligence." },
-              { key: "indemnify", title: "Indemnification",
-                text: "I agree to indemnify, defend, and hold harmless TW Assets LLC from any claims, damages, or expenses brought by any person arising from my rental, use, or transport of the UTV and equipment." },
-              { key: "rules", title: "Renter Obligations",
-                text: "I confirm that: I am at least 25 years old with a valid driver's license. All operators must be 18+ with valid driver's license. All occupants will wear seatbelts and DOT-approved helmets at all times. I will not operate under the influence of alcohol or drugs. I will stay on designated trails and obey all posted speed limits and signs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable OHV laws and Utah State Parks regulations." },
-              { key: "damage", title: "Damage & Security Deposit",
-                text: "I accept financial responsibility for all damage to, loss of, or theft of the UTV and equipment during the rental period, regardless of fault. A $1,500 security deposit will be collected and refunded upon satisfactory return. Damage from rollovers, suspension stress, frame damage, clutch wear from improper use, and aftermarket component damage (tires, audio, doors, windshield) is renter's responsibility." },
-              { key: "fuel", title: "Fuel Policy",
-                text: "I understand that I am responsible for fueling the UTV and must return it with a FULL tank of 91-octane gasoline. If returned with less than a full tank, or fueled with anything other than 91-octane gasoline, I authorize Full Throttle Utah to deduct the actual refueling cost plus a 20% service premium from my security deposit." },
-              { key: "noInsurance", title: "No Insurance Provided",
-                text: "I understand that TW Assets LLC does not provide collision, liability, or personal injury insurance for renters, passengers, or third parties. I assume all financial risk for any uninsured loss. UTVs are typically not covered by standard auto policies — I am responsible for understanding my own coverage." },
-            ] : [
+            {[
               { key: "risks", title: "Acknowledgment of Risks",
                 text: "I understand that operating a personal watercraft involves serious risks including collision, capsizing, drowning, equipment malfunction, and injuries from jet propulsion systems. These risks can result in bodily injury, permanent disability, or death." },
               { key: "release", title: "Waiver & Release of Liability",
@@ -820,11 +800,15 @@ export default function JetSkiBooking() {
                 text: "I confirm that: I am at least 18 years old with valid ID. All operators will be 16+ per Utah Code §73-18-15.1. All riders will wear USCG-approved life vests at all times. I will not operate under the influence of alcohol or drugs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable boating laws." },
               { key: "damage", title: "Damage & Security Deposit",
                 text: "I accept financial responsibility for all damage to, loss of, or theft of the PWC and equipment during the rental period, regardless of fault. A $1,000 security deposit will be collected and refunded upon satisfactory return." },
-              { key: "fuel", title: "Fuel Policy",
-                text: "I understand that I am responsible for fueling the watercraft and must return all equipment with a FULL tank of 91-octane gasoline. If equipment is returned with less than a full tank, or fueled with anything other than 91-octane gasoline, I authorize Full Throttle Utah to deduct the actual refueling cost plus a 20% service premium from my security deposit." },
               { key: "noInsurance", title: "No Insurance Provided",
                 text: "I understand that TW Assets LLC does not provide collision, liability, or personal injury insurance for renters, passengers, or third parties. I assume all financial risk for any uninsured loss." },
-            ]).map(section => (
+              { key: "ais", title: "Aquatic Invasive Species (AIS) Compliance",
+                text: "I acknowledge that Utah requires all boaters to complete the annual Mussel Aware Boater Course before launching any watercraft. The Utah AIS registration and certificate are stored inside this PWC. I agree to: (1) stop at all operating AIS inspection stations, (2) remove all drain plugs before transport, (3) clean, drain, and dry the watercraft after every use, and (4) NOT transport this watercraft to any out-of-state waterbody without prior written permission from Full Throttle Utah." },
+              { key: "noLakePowell", title: isLakePowell ? "Lake Powell Decontamination Acknowledgment" : "Mussel-Infested Water Prohibition",
+                text: isLakePowell
+                  ? "I understand Lake Powell is a quagga mussel-infested waterbody. I agree to the $200 mandatory decontamination fee. I will not launch this watercraft at any other Utah waterbody for 30 days after Lake Powell use without prior written permission from Full Throttle Utah. I will follow all DWR clean/drain/dry protocols when exiting Lake Powell, remove all drain plugs, and submit to inspection at any operating AIS station."
+                  : "I agree NOT to transport or operate this watercraft at Lake Powell, Lake Mead, or any other mussel-infested waterbody during the rental period. I understand that violation of this agreement will result in a $500 contamination fee, forfeiture of the security deposit, and additional liability for revenue lost during the resulting 30-day machine quarantine." },
+            ].map(section => (
               <div key={section.key} style={{
                 marginBottom: 12,
                 border: waiverChecks[section.key] ? "2px solid #16A34A" : "2px solid #E2E8F0",
@@ -852,7 +836,6 @@ export default function JetSkiBooking() {
               </div>
             ))}
 
-            {/* Signature Pad */}
             <div style={{ marginTop: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 8 }}>Your Signature</div>
               <div style={{ fontSize: 12, color: "#64748B", marginBottom: 10 }}>
@@ -958,7 +941,7 @@ export default function JetSkiBooking() {
             </div>
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, overflow: "hidden" }}>
               {[
-                { label: "Location", value: `${loc?.emoji} ${loc?.name}`, sub: loc?.drive + " from SLC" },
+                { label: "Location", value: `${loc?.emoji} ${loc?.name}`, sub: whiteGlove ? "🤝 White glove delivery included" : isLakePowell ? "🦠 Decon performed at return" : loc?.drive + " from SLC" },
                 { label: "Dates", value: `${formatDate(dates[0])}${dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}`, sub: `${days} day${days > 1 ? "s" : ""} · Pickup 8AM · Return 8PM` },
                 { label: "Renter", value: info.name, sub: `${info.email} · ${info.phone} · ${info.experience}` },
               ].map((row, i) => (
@@ -970,18 +953,21 @@ export default function JetSkiBooking() {
               ))}
               <div style={{ padding: "16px 18px", background: "#F8FAFC" }}>
                 {[
-                  { l: `Rental (${days} day${days > 1 ? "s" : ""})`, v: `$${price.toLocaleString()}` },
+                  { l: `Rental (${days} day${days > 1 ? "s" : ""})`, v: `$${basePrice.toLocaleString()}` },
+                  ...(holidayInfo.holidays.map(h => ({ l: `🎆 ${h.name} surcharge`, v: `+$${h.premium}/day`, color: "#DC2626" }))),
+                  ...(whiteGlove ? [{ l: "🤝 White glove delivery", v: "+$200", color: "#16A34A" }] : []),
+                  ...(deconFee > 0 ? [{ l: "🦠 Lake Powell decontamination", v: `+$${deconFee}`, color: "#D97706" }] : []),
                   { l: "Security deposit (refundable)", v: `$${pkg.deposit.toLocaleString()}` },
-                  { l: "Due today (50% booking deposit)", v: `$${Math.round(price / 2).toLocaleString()}`, bold: true },
+                  { l: "Due today (50% booking deposit)", v: `$${Math.round(totalPrice / 2).toLocaleString()}`, bold: true },
                 ].map((r, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: r.bold ? 14 : 13, fontWeight: r.bold ? 700 : 400, color: r.bold ? "#0F172A" : "#64748B" }}>
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: r.bold ? 14 : 13, fontWeight: r.bold ? 700 : 400, color: r.color || (r.bold ? "#0F172A" : "#64748B") }}>
                     <span>{r.l}</span><span style={{ fontWeight: 600 }}>{r.v}</span>
                   </div>
                 ))}
                 <div style={{ borderTop: "2px solid #CBD5E1", paddingTop: 12, marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 14, fontWeight: 700 }}>Due at pickup</span>
                   <span style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                    ${(Math.round(price / 2) + pkg.deposit).toLocaleString()}
+                    ${(Math.round(totalPrice / 2) + pkg.deposit).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -1002,15 +988,15 @@ export default function JetSkiBooking() {
             <div style={{ fontSize: 56, marginBottom: 12 }}>🌊</div>
             <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 28, fontWeight: 700, margin: 0 }}>Booking Confirmed!</h2>
             <p style={{ fontSize: 14, color: "#64748B", marginTop: 10, lineHeight: 1.6 }}>
-              Confirmation sent to <strong>{info.email}</strong> and a text to your phone.
+              Check <strong>{info.email}</strong> for your confirmation and waiver link.
             </p>
             <div style={{ marginTop: 24, background: "#F8FAFC", borderRadius: 14, padding: 20, textAlign: "left" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Next Steps</div>
               {[
-                "Arrive at Farmington pickup by 8:00 AM",
-                "Bring valid ID, proof of insurance, 2\" ball hitch",
-                `Pay remaining $${(Math.round(price/2) + pkg.deposit).toLocaleString()} at pickup`,
-                "Return with FULL tank of 91-octane gas (+20% premium if not full)",
+                "Sign the digital waiver (link in your email)",
+                whiteGlove ? "We'll deliver to the lake — just show up and ride!" : "Arrive at Farmington pickup by 8:00 AM",
+                "Bring valid ID" + (whiteGlove ? "" : ", proof of insurance, 2\" ball hitch"),
+                `Pay remaining $${(Math.round(totalPrice/2) + pkg.deposit).toLocaleString()} at ${whiteGlove ? "delivery" : "pickup"}`,
               ].map((s, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                   <div style={{
@@ -1022,7 +1008,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setSmsConsent(false); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, fuel: false, noInsurance: false}); setSignature(null); setDone(false); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
@@ -1041,7 +1027,7 @@ export default function JetSkiBooking() {
                 background: step === 5 ? "linear-gradient(135deg, #16A34A, #15803D)" : "linear-gradient(135deg, #0EA5E9, #0284C7)",
                 boxShadow: step === 5 ? "0 4px 20px rgba(22,163,74,0.3)" : "0 4px 20px rgba(14,165,233,0.25)",
               }}>
-              {step === 5 ? (paying ? "Redirecting to Stripe..." : `Pay $${Math.round(price / 2).toLocaleString()} Deposit →`) : step === 4 ? "I Agree — Continue →" : "Continue →"}
+              {step === 5 ? (paying ? "Redirecting to Stripe..." : `Pay $${Math.round(totalPrice / 2).toLocaleString()} Deposit →`) : step === 4 ? "I Agree — Continue →" : "Continue →"}
             </button>
           </div>
         )}
@@ -1060,7 +1046,7 @@ const labelSt = {
 };
 const inputSt = {
   width: "100%", padding: "14px 16px", borderRadius: 10,
-  border: "2px solid #E2E8F0", fontSize: 16, color: "#0F172A",
+  border: "2px solid #E2E8F0", fontSize: 14, color: "#0F172A",
   background: "#fff", outline: "none", boxSizing: "border-box",
   fontFamily: "'Outfit', sans-serif",
 };
