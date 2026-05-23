@@ -155,14 +155,11 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
   const isBooked = (day) => {
     if (!day || !bookedDates?.length) return false;
     const date = new Date(year, month, day);
-    date.setHours(0,0,0,0);
     return bookedDates.some(b => {
-      if (!b.start) return false;
-      const [sy, sm, sd] = b.start.split('-').map(Number);
-      const start = new Date(sy, sm - 1, sd);
-      const endStr = b.end || b.start;
-      const [ey, em, ed] = endStr.split('-').map(Number);
-      const end = new Date(ey, em - 1, ed);
+      const start = new Date(b.start);
+      const end = new Date(b.end || b.start);
+      start.setHours(0,0,0,0);
+      end.setHours(0,0,0,0);
       return date >= start && date <= end;
     });
   };
@@ -242,7 +239,7 @@ export default function JetSkiBooking() {
   const [dates, setDates] = useState([]);
   const [mo, setMo] = useState(new Date().getMonth());
   const [yr, setYr] = useState(new Date().getFullYear());
-  const [info, setInfo] = useState({ name: "", email: "", phone: "", experience: "" });
+  const [info, setInfo] = useState({ name: "", email: "", phone: "", experience: "", smsOptIn: false });
   const [done, setDone] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState(null);
@@ -295,6 +292,7 @@ export default function JetSkiBooking() {
           renterEmail: info.email,
           renterPhone: info.phone,
           experience: info.experience,
+          smsOptIn: info.smsOptIn,
           whiteGlove: whiteGlove,
           holidaySurcharge: holidayInfo.total,
           deconFee: deconFee,
@@ -780,6 +778,28 @@ export default function JetSkiBooking() {
                 <strong>Digital waiver required.</strong> After booking you'll receive a Smartwaiver link. All riders must sign before pickup.
               </div>
             </div>
+
+            <div style={{ marginTop: 14, border: "2px solid #E2E8F0", borderRadius: 12, padding: 14, background: info.smsOptIn ? "rgba(14,165,233,0.04)" : "#fff" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={info.smsOptIn}
+                  onChange={() => setInfo({ ...info, smsOptIn: !info.smsOptIn })}
+                  style={{ width: 20, height: 20, marginTop: 2, accentColor: "#0C4A6E", cursor: "pointer", flexShrink: 0 }}
+                />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", marginBottom: 4 }}>
+                    📱 Text me booking updates <span style={{ color: "#64748B", fontWeight: 400, fontStyle: "italic" }}>(Optional)</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748B", lineHeight: 1.5 }}>
+                    I agree to receive SMS notifications from Full Throttle Utah about my reservation (booking confirmation, pickup/return reminders, and follow-up). Message frequency varies. Msg & data rates may apply. Reply STOP to opt out.
+                  </div>
+                  <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 4, fontStyle: "italic" }}>
+                    Consent is not required to complete your booking — you'll still receive email confirmations.
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
         )}
 
@@ -1014,7 +1034,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"" }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
