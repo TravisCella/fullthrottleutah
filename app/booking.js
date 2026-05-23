@@ -277,7 +277,6 @@ export default function JetSkiBooking() {
     setPaying(true);
     setPayError(null);
     try {
-      const depositAmt = Math.round(totalPrice / 2);
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -285,7 +284,6 @@ export default function JetSkiBooking() {
           packageName: pkg.name,
           packageTagline: pkg.tagline,
           totalPrice: totalPrice,
-          depositAmount: depositAmt,
           days: days,
           startDate: formatDate(dates[0]),
           endDate: dates.length === 2 ? formatDate(dates[1]) : formatDate(dates[0]),
@@ -957,18 +955,23 @@ export default function JetSkiBooking() {
                   ...(holidayInfo.holidays.map(h => ({ l: `🎆 ${h.name} surcharge`, v: `+$${h.premium}/day`, color: "#DC2626" }))),
                   ...(whiteGlove ? [{ l: "🤝 White glove delivery", v: "+$200", color: "#16A34A" }] : []),
                   ...(deconFee > 0 ? [{ l: "🦠 Lake Powell decontamination", v: `+$${deconFee}`, color: "#D97706" }] : []),
-                  { l: "Security deposit (refundable)", v: `$${pkg.deposit.toLocaleString()}` },
-                  { l: "Due today (50% booking deposit)", v: `$${Math.round(totalPrice / 2).toLocaleString()}`, bold: true },
+                  { l: "Total due now", v: `$${totalPrice.toLocaleString()}`, bold: true },
                 ].map((r, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: r.bold ? 14 : 13, fontWeight: r.bold ? 700 : 400, color: r.color || (r.bold ? "#0F172A" : "#64748B") }}>
                     <span>{r.l}</span><span style={{ fontWeight: 600 }}>{r.v}</span>
                   </div>
                 ))}
                 <div style={{ borderTop: "2px solid #CBD5E1", paddingTop: 12, marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>Due at pickup</span>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>Pay now (full rental)</span>
                   <span style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                    ${(Math.round(totalPrice / 2) + pkg.deposit).toLocaleString()}
+                    ${totalPrice.toLocaleString()}
                   </span>
+                </div>
+                <div style={{ marginTop: 12, padding: 12, background: "#FEF3C7", borderRadius: 10, border: "1px solid #FCD34D" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>🔐 At Pickup: $1,000 Security Deposit</div>
+                  <div style={{ fontSize: 11, color: "#92400E", lineHeight: 1.5 }}>
+                    A $1,000 security deposit will be held at pickup via card hold or accepted in cash. Released in full upon satisfactory return of the watercraft.
+                  </div>
                 </div>
               </div>
             </div>
@@ -995,8 +998,8 @@ export default function JetSkiBooking() {
               {[
                 "Sign the digital waiver (link in your email)",
                 whiteGlove ? "We'll deliver to the lake — just show up and ride!" : "Arrive at Farmington pickup by 8:00 AM",
-                "Bring valid ID" + (whiteGlove ? "" : ", proof of insurance, 2\" ball hitch"),
-                `Pay remaining $${(Math.round(totalPrice/2) + pkg.deposit).toLocaleString()} at ${whiteGlove ? "delivery" : "pickup"}`,
+                "Bring valid ID and a credit card OR $1,000 cash for security deposit",
+                `Security deposit ($1,000) will be held at pickup and released on safe return`,
               ].map((s, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                   <div style={{
@@ -1027,7 +1030,7 @@ export default function JetSkiBooking() {
                 background: step === 5 ? "linear-gradient(135deg, #16A34A, #15803D)" : "linear-gradient(135deg, #0EA5E9, #0284C7)",
                 boxShadow: step === 5 ? "0 4px 20px rgba(22,163,74,0.3)" : "0 4px 20px rgba(14,165,233,0.25)",
               }}>
-              {step === 5 ? (paying ? "Redirecting to Stripe..." : `Pay $${Math.round(totalPrice / 2).toLocaleString()} Deposit →`) : step === 4 ? "I Agree — Continue →" : "Continue →"}
+              {step === 5 ? (paying ? "Redirecting to Stripe..." : `Pay $${totalPrice.toLocaleString()} →`) : step === 4 ? "I Agree — Continue →" : "Continue →"}
             </button>
           </div>
         )}
