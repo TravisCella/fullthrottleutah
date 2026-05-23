@@ -156,11 +156,14 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
   const isBooked = (day) => {
     if (!day || !bookedDates?.length) return false;
     const date = new Date(year, month, day);
+    date.setHours(0,0,0,0);
     return bookedDates.some(b => {
-      const start = new Date(b.start);
-      const end = new Date(b.end || b.start);
-      start.setHours(0,0,0,0);
-      end.setHours(0,0,0,0);
+      if (!b.start) return false;
+      const [sy, sm, sd] = b.start.split('-').map(Number);
+      const start = new Date(sy, sm - 1, sd);
+      const endStr = b.end || b.start;
+      const [ey, em, ed] = endStr.split('-').map(Number);
+      const end = new Date(ey, em - 1, ed);
       return date >= start && date <= end;
     });
   };
