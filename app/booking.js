@@ -50,8 +50,12 @@ const PACKAGES = [
 const LOCATIONS = [
   { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️", aisStatus: "clean" },
   { id: "willard-bay", name: "Willard Bay", region: "Northern Utah", drive: "~35min", emoji: "🦅", aisStatus: "clean" },
+  { id: "echo", name: "Echo Reservoir", region: "Summit County", drive: "~45min", emoji: "🌊", aisStatus: "clean" },
+  { id: "rockport", name: "Rockport Reservoir", region: "Summit County", drive: "~50min", emoji: "🪨", aisStatus: "clean" },
+  { id: "east-canyon", name: "East Canyon Reservoir", region: "Morgan County", drive: "~50min", emoji: "🏞️", aisStatus: "clean" },
   { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲", aisStatus: "clean" },
   { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌", aisStatus: "clean" },
+  { id: "utah-lake", name: "Utah Lake", region: "Utah County", drive: "~1hr", emoji: "🐟", aisStatus: "clean" },
   { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean" },
   { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️", aisStatus: "infested", minDays: 3, deconFee: 200 },
 ];
@@ -690,8 +694,7 @@ export default function JetSkiBooking() {
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(22,163,74,0.15)", fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
                     We'll deliver your watercraft to the ramp, launch it, and pick it up when you're done. No towing needed — just show up and ride.
                     <div style={{ marginTop: 8, padding: 8, background: "#FEF3C7", borderRadius: 6, fontSize: 11, color: "#92400E" }}>
-                      <strong>Note:</strong> $200 flat fee covers destinations within 45 min of Farmington (Pineview, Willard Bay, Jordanelle, Deer Creek). For destinations beyond 45 min (Bear Lake, etc.), actual round-trip towing fuel cost will be added and settled at pickup.
-                    </div>
+<strong>Note:</strong> $200 flat fee covers destinations within 45 min of Farmington (Pineview, Willard Bay, Echo, Jordanelle). For destinations beyond 45 min (Rockport, East Canyon, Deer Creek, Utah Lake, Bear Lake), actual round-trip towing fuel cost will be added and settled at pickup.                    </div>
                   </div>
                 )}
               </div>
