@@ -254,6 +254,8 @@ export default function JetSkiBooking() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [bookedDates, setBookedDates] = useState([]);
   const [whiteGlove, setWhiteGlove] = useState(false);
+  const [isRepeatCustomer, setIsRepeatCustomer] = useState(false);
+  const [checkingCustomer, setCheckingCustomer] = useState(false);
 
   useEffect(() => { setFadeIn(false); const t = setTimeout(() => setFadeIn(true), 20); return () => clearTimeout(t); }, [step]);
 
@@ -275,6 +277,25 @@ export default function JetSkiBooking() {
     let m = mo + dir, y = yr;
     if (m > 11) { m = 0; y++; } if (m < 0) { m = 11; y--; }
     setMo(m); setYr(y);
+  };
+
+  // Check if customer is a returning customer when they finish typing email/phone
+  const checkReturningCustomer = async () => {
+    if (!info.email || !info.email.includes('@')) return;
+    setCheckingCustomer(true);
+    try {
+      const res = await fetch('/api/check-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: info.email, phone: info.phone }),
+      });
+      const data = await res.json();
+      setIsRepeatCustomer(data.isRepeat || false);
+    } catch (err) {
+      // Silently fail — don't block booking
+      setIsRepeatCustomer(false);
+    }
+    setCheckingCustomer(false);
   };
 
   const handleCheckout = async () => {
@@ -324,7 +345,9 @@ export default function JetSkiBooking() {
   const whiteGloveFee = whiteGlove ? 200 : 0;
   const isLakePowell = loc?.id === "lake-powell";
   const deconFee = isLakePowell ? 200 : 0;
-  const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee;
+  // Loyalty discount: 10% off base rental only (not white glove, decon, or holiday surcharge)
+  const loyaltyDiscount = isRepeatCustomer ? Math.round(basePrice * 0.10) : 0;
+  const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee - loyaltyDiscount;
   const meetsLakePowellMinimum = !isLakePowell || days >= 3;
 
   const canNext = () => {
@@ -717,7 +740,7 @@ export default function JetSkiBooking() {
                     {days > 1 && <div style={{ fontSize: 11, opacity: 0.6 }}>${Math.round(totalPrice/days)}/day avg</div>}
                   </div>
                 </div>
-                {(holidayInfo.total > 0 || whiteGlove || deconFee > 0) && (
+                {(holidayInfo.total > 0 || whiteGlove || deconFee > 0 || loyaltyDiscount > 0) && (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.15)", fontSize: 11, opacity: 0.7 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                       <span>Base rental</span><span>${basePrice.toLocaleString()}</span>
@@ -735,6 +758,11 @@ export default function JetSkiBooking() {
                     {deconFee > 0 && (
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#FCD34D" }}>
                         <span>🦠 Lake Powell decontamination</span><span>+${deconFee}</span>
+                      </div>
+                    )}
+                    {loyaltyDiscount > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#86EFAC" }}>
+                        <span>✨ Returning customer</span><span>-${loyaltyDiscount}</span>
                       </div>
                     )}
                   </div>
@@ -759,8 +787,22 @@ export default function JetSkiBooking() {
                 <label style={labelSt}>{f.label}</label>
                 <input type={f.type} placeholder={f.ph} value={info[f.k]}
                   onChange={e => setInfo({ ...info, [f.k]: e.target.value })}
+                  onBlur={() => (f.k === 'email' || f.k === 'phone') && checkReturningCustomer()}
                   style={inputSt}
                 />
+                {f.k === 'phone' && isRepeatCustomer && (
+                  <div style={{ marginTop: 8, padding: 10, background: "rgba(22,163,74,0.08)", borderRadius: 8, border: "1px solid #16A34A", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>✨</span>
+                    <div style={{ fontSize: 12, color: "#15803D", lineHeight: 1.4 }}>
+                      <strong>Welcome back!</strong> You're getting 10% off your rental as a returning customer.
+                    </div>
+                  </div>
+                )}
+                {f.k === 'phone' && checkingCustomer && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#94A3B8", fontStyle: "italic" }}>
+                    Checking your account...
+                  </div>
+                )}
               </div>
             ))}
             <div style={{ marginBottom: 14 }}>
@@ -985,6 +1027,7 @@ export default function JetSkiBooking() {
                   ...(holidayInfo.holidays.map(h => ({ l: `🎆 ${h.name} surcharge`, v: `+$${h.premium}/day`, color: "#DC2626" }))),
                   ...(whiteGlove ? [{ l: "🤝 White glove delivery", v: "+$200", color: "#16A34A" }] : []),
                   ...(deconFee > 0 ? [{ l: "🦠 Lake Powell decontamination", v: `+$${deconFee}`, color: "#D97706" }] : []),
+                  ...(loyaltyDiscount > 0 ? [{ l: "✨ Returning customer (10% off)", v: `-$${loyaltyDiscount}`, color: "#16A34A" }] : []),
                   { l: "Total due now", v: `$${totalPrice.toLocaleString()}`, bold: true },
                 ].map((r, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: r.bold ? 14 : 13, fontWeight: r.bold ? 700 : 400, color: r.color || (r.bold ? "#0F172A" : "#64748B") }}>
@@ -1041,7 +1084,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); setIsRepeatCustomer(false); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
