@@ -38,17 +38,17 @@ async function sendConfirmationEmail(booking) {
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Location</td><td style="padding: 8px; font-weight: 600;">${booking.location}</td></tr>
                 <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Dates</td><td style="padding: 8px; font-weight: 600;">${booking.start_date}${booking.end_date !== booking.start_date ? ' → ' + booking.end_date : ''}</td></tr>
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Days</td><td style="padding: 8px; font-weight: 600;">${booking.days}</td></tr>
-                <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Deposit Paid</td><td style="padding: 8px; font-weight: 600; color: #16a34a;">$${booking.deposit_paid}</td></tr>
-                <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">$${Number(booking.total_price) - Number(booking.deposit_paid) + 1000}</td></tr>
+                <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Rental Paid in Full</td><td style="padding: 8px; font-weight: 600; color: #16a34a;">$${booking.total_price}</td></tr>
+                <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">$1,000 security deposit</td></tr>
               </table>
 
               <div style="background: #FEF3C7; padding: 16px; border-radius: 8px; margin: 16px 0;">
                 <strong style="color: #92400E;">Before Your Rental:</strong>
                 <ol style="color: #92400E; margin: 8px 0; padding-left: 20px; font-size: 14px;">
                   <li>Arrive at Farmington pickup point by 8:00 AM</li>
-                  <li>Bring valid driver's license and proof of insurance</li>
+                  <li>Bring valid driver's license</li>
                   <li>Bring a vehicle with a 2" ball hitch and flat 4-prong light hookup</li>
-                  <li>Pay remaining balance + $1,000 security deposit at pickup</li>
+                  <li>Bring $1,000 security deposit (card hold or cash)</li>
                 </ol>
               </div>
 
@@ -59,7 +59,7 @@ async function sendConfirmationEmail(booking) {
                 </p>
               </div>
 
-              <p style="font-size: 13px; color: #64748b;">Questions? Reply to this email or call/text us.</p>
+              <p style="font-size: 13px; color: #64748b;">Questions? Reply to this email or call/text us at (714) 856-5676.</p>
               <p style="font-size: 13px; color: #64748b;">See you on the water!</p>
               <p><strong>Full Throttle Utah</strong><br/>TW Assets LLC · Farmington, UT</p>
             </div>
@@ -94,27 +94,47 @@ export async function POST(request) {
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      const meta = session.metadata || {};
+      
+      // Get the payment intent to access the metadata (new flow stores it there)
+      let meta = {};
+      if (session.payment_intent) {
+        try {
+          const pi = await stripe.paymentIntents.retrieve(session.payment_intent);
+          meta = pi.metadata || {};
+        } catch (err) {
+          console.error('Failed to retrieve payment intent:', err);
+        }
+      }
+      
+      // Fall back to session metadata if needed (for legacy compatibility)
+      if (!meta.renterName && session.metadata) {
+        meta = { ...session.metadata, ...meta };
+      }
 
       const booking = {
         booking_id: session.id,
-        package: meta.package || '',
+        // Support both new (camelCase) and old (snake_case) field names
+        package: meta.packageName || meta.package || '',
         location: meta.location || '',
-        start_date: meta.start_date || '',
-        end_date: meta.end_date || '',
+        start_date: meta.startDate || meta.start_date || '',
+        end_date: meta.endDate || meta.end_date || '',
         days: meta.days || '',
-        total_price: meta.total_price || '',
-        deposit_paid: meta.deposit_amount || '',
-        renter_name: meta.renter_name || '',
-        renter_email: meta.renter_email || session.customer_email || '',
-        renter_phone: meta.renter_phone || '',
+        total_price: (session.amount_total / 100).toString(),
+        deposit_paid: (session.amount_total / 100).toString(),
+        renter_name: meta.renterName || meta.renter_name || '',
+        renter_email: meta.renterEmail || meta.renter_email || session.customer_email || '',
+        renter_phone: meta.renterPhone || meta.renter_phone || '',
         experience: meta.experience || '',
-        sms_consent: meta.sms_consent === 'true',
+        sms_consent: meta.smsOptIn === 'true' || meta.sms_consent === 'true',
       };
 
       // Write to Google Sheets
-      await addBooking(booking);
-      console.log('Booking added to sheet:', booking.booking_id);
+      try {
+        await addBooking(booking);
+        console.log('Booking added to sheet:', booking.booking_id);
+      } catch (sheetErr) {
+        console.error('Sheet error (non-fatal):', sheetErr.message);
+      }
 
       // Create Google Calendar event
       try {
@@ -141,7 +161,7 @@ export async function POST(request) {
       try {
         const ownerPhone = process.env.OWNER_PHONE_NUMBER;
         if (ownerPhone) {
-          const ownerMsg = `🛎️ New booking!\n${booking.package}\n${booking.location}\n${booking.start_date}\nRenter: ${booking.renter_name} (${booking.renter_phone})\nDeposit: $${booking.deposit_paid}`;
+          const ownerMsg = `🛎️ New booking!\n${booking.package}\n${booking.location}\n${booking.start_date}\nRenter: ${booking.renter_name} (${booking.renter_phone})\nPaid: $${booking.total_price}`;
           await sendSMS(ownerPhone, ownerMsg);
           console.log('SMS sent to owner:', ownerPhone);
         }
