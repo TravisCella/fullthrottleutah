@@ -49,6 +49,7 @@ const PACKAGES = [
 
 const LOCATIONS = [
   { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️", aisStatus: "clean" },
+  { id: "willard-bay", name: "Willard Bay", region: "Northern Utah", drive: "~35min", emoji: "🦅", aisStatus: "clean" },
   { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲", aisStatus: "clean" },
   { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌", aisStatus: "clean" },
   { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean" },
@@ -155,14 +156,11 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
   const isBooked = (day) => {
     if (!day || !bookedDates?.length) return false;
     const date = new Date(year, month, day);
-    date.setHours(0,0,0,0);
     return bookedDates.some(b => {
-      if (!b.start) return false;
-      const [sy, sm, sd] = b.start.split('-').map(Number);
-      const start = new Date(sy, sm - 1, sd);
-      const endStr = b.end || b.start;
-      const [ey, em, ed] = endStr.split('-').map(Number);
-      const end = new Date(ey, em - 1, ed);
+      const start = new Date(b.start);
+      const end = new Date(b.end || b.start);
+      start.setHours(0,0,0,0);
+      end.setHours(0,0,0,0);
       return date >= start && date <= end;
     });
   };
@@ -417,7 +415,7 @@ export default function JetSkiBooking() {
               </div>
             </div>
             <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
-              Skip the towing. We bring the watercraft to your lake, launch it, and pick it up when you're done.
+              Skip the towing. We bring the watercraft to your lake, launch it, and pick it up when you're done. $200 flat fee within 45 min of Farmington; longer distances add fuel cost.
             </div>
           </div>
 
@@ -664,7 +662,10 @@ export default function JetSkiBooking() {
                 </div>
                 {whiteGlove && (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(22,163,74,0.15)", fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
-                    We'll deliver your watercraft to the ramp, launch it, and pick it up when you're done. No towing needed — just show up and ride. Available within 45 min of Farmington.
+                    We'll deliver your watercraft to the ramp, launch it, and pick it up when you're done. No towing needed — just show up and ride.
+                    <div style={{ marginTop: 8, padding: 8, background: "#FEF3C7", borderRadius: 6, fontSize: 11, color: "#92400E" }}>
+                      <strong>Note:</strong> $200 flat fee covers destinations within 45 min of Farmington (Pineview, Willard Bay, Jordanelle, Deer Creek). For destinations beyond 45 min (Bear Lake, etc.), actual round-trip towing fuel cost will be added and settled at pickup.
+                    </div>
                   </div>
                 )}
               </div>
