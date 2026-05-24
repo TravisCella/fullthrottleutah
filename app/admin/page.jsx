@@ -15,6 +15,9 @@ export default function AdminPage() {
   const [captureAmount, setCaptureAmount] = useState('');
   const [damageReason, setDamageReason] = useState('');
   const [returnNotes, setReturnNotes] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [hideTests, setHideTests] = useState(true);
 
   // Check for saved password on mount
   useEffect(() => {
@@ -295,7 +298,47 @@ export default function AdminPage() {
         </button>
       </div>
 
-      <div style={{ padding: '20px 16px' }}>
+      <div style={{ padding: '16px 16px 0' }}>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="🔍 Search by name, email, lake, date..."
+          style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '2px solid #E2E8F0', fontSize: 14, boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#fff' }}
+        />
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'upcoming', label: 'Upcoming' },
+            { id: 'out', label: 'Out' },
+            { id: 'completed', label: 'Completed' },
+          ].map(f => (
+            <button
+              key={f.id}
+              onClick={() => setStatusFilter(f.id)}
+              style={{
+                padding: '6px 14px', borderRadius: 20,
+                border: statusFilter === f.id ? '1.5px solid #0C4A6E' : '1.5px solid #E2E8F0',
+                background: statusFilter === f.id ? '#0C4A6E' : '#fff',
+                color: statusFilter === f.id ? '#fff' : '#475569',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >{f.label}</button>
+          ))}
+          <button
+            onClick={() => setHideTests(!hideTests)}
+            style={{
+              padding: '6px 14px', borderRadius: 20,
+              border: '1.5px solid #E2E8F0',
+              background: hideTests ? '#F1F5F9' : '#FEF3C7',
+              color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              whiteSpace: 'nowrap', marginLeft: 'auto',
+            }}
+          >{hideTests ? '🧪 Show tests' : '🧪 Hide tests'}</button>
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 16px 40px' }}>
         {bookings.length === 0 && (
           <div style={{ textAlign: 'center', padding: 60, color: '#94A3B8' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
@@ -303,7 +346,23 @@ export default function AdminPage() {
           </div>
         )}
 
-        {bookings.map(b => {
+        {bookings
+          .filter(b => {
+            if (hideTests && b.isTestBooking) return false;
+            if (statusFilter !== 'all') {
+              const s = b.rentalStatus;
+              if (statusFilter === 'upcoming' && s !== 'booked') return false;
+              if (statusFilter === 'out' && s !== 'picked_up') return false;
+              if (statusFilter === 'completed' && s !== 'returned') return false;
+            }
+            if (searchQuery.trim()) {
+              const q = searchQuery.toLowerCase();
+              const hay = [b.renterName, b.renterEmail, b.renterPhone, b.location, b.packageName, b.startDate, b.endDate].join(' ').toLowerCase();
+              if (!hay.includes(q)) return false;
+            }
+            return true;
+          })
+          .map(b => {
           const badge = statusBadge(b);
           return (
             <div
@@ -320,16 +379,21 @@ export default function AdminPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#0F172A' }}>{b.renterName}</div>
-                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{b.packageName} · {b.location}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.renterName}</div>
+                    {b.isTestBooking && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: '#92400E', background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em' }}>TEST</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748B' }}>{b.packageName || '—'} {b.location ? `· ${b.location}` : ''}</div>
                 </div>
                 <span style={{ fontSize: 10, fontWeight: 700, color: badge.color, background: badge.bg, padding: '4px 8px', borderRadius: 6, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                   {badge.label}
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748B' }}>
-                <span>📅 {b.startDate}{b.endDate !== b.startDate ? ` → ${b.endDate}` : ''}</span>
+              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748B', flexWrap: 'wrap' }}>
+                <span>📅 {b.startDate || 'No date'}{b.endDate && b.endDate !== b.startDate ? ` → ${b.endDate}` : ''}</span>
                 <span>· {b.days} day{b.days > 1 ? 's' : ''}</span>
                 <span>· ${b.totalPaid}</span>
               </div>
