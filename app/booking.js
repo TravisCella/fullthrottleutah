@@ -314,8 +314,15 @@ export default function JetSkiBooking() {
           packageTagline: pkg.tagline,
           totalPrice: totalPrice,
           days: days,
-          startDate: formatDate(dates[0]),
-          endDate: dates.length === 2 ? formatDate(dates[1]) : formatDate(dates[0]),
+          startDate: toISODate(dates[0]),
+          endDate: dates.length === 2 ? toISODate(dates[1]) : toISODate(dates[0]),function formatDate(d) { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
+          function formatDate(d) { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
+function toISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
           location: loc.name,
           renterName: info.name,
           renterEmail: info.email,
