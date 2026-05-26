@@ -100,6 +100,12 @@ function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDayOfMonth(y, m) { return new Date(y, m, 1).getDay(); }
 function isWeekend(d) { const day = new Date(d).getDay(); return day === 0 || day === 5 || day === 6; }
 function formatDate(d) { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
+function toISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function daysBetween(a, b) { return Math.round((b - a) / 864e5) + 1; }
 
 function calculatePrice(pkg, start, end) {
@@ -315,14 +321,7 @@ export default function JetSkiBooking() {
           totalPrice: totalPrice,
           days: days,
           startDate: toISODate(dates[0]),
-          endDate: dates.length === 2 ? toISODate(dates[1]) : toISODate(dates[0]),function formatDate(d) { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
-          function formatDate(d) { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
-function toISODate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+          endDate: dates.length === 2 ? toISODate(dates[1]) : toISODate(dates[0]),
           location: loc.name,
           renterName: info.name,
           renterEmail: info.email,
@@ -702,7 +701,8 @@ function toISODate(d) {
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(22,163,74,0.15)", fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
                     We'll deliver your watercraft to the ramp, launch it, and pick it up when you're done. No towing needed — just show up and ride.
                     <div style={{ marginTop: 8, padding: 8, background: "#FEF3C7", borderRadius: 6, fontSize: 11, color: "#92400E" }}>
-<strong>Note:</strong> $200 flat fee covers destinations within 45 min of Farmington (Pineview, Willard Bay, Echo, Jordanelle). For destinations beyond 45 min (Rockport, East Canyon, Deer Creek, Utah Lake, Bear Lake), actual round-trip towing fuel cost will be added and settled at pickup.                    </div>
+                      <strong>Note:</strong> $200 flat fee covers destinations within 45 min of Farmington (Pineview, Willard Bay, Echo, Jordanelle). For destinations beyond 45 min (Rockport, East Canyon, Deer Creek, Utah Lake, Bear Lake), actual round-trip towing fuel cost will be added and settled at pickup.
+                    </div>
                   </div>
                 )}
               </div>
