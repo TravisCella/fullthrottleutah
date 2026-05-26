@@ -60,6 +60,7 @@ async function sendConfirmationEmail(booking) {
               </div>
 
               <p style="font-size: 13px; color: #64748b;">Questions? Reply to this email or call/text us at (714) 856-5676.</p>
+              <p style="font-size: 13px; color: #64748b; margin-top: 16px;">📋 <a href="https://www.fullthrottleutah.com/cancellation-policy" style="color: #0C4A6E;">View our Cancellation &amp; Weather Policy</a></p>
               <p style="font-size: 13px; color: #64748b;">See you on the water!</p>
               <p><strong>Full Throttle Utah</strong><br/>TW Assets LLC · Farmington, UT</p>
             </div>
