@@ -496,6 +496,7 @@ export default function JetSkiBooking() {
             <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.6 }}>
               Pickup from Farmington, UT · 8 AM – 8 PM<br/>
               2" ball hitch + valid ID required<br/>
+              <a href="/cancellation-policy" style={{ color: "#0EA5E9", textDecoration: "none" }}>Cancellation & Weather Policy</a><br/>
               <span style={{ color: "#64748B" }}>© {new Date().getFullYear()} TW Assets LLC d/b/a Full Throttle Utah</span>
             </div>
           </div>
@@ -1052,7 +1053,7 @@ export default function JetSkiBooking() {
               </div>
             </div>
             <div style={{ marginTop: 12, fontSize: 11, color: "#94A3B8", textAlign: "center", lineHeight: 1.6 }}>
-              By booking you agree to our rental terms. Cancellations 72+ hours out receive a full deposit refund.
+              By booking you agree to our rental terms. View our <a href="/cancellation-policy" style={{ color: "#0EA5E9", textDecoration: "none" }}>cancellation & weather policy</a>.
             </div>
             {payError && (
               <div style={{ marginTop: 12, padding: 12, background: "#FEE2E2", borderRadius: 10, fontSize: 13, color: "#991B1B", textAlign: "center" }}>
