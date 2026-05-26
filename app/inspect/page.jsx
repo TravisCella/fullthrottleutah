@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 const CUSTOMER_ZONES = [
   { id: "bow", label: "Bow / front", icon: "↗", hint: "Stand in front, capture the full nose and hull" },
@@ -54,11 +54,41 @@ function upload(record, cb) {
   }).then(() => cb(true, id)).catch(() => cb(false, null));
 }
 
+// Notify backend so it can email/SMS the owner AND log to Google Sheets
+function notifyBackend(record, inspectionId) {
+  const damageNotes = (record.zones || [])
+    .filter(z => z.damage && z.damage !== "None" && z.damage.trim() !== "")
+    .map(z => `${z.zone}: ${z.damage}`);
+  
+  return fetch('/api/inspection-submitted', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      inspectionId,
+      type: record.role, // 'customer' or 'owner'
+      timestamp: ts(),
+      customerName: record.customerName,
+      machineName: record.machineName,
+      rentalDate: record.rentalDate,
+      photoCount: record.photoCount,
+      damageNotes,
+      hasDamage: damageNotes.length > 0,
+      fuelOk: record.fuelOk,
+      hourMeter: record.hourMeter,
+      globalNote: record.globalNote,
+    }),
+  }).catch(err => {
+    console.error('Notify backend failed (non-fatal):', err);
+    // Inspection is still saved in Firebase even if notification fails
+  });
+}
+
 function aiCompare(checkoutId, checkinId, cb) {
   Promise.all([
     fetch(`${DB_URL}/inspections/${checkoutId}.json`).then(r => r.json()),
     fetch(`${DB_URL}/inspections/${checkinId}.json`).then(r => r.json()),
   ]).then(([out, inn]) => {
+    if (!out || !inn) { cb(null); return; }
     const findings = [];
     const allZones = [...new Set([...Object.keys(out.zones || {}), ...Object.keys(inn.zones || {})])];
     
@@ -69,8 +99,6 @@ function aiCompare(checkoutId, checkinId, cb) {
       
       const outDmg = outZone.damage || "None";
       const inDmg = inZone.damage || "None";
-      const outPhotos = outZone.photos || 0;
-      const inPhotos = inZone.photos || 0;
       
       if (inDmg !== "None" && inDmg !== outDmg) {
         findings.push({
@@ -162,6 +190,11 @@ export default function InspectionV2() {
   const [aiLoading, setAiLoading] = useState(false);
   const [impellerNotes, setImpellerNotes] = useState("");
   const [hourMeter, setHourMeter] = useState("");
+  
+  // NEW: server-loaded recent inspections (replaces local session state)
+  const [recentInspections, setRecentInspections] = useState([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+  const [recentSearch, setRecentSearch] = useState("");
 
   const zones = role === "owner" ? OWNER_ZONES : CUSTOMER_ZONES;
   const mk = machine?.id || "";
@@ -171,6 +204,24 @@ export default function InspectionV2() {
   const cp = zp[cz?.id] || [];
   const cn = zn[cz?.id] || "";
   const done = Object.keys(zp).filter(k => (zp[k] || []).length > 0).length;
+  
+  // Load recent inspections from server when entering home screen or compare mode
+  useEffect(() => {
+    if (role === null || compareMode) {
+      loadRecentInspections();
+    }
+  }, [role, compareMode]);
+  
+  function loadRecentInspections() {
+    setLoadingRecent(true);
+    fetch('/api/recent-inspections?days=30')
+      .then(r => r.json())
+      .then(data => {
+        setRecentInspections(data.inspections || []);
+      })
+      .catch(() => setRecentInspections([]))
+      .finally(() => setLoadingRecent(false));
+  }
 
   const addPhoto = useCallback(img => {
     setPhotos(p => { const m = { ...(p[mk] || {}) }; m[cz.id] = [...(m[cz.id] || []), img]; return { ...p, [mk]: m }; });
@@ -201,13 +252,16 @@ export default function InspectionV2() {
       photos: zp,
     };
     upload(record, (ok, id) => {
-      setUploading(false);
       if (ok) {
+        // NEW: Notify backend (email + SMS owner, log to Sheets) — fire and forget
+        notifyBackend(record, id);
+        
         setSubmitted(prev => [...prev, { ...record, id, timestamp: ts() }]);
         setPhotos(p => { const n = { ...p }; delete n[mk]; return n; });
         setNotes(p => { const n = { ...p }; delete n[mk]; return n; });
         setFuelOk(null); setGlobalNote(""); setZone(0); setHourMeter(""); setStep("done");
       }
+      setUploading(false);
     });
   };
 
@@ -231,8 +285,58 @@ export default function InspectionV2() {
   const green = "#1a8a5c";
   const red = "#c44";
 
-  const btn = (bg, color) => ({ padding: "13px 24px", border: "none", borderRadius: 12, background: bg, color, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", width: "100%", transition: "opacity 0.15s" });
+  const btn = (bgColor, color) => ({ padding: "13px 24px", border: "none", borderRadius: 12, background: bgColor, color, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", width: "100%", transition: "opacity 0.15s" });
   const outline = { padding: "11px 18px", border: `1.5px solid ${bdr}`, borderRadius: 12, background: "transparent", color: dark, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.2s" };
+  
+  // Helper to render a recent inspection card with tap-to-use action
+  function RecentCard({ insp, onTap, showSelectButtons, onUseAsCheckout, onUseAsCheckin }) {
+    const isCustomer = insp.type === 'customer';
+    return (
+      <div style={{ background: card, border: `1px solid ${bdr}`, borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: isCustomer ? "#e8f4fd" : "#fef0ea", color: isCustomer ? "#1e40af" : "#92400e" }}>
+                {isCustomer ? "OUT" : "IN"}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{insp.customerName || "—"}</span>
+            </div>
+            <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
+              {insp.machineName} · {insp.photoCount} photos · {insp.timestamp}
+            </div>
+            <div style={{ fontSize: 10, fontFamily: "monospace", color: green, marginTop: 4, wordBreak: "break-all" }}>
+              {insp.inspectionId}
+            </div>
+            {insp.damageNotes && (
+              <div style={{ fontSize: 10, color: red, marginTop: 4 }}>⚠ {insp.damageNotes}</div>
+            )}
+          </div>
+          {showSelectButtons && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {isCustomer && (
+                <button onClick={() => onUseAsCheckout(insp.inspectionId)}
+                  style={{ ...outline, padding: "5px 10px", fontSize: 11, whiteSpace: "nowrap" }}>
+                  Use as OUT
+                </button>
+              )}
+              {!isCustomer && (
+                <button onClick={() => onUseAsCheckin(insp.inspectionId)}
+                  style={{ ...outline, padding: "5px 10px", fontSize: 11, whiteSpace: "nowrap" }}>
+                  Use as IN
+                </button>
+              )}
+            </div>
+          )}
+          {!showSelectButtons && (
+            <button onClick={() => navigator.clipboard?.writeText(insp.inspectionId)}
+              style={{ ...outline, padding: "5px 10px", fontSize: 10, whiteSpace: "nowrap" }}>
+              Copy ID
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: bg, minHeight: "100vh", color: dark }}>
@@ -286,23 +390,31 @@ export default function InspectionV2() {
               <span style={{ fontSize: 18, color: accent }}>→</span>
             </div>
 
-            {submitted.length > 0 && (
-              <div style={{ marginTop: 28 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Recent inspections</div>
-                {submitted.map((r, i) => (
-                  <div key={i} style={{ background: card, border: `1px solid ${bdr}`, borderRadius: 10, padding: "10px 14px", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{r.machineName}</div>
-                      <div style={{ fontSize: 11, color: muted }}>{r.role === "customer" ? "OUT" : "IN"} · {r.customerName} · {r.photoCount} photos</div>
-                    </div>
-                    <div style={{ fontSize: 10, color: muted, textAlign: "right" }}>
-                      {r.timestamp}
-                      {r.id && <div style={{ fontFamily: "monospace", color: green, fontSize: 9 }}>ID: {r.id.substr(0, 12)}…</div>}
-                    </div>
-                  </div>
-                ))}
+            {/* NEW: Server-loaded recent inspections (last 30 days) */}
+            <div style={{ marginTop: 28 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Recent inspections (30 days)</div>
+                <button onClick={loadRecentInspections} style={{ ...outline, padding: "4px 10px", fontSize: 11 }}>
+                  {loadingRecent ? "..." : "↻"}
+                </button>
               </div>
-            )}
+              {loadingRecent && recentInspections.length === 0 && (
+                <div style={{ textAlign: "center", padding: 16, color: muted, fontSize: 12 }}>Loading...</div>
+              )}
+              {!loadingRecent && recentInspections.length === 0 && (
+                <div style={{ textAlign: "center", padding: 16, color: muted, fontSize: 12, background: card, border: `1px solid ${bdr}`, borderRadius: 10 }}>
+                  No recent inspections yet
+                </div>
+              )}
+              {recentInspections.slice(0, 10).map((insp, i) => (
+                <RecentCard key={i} insp={insp} showSelectButtons={false} />
+              ))}
+              {recentInspections.length > 10 && (
+                <div style={{ textAlign: "center", fontSize: 11, color: muted, marginTop: 4 }}>
+                  {recentInspections.length - 10} more not shown
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -311,7 +423,41 @@ export default function InspectionV2() {
           <div style={{ marginTop: 20 }}>
             <button onClick={reset} style={{ ...outline, padding: "6px 12px", fontSize: 12, marginBottom: 16 }}>← Back</button>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>🤖 AI damage comparison</div>
-            <div style={{ fontSize: 13, color: muted, marginBottom: 20 }}>Enter the inspection IDs from check-out and check-in to compare.</div>
+            <div style={{ fontSize: 13, color: muted, marginBottom: 16 }}>Tap a recent inspection to autofill, or enter IDs manually.</div>
+
+            {/* NEW: Tappable recent inspections to autofill IDs */}
+            <div style={{ marginBottom: 16 }}>
+              <input value={recentSearch} onChange={e => setRecentSearch(e.target.value)}
+                placeholder="🔍 Search by customer name..."
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${bdr}`, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 8 }} />
+              
+              <div style={{ fontSize: 11, fontWeight: 600, color: muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Recent inspections {recentInspections.length > 0 ? `(${recentInspections.length})` : ''}
+              </div>
+              {recentInspections
+                .filter(insp => {
+                  if (!recentSearch.trim()) return true;
+                  const q = recentSearch.toLowerCase();
+                  return (insp.customerName || '').toLowerCase().includes(q) ||
+                         (insp.machineName || '').toLowerCase().includes(q) ||
+                         (insp.inspectionId || '').toLowerCase().includes(q);
+                })
+                .slice(0, 10)
+                .map((insp, i) => (
+                  <RecentCard
+                    key={i}
+                    insp={insp}
+                    showSelectButtons={true}
+                    onUseAsCheckout={(id) => setCompareOut(id)}
+                    onUseAsCheckin={(id) => setCompareIn(id)}
+                  />
+                ))}
+              {recentInspections.length === 0 && !loadingRecent && (
+                <div style={{ textAlign: "center", padding: 16, color: muted, fontSize: 12, background: card, border: `1px solid ${bdr}`, borderRadius: 10 }}>
+                  No recent inspections found. Enter IDs manually below.
+                </div>
+              )}
+            </div>
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 12, fontWeight: 500, display: "block", marginBottom: 4 }}>Check-out ID (customer departure)</label>
@@ -562,14 +708,25 @@ export default function InspectionV2() {
             </div>
             <div style={{ fontSize: 13, color: muted, marginBottom: 6 }}>{machine?.name} · {customer}</div>
             {submitted.length > 0 && (
-              <div style={{ fontSize: 11, fontFamily: "monospace", color: green, marginBottom: 20 }}>
-                ID: {submitted[submitted.length - 1].id}
-              </div>
+              <>
+                <div style={{ background: "#fef0ea", border: `2px solid ${accent}`, borderRadius: 10, padding: 12, margin: "12px 0", textAlign: "left" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Inspection ID</div>
+                  <div style={{ fontSize: 13, fontFamily: "monospace", color: dark, wordBreak: "break-all", marginBottom: 6 }}>
+                    {submitted[submitted.length - 1].id}
+                  </div>
+                  <button onClick={() => navigator.clipboard?.writeText(submitted[submitted.length - 1].id)}
+                    style={{ ...outline, padding: "5px 12px", fontSize: 11 }}>📋 Copy ID</button>
+                </div>
+                
+                <div style={{ background: "#eaf7f0", border: `1px solid ${green}`, borderRadius: 8, padding: 10, marginBottom: 16, fontSize: 11, color: green, textAlign: "left" }}>
+                  ✅ Saved to inspection log. {role === "owner" ? "Owner email + SMS sent." : "Owner has been notified."}
+                </div>
+              </>
             )}
 
             {role === "customer" && (
               <div style={{ background: "#e8f4fd", borderRadius: 10, padding: 14, marginBottom: 20, fontSize: 12, color: "#1e40af", lineHeight: 1.5, textAlign: "left" }}>
-                <strong>Save your inspection ID above.</strong> This is your proof of the watercraft's condition at pickup. If there's a damage dispute, this ID links to your photos.
+                <strong>Your photos protect you.</strong> They're saved with your inspection ID above. If there's any damage dispute, this ID links to your photos.
               </div>
             )}
 
