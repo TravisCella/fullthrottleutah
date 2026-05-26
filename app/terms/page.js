@@ -22,7 +22,7 @@ export default function Terms() {
           Terms and Conditions
         </h1>
         <p style={{ fontSize: 13, color: '#94A3B8', marginBottom: 32 }}>
-          Last updated: May 18, 2026
+          Last updated: May 25, 2026
         </p>
 
         <div style={{
@@ -46,9 +46,9 @@ export default function Terms() {
 
           <Section title="3. Rental Process">
             <ul>
-              <li><strong>Booking:</strong> A 50% deposit is collected at the time of online booking via Stripe.</li>
+              <li><strong>Booking:</strong> Full payment of the rental fee is collected at the time of online booking via Stripe.</li>
               <li><strong>Pickup:</strong> Rentals are picked up at our Farmington, UT location at 8:00 AM on the rental date unless other arrangements are made.</li>
-              <li><strong>Remaining balance:</strong> The remaining balance, plus a $1,000 refundable security deposit per package, is due at pickup.</li>
+              <li><strong>Security deposit:</strong> A $1,000 refundable security deposit per package is due at pickup via card hold or cash.</li>
               <li><strong>Return:</strong> Equipment must be returned by 8:00 PM on the final rental date, fully refueled, with all included accessories.</li>
               <li><strong>Towing:</strong> Renter is responsible for transporting the equipment with a vehicle equipped with a 2&quot; ball hitch and flat 4-prong light hookup.</li>
             </ul>
@@ -63,14 +63,26 @@ export default function Terms() {
             </ul>
           </Section>
 
-          <Section title="5. Cancellation & Refund Policy">
+          <Section title="5. Cancellation & Weather Policy">
+            <p><strong>General Cancellations (non-weather):</strong></p>
             <ul>
-              <li><strong>72+ hours before rental:</strong> Full refund of deposit.</li>
-              <li><strong>48-72 hours before rental:</strong> 50% refund of deposit.</li>
-              <li><strong>Less than 48 hours before rental:</strong> No refund.</li>
-              <li><strong>Weather:</strong> No refunds for weather. Renter may reschedule for another available date within the same season.</li>
-              <li><strong>No-shows:</strong> No refund.</li>
+              <li><strong>48+ hours before reservation:</strong> Full refund to original payment method.</li>
+              <li><strong>24–48 hours before reservation:</strong> 50% refund, or full credit toward a future booking within the current season.</li>
+              <li><strong>Less than 24 hours / No-show:</strong> No refund.</li>
             </ul>
+            <p><strong>Weather Cancellations:</strong></p>
+            <ul>
+              <li>If Full Throttle Utah determines that conditions are unsafe (thunderstorms/lightning, sustained high winds, heavy rain affecting visibility, or reservoir closures/advisories), we will contact you and offer a free reschedule to another available date or a full credit valid through the end of the current season.</li>
+              <li>Light rain, overcast skies, or brief passing showers do not qualify for weather cancellation.</li>
+              <li>We do not cancel based on weather forecasts alone. Weather decisions are made the morning of your reservation based on actual conditions.</li>
+            </ul>
+            <p><strong>Mid-Rental Weather Interruptions:</strong></p>
+            <ul>
+              <li>If severe weather develops during your rental and Full Throttle Utah determines it is unsafe to continue, your rental time will be paused.</li>
+              <li>Once conditions improve, your remaining time restarts.</li>
+              <li>If conditions do not improve, a prorated credit will be issued for unused rental time.</li>
+            </ul>
+            <p>For full details, see our <a href="/cancellation-policy" style={{ color: '#0C4A6E', textDecoration: 'none', fontWeight: 600 }}>Cancellation & Weather Policy</a> page.</p>
           </Section>
 
           <Section title="6. Liability Waiver">
@@ -121,7 +133,7 @@ export default function Terms() {
           <Section title="Contact">
             <strong>Full Throttle Utah</strong> (TW Assets LLC d/b/a Full Throttle Utah)<br/>
             Farmington, UT<br/>
-            Phone: 801-548-1273<br/>
+            Phone: (714) 856-5676<br/>
             Website: www.fullthrottleutah.com
           </Section>
         </div>
