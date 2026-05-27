@@ -155,7 +155,7 @@ function ImageGallery({ images: imgKeys }) {
   );
 }
 
-function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates }) {
+function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates, pkg }) {
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
   const today = new Date(); today.setHours(0,0,0,0);
@@ -216,10 +216,29 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
           const booked = isBooked(day);
           const holiday = isHoliday(day);
           const unavailable = past || booked;
+          
+          // Compute the price to display under this date
+          let dayPrice = null;
+          if (day && pkg && !past) {
+            const baseRate = wknd ? pkg.weekend : pkg.weekday;
+            // Add holiday surcharge if applicable
+            const mmdd = `${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const holidayMatch = HOLIDAYS.find(h => mmdd >= h.start && mmdd <= h.end);
+            dayPrice = baseRate + (holidayMatch ? holidayMatch.premium : 0);
+          }
+          
+          // Color for the price text — keep readable against the background
+          const priceColor = !day ? "transparent"
+            : booked ? "#EF4444"
+            : sel ? "#fff"
+            : holiday ? "#DC2626"
+            : wknd ? "#D97706"
+            : "#94A3B8";
+          
           return (
             <div key={i} onClick={() => day && !unavailable && onSelectDate(new Date(year, month, day))}
               style={{
-                padding: "10px 0", fontSize: 13, fontWeight: sel ? 700 : 400,
+                padding: "8px 0 6px", fontSize: 13, fontWeight: sel ? 700 : 400,
                 cursor: day && !unavailable ? "pointer" : "default",
                 color: !day ? "transparent" : booked ? "#EF4444" : past ? "#D1D5DB" : sel ? "#fff" : holiday ? "#DC2626" : wknd ? "#D97706" : "#1E293B",
                 background: sel ? (start || end ? "#0C4A6E" : "rgba(12,74,110,0.12)") : booked ? "rgba(239,68,68,0.06)" : holiday && !past ? "rgba(220,38,38,0.06)" : "transparent",
@@ -227,8 +246,23 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
                 transition: "all 0.15s",
                 textDecoration: booked ? "line-through" : "none",
                 position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 44,
               }}>
-              {day || ""}
+              <div>{day || ""}</div>
+              {dayPrice && !booked && (
+                <div style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: priceColor,
+                  marginTop: 1,
+                  letterSpacing: "-0.02em",
+                  textDecoration: "none",
+                }}>${dayPrice}</div>
+              )}
               {holiday && day && !past && !booked && (
                 <div style={{ position: "absolute", bottom: 2, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "#DC2626" }} />
               )}
@@ -236,10 +270,22 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
           );
         })}
       </div>
-      <div style={{ marginTop: 8, display: "flex", gap: 12, justifyContent: "center" }}>
-        <span style={{ fontSize: 10, color: "#D97706", fontWeight: 600 }}>● Weekend (+$50)</span>
-        <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 600 }}>● Holiday (+$75)</span>
-      </div>
+      {pkg && (
+        <div style={{ marginTop: 10, padding: "8px 10px", background: "#F8FAFC", borderRadius: 8, fontSize: 10, color: "#64748B", textAlign: "center", lineHeight: 1.5 }}>
+          <span style={{ color: "#1E293B", fontWeight: 600 }}>${pkg.weekday}</span> weekday
+          <span style={{ margin: "0 6px", color: "#CBD5E1" }}>·</span>
+          <span style={{ color: "#D97706", fontWeight: 600 }}>${pkg.weekend}</span> weekend
+          <span style={{ margin: "0 6px", color: "#CBD5E1" }}>·</span>
+          <span style={{ color: "#DC2626", fontWeight: 600 }}>+$75</span> holiday
+          <div style={{ marginTop: 2, fontSize: 9 }}>Multi-day discounts apply automatically</div>
+        </div>
+      )}
+      {!pkg && (
+        <div style={{ marginTop: 8, display: "flex", gap: 12, justifyContent: "center" }}>
+          <span style={{ fontSize: 10, color: "#D97706", fontWeight: 600 }}>● Weekend</span>
+          <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 600 }}>● Holiday</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -720,7 +766,7 @@ export default function JetSkiBooking() {
           <div>
             <h2 style={secTitle}>Select Your Dates</h2>
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
-              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} />
+              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} />
             </div>
 
             {isLakePowell && days > 0 && days < 3 && (
