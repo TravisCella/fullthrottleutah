@@ -56,7 +56,9 @@ const LOCATIONS = [
   { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲", aisStatus: "clean" },
   { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌", aisStatus: "clean" },
   { id: "utah-lake", name: "Utah Lake", region: "Utah County", drive: "~1hr", emoji: "🐟", aisStatus: "clean" },
-  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean" },
+  { id: "yuba", name: "Yuba Lake", region: "Central Utah", drive: "~2hr", emoji: "🏖️", aisStatus: "clean" },
+  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean", minDays: 2 },
+  { id: "flaming-gorge", name: "Flaming Gorge Reservoir", region: "Utah/Wyoming Border", drive: "~3.5hr", emoji: "🔥", aisStatus: "clean", minDays: 3 },
   { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️", aisStatus: "infested", minDays: 3, deconFee: 200 },
 ];
 
@@ -404,12 +406,14 @@ export default function JetSkiBooking() {
   // Loyalty discount: 10% off base rental only (not white glove, decon, or holiday surcharge)
   const loyaltyDiscount = isRepeatCustomer ? Math.round(basePrice * 0.10) : 0;
   const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee - loyaltyDiscount;
-  const meetsLakePowellMinimum = !isLakePowell || days >= 3;
+  // General min-days check — works for any lake that has a minDays field on it
+  const minDaysRequired = loc?.minDays || 1;
+  const meetsMinimum = days >= minDaysRequired;
 
   const canNext = () => {
     if (step === 0) return pkg;
     if (step === 1) return loc;
-    if (step === 2) return dates.length >= 1 && meetsLakePowellMinimum;
+    if (step === 2) return dates.length >= 1 && meetsMinimum;
     if (step === 3) return info.name && info.email && info.phone && info.experience;
     if (step === 4) return Object.values(waiverChecks).every(Boolean) && signature;
     if (step === 5) return true;
@@ -684,6 +688,9 @@ export default function JetSkiBooking() {
                       {l.aisStatus === "infested" && (
                         <span style={{ fontSize: 9, fontWeight: 700, color: "#D97706", background: "#FEF3C7", padding: "2px 6px", borderRadius: 4, marginLeft: 6, letterSpacing: "0.05em" }}>AIS</span>
                       )}
+                      {l.minDays && l.aisStatus !== "infested" && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "#0C4A6E", background: "#DBEAFE", padding: "2px 6px", borderRadius: 4, marginLeft: 6, letterSpacing: "0.05em" }}>{l.minDays}-DAY MIN</span>
+                      )}
                     </div>
                     <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>{l.region}</div>
                   </div>
@@ -706,6 +713,20 @@ export default function JetSkiBooking() {
                   • <strong>$200 decontamination fee</strong> auto-added<br/>
                   • Professional decon performed at return<br/>
                   • Machine quarantined 30 days after use
+                </div>
+              </div>
+            )}
+
+            {loc?.minDays && loc?.aisStatus !== "infested" && (
+              <div style={{ marginTop: 12, padding: 14, background: "#DBEAFE", borderRadius: 14, border: "2px solid #2563EB" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>📍</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1E40AF", marginBottom: 2 }}>{loc.name} — {loc.minDays}-day minimum rental</div>
+                    <div style={{ fontSize: 11, color: "#1E40AF", lineHeight: 1.5 }}>
+                      This destination is {loc.drive} from Farmington each way. To make the trip worthwhile for you (and for us to dedicate the watercraft to your reservation), we require a minimum {loc.minDays}-day booking. Multi-day discount automatically applies.
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -769,18 +790,20 @@ export default function JetSkiBooking() {
               <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} />
             </div>
 
-            {isLakePowell && days > 0 && days < 3 && (
+            {loc?.minDays && days > 0 && days < loc.minDays && (
               <div style={{ marginTop: 14, padding: 14, background: "#FEE2E2", borderRadius: 12, border: "2px solid #DC2626" }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B", marginBottom: 4 }}>
-                  ⚠️ Lake Powell requires 3+ day rental
+                  ⚠️ {loc.name} requires {loc.minDays}+ day rental
                 </div>
                 <div style={{ fontSize: 12, color: "#991B1B", lineHeight: 1.5 }}>
-                  Due to mandatory 30-day machine quarantine after Lake Powell use, we require a minimum 3-day booking. Please extend your date range.
+                  {isLakePowell
+                    ? `Due to mandatory 30-day machine quarantine after Lake Powell use, we require a minimum ${loc.minDays}-day booking. Please extend your date range.`
+                    : `Due to the long travel distance (${loc.drive} each way), ${loc.name} rentals require a minimum ${loc.minDays}-day booking to make the trip worthwhile. Please extend your date range.`}
                 </div>
               </div>
             )}
 
-            {days > 0 && meetsLakePowellMinimum && (
+            {days > 0 && meetsMinimum && (
               <div style={{
                 marginTop: 14, background: "#0C4A6E", borderRadius: 14, padding: "16px 18px",
                 color: "#fff",
