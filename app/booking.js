@@ -688,7 +688,7 @@ export default function JetSkiBooking() {
                       {l.aisStatus === "infested" && (
                         <span style={{ fontSize: 9, fontWeight: 700, color: "#D97706", background: "#FEF3C7", padding: "2px 6px", borderRadius: 4, marginLeft: 6, letterSpacing: "0.05em" }}>AIS</span>
                       )}
-                      {l.minDays && l.aisStatus !== "infested" && (
+                      {l.minDays && (
                         <span style={{ fontSize: 9, fontWeight: 700, color: "#0C4A6E", background: "#DBEAFE", padding: "2px 6px", borderRadius: 4, marginLeft: 6, letterSpacing: "0.05em" }}>{l.minDays}-DAY MIN</span>
                       )}
                     </div>
