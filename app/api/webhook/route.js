@@ -127,6 +127,9 @@ export async function POST(request) {
         renter_phone: meta.renterPhone || meta.renter_phone || '',
         experience: meta.experience || '',
         sms_consent: meta.smsOptIn === 'true' || meta.sms_consent === 'true',
+        white_glove: meta.white_glove === 'true',
+        holiday_surcharge: parseInt(meta.holiday_surcharge || '0', 10),
+        loyalty_discount: parseInt(meta.loyalty_discount || '0', 10),
       };
 
       // Write to Google Sheets
