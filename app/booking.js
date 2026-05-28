@@ -59,6 +59,7 @@ const LOCATIONS = [
   { id: "yuba", name: "Yuba Lake", region: "Central Utah", drive: "~2hr", emoji: "🏖️", aisStatus: "clean" },
   { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean", minDays: 2 },
   { id: "flaming-gorge", name: "Flaming Gorge Reservoir", region: "Utah/Wyoming Border", drive: "~3.5hr", emoji: "🔥", aisStatus: "clean", minDays: 3 },
+  { id: "sand-hollow", name: "Sand Hollow Reservoir", region: "St. George / Hurricane", drive: "~4hr", emoji: "🌅", aisStatus: "clean", minDays: 3 },
   { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️", aisStatus: "infested", minDays: 3, deconFee: 200 },
 ];
 
