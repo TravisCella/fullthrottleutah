@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { addBooking } from '../../../lib/sheets';
 import { createBookingEvent } from '../../../lib/calendar';
-import { sendSMS, buildBookingConfirmationSMS } from '../../../lib/sms';
+import { sendSMS, buildBookingConfirmationSMS, buildOwnerNotificationSMS } from '../../../lib/sms';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -12,6 +12,36 @@ async function sendConfirmationEmail(booking) {
     console.log('No Resend API key, skipping email');
     return;
   }
+
+  // White-glove customers get different pickup instructions
+  const pickupSection = booking.white_glove ? `
+              <div style="background: #DCFCE7; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #16A34A;">
+                <strong style="color: #15803D;">🤝 White Glove Delivery Confirmed</strong>
+                <p style="color: #166534; margin: 8px 0 0 0; font-size: 14px; line-height: 1.5;">
+                  We'll deliver the watercraft to your chosen lake, launch it for you, and pick it up when you're done. We'll reach out to confirm delivery time and location closer to your rental date.
+                </p>
+              </div>
+
+              <div style="background: #FEF3C7; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <strong style="color: #92400E;">Before Your Rental:</strong>
+                <ol style="color: #92400E; margin: 8px 0; padding-left: 20px; font-size: 14px;">
+                  <li>We'll text/call to confirm delivery time and location</li>
+                  <li>Bring valid driver's license</li>
+                  <li>Bring $1,000 security deposit (card hold or cash)</li>
+                  <li>No tow vehicle needed — we handle delivery and launch</li>
+                </ol>
+              </div>
+  ` : `
+              <div style="background: #FEF3C7; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <strong style="color: #92400E;">Before Your Rental:</strong>
+                <ol style="color: #92400E; margin: 8px 0; padding-left: 20px; font-size: 14px;">
+                  <li>Arrive at Farmington pickup point by 8:00 AM</li>
+                  <li>Bring valid driver's license</li>
+                  <li>Bring a vehicle with a 2" ball hitch and flat 4-prong light hookup</li>
+                  <li>Bring $1,000 security deposit (card hold or cash)</li>
+                </ol>
+              </div>
+  `;
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -23,11 +53,12 @@ async function sendConfirmationEmail(booking) {
       body: JSON.stringify({
         from: 'Full Throttle Utah <onboarding@resend.dev>',
         to: booking.renter_email,
-        subject: `Booking Confirmed — ${booking.package} | Full Throttle Utah`,
+        subject: `Booking Confirmed — ${booking.package}${booking.white_glove ? ' (White Glove)' : ''} | Full Throttle Utah`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: #0C4A6E; padding: 24px; text-align: center; border-radius: 12px 12px 0 0;">
               <h1 style="color: #fff; margin: 0; font-size: 24px;">Booking Confirmed!</h1>
+              ${booking.white_glove ? '<p style="color: #BAE6FD; margin: 8px 0 0; font-size: 14px;">🤝 White Glove Delivery</p>' : ''}
             </div>
             <div style="padding: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
               <p>Hi ${booking.renter_name},</p>
@@ -38,19 +69,12 @@ async function sendConfirmationEmail(booking) {
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Location</td><td style="padding: 8px; font-weight: 600;">${booking.location}</td></tr>
                 <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Dates</td><td style="padding: 8px; font-weight: 600;">${booking.start_date}${booking.end_date !== booking.start_date ? ' → ' + booking.end_date : ''}</td></tr>
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Days</td><td style="padding: 8px; font-weight: 600;">${booking.days}</td></tr>
-                <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Rental Paid in Full</td><td style="padding: 8px; font-weight: 600; color: #16a34a;">$${booking.total_price}</td></tr>
-                <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">$1,000 security deposit</td></tr>
+                ${booking.white_glove ? '<tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Service</td><td style="padding: 8px; font-weight: 600; color: #16A34A;">🤝 White Glove Delivery</td></tr>' : ''}
+                <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Rental Paid in Full</td><td style="padding: 8px; font-weight: 600; color: #16a34a;">$${booking.total_price}</td></tr>
+                <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">$1,000 security deposit</td></tr>
               </table>
 
-              <div style="background: #FEF3C7; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                <strong style="color: #92400E;">Before Your Rental:</strong>
-                <ol style="color: #92400E; margin: 8px 0; padding-left: 20px; font-size: 14px;">
-                  <li>Arrive at Farmington pickup point by 8:00 AM</li>
-                  <li>Bring valid driver's license</li>
-                  <li>Bring a vehicle with a 2" ball hitch and flat 4-prong light hookup</li>
-                  <li>Bring $1,000 security deposit (card hold or cash)</li>
-                </ol>
-              </div>
+              ${pickupSection}
 
               <div style="background: #FEE2E2; padding: 16px; border-radius: 8px; margin: 16px 0;">
                 <strong style="color: #991B1B;">⛽ Fuel Policy:</strong>
@@ -161,11 +185,12 @@ export async function POST(request) {
         console.error('SMS error (non-fatal):', smsErr.message);
       }
 
-      // Send SMS alert to owner
+      // Send SMS alert to owner — uses the new buildOwnerNotificationSMS template
+      // which includes white-glove indicator, holiday surcharge, and loyalty discount flags
       try {
         const ownerPhone = process.env.OWNER_PHONE_NUMBER;
         if (ownerPhone) {
-          const ownerMsg = `🛎️ New booking!\n${booking.package}\n${booking.location}\n${booking.start_date}\nRenter: ${booking.renter_name} (${booking.renter_phone})\nPaid: $${booking.total_price}`;
+          const ownerMsg = buildOwnerNotificationSMS(booking);
           await sendSMS(ownerPhone, ownerMsg);
           console.log('SMS sent to owner:', ownerPhone);
         }
