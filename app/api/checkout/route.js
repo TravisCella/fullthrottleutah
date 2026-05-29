@@ -1,4 +1,6 @@
- // Force rebuild 2026-05-28
+// app/api/checkout/route.js
+// Version: 2026-05-29 — Fix body undefined error, add loyaltyDiscount, clean metadata
+// Last edited: May 29 2026
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -6,7 +8,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export async function POST(request) {
   try {
     const data = await request.json();
-    
+
     const {
       packageName,
       packageTagline,
@@ -24,14 +26,15 @@ export async function POST(request) {
       holidaySurcharge,
       deconFee,
       isLakePowell,
+      loyaltyDiscount,
       waiverSigned,
       waiverDate,
     } = data;
 
-    // Charge 100% of rental upfront
-    const fullAmount = Math.round(totalPrice * 100); // Stripe uses cents
+    // Charge 100% of rental upfront (Stripe uses cents)
+    const fullAmount = Math.round(totalPrice * 100);
 
-    // Create or retrieve customer
+    // Create or retrieve customer so the card is saved for the $1,000 deposit hold at pickup
     let customer;
     const existingCustomers = await stripe.customers.list({ email: renterEmail, limit: 1 });
     if (existingCustomers.data.length > 0) {
@@ -55,26 +58,35 @@ export async function POST(request) {
       payment_intent_data: {
         setup_future_usage: 'off_session',
         metadata: {
+          // Renter info
           renterName,
           renterEmail,
           renterPhone,
+          experience: experience || '',
+          // Booking details
           packageName,
           location,
           startDate,
-          white_glove: whiteGlove ? 'true' : 'false',
-        holiday_surcharge: String(holidaySurcharge || 0),
-        loyalty_discount: String(body.loyaltyDiscount || 0),
           endDate,
           days: days?.toString() || '1',
-          experience: experience || '',
+          // Pricing detail flags
+          whiteGlove: whiteGlove ? 'true' : 'false',
+          white_glove: whiteGlove ? 'true' : 'false',
+          holidaySurcharge: holidaySurcharge?.toString() || '0',
+          holiday_surcharge: (holidaySurcharge || 0).toString(),
+          deconFee: deconFee?.toString() || '0',
+          decon_fee: (deconFee || 0).toString(),
+          isLakePowell: isLakePowell ? 'true' : 'false',
+          is_lake_powell: isLakePowell ? 'true' : 'false',
+          loyaltyDiscount: loyaltyDiscount?.toString() || '0',
+          loyalty_discount: (loyaltyDiscount || 0).toString(),
+          // SMS consent (TCPA tracking)
           smsOptIn: smsOptIn ? 'true' : 'false',
           smsOptInDate: smsOptIn ? new Date().toISOString() : '',
-          whiteGlove: whiteGlove ? 'true' : 'false',
-          holidaySurcharge: holidaySurcharge?.toString() || '0',
-          deconFee: deconFee?.toString() || '0',
-          isLakePowell: isLakePowell ? 'true' : 'false',
+          // Waiver tracking
           waiverSigned: waiverSigned || 'false',
           waiverDate: waiverDate || '',
+          // Status flags for admin dashboard
           securityDepositStatus: 'pending',
           rentalStatus: 'booked',
         },
@@ -84,7 +96,7 @@ export async function POST(request) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: packageName,
+              name: `${packageName}${whiteGlove ? ' (White Glove)' : ''}`,
               description: `${packageTagline} · ${location} · ${days} day${days > 1 ? 's' : ''} (${startDate}${endDate !== startDate ? ` - ${endDate}` : ''})`,
             },
             unit_amount: fullAmount,
@@ -94,7 +106,6 @@ export async function POST(request) {
       ],
       success_url: `${request.headers.get('origin') || 'https://www.fullthrottleutah.com'}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.headers.get('origin') || 'https://www.fullthrottleutah.com'}/`,
-      customer_email: undefined,
     });
 
     return Response.json({ url: session.url, sessionId: session.id });
