@@ -1,3 +1,21 @@
+// app/booking.js
+// Version: 2026-05-30 — Distance-tiered white-glove pricing per location
+// Last edited: May 30 2026 (afternoon)
+// Feature: Replaces the flat $200 white-glove fee with per-destination pricing
+//          ranging from $150 (Willard Bay) to $750 (Sand Hollow). Lake Powell is
+//          now "Call for quote" — toggle is hidden and customer is shown phone
+//          number. Landing page card updated to "Starting at $150, varies by
+//          destination". White-glove toggle no longer appears until customer has
+//          selected a location. All in-flow price summaries (Step 1 toggle pill,
+//          Step 2 calendar summary, Step 5 review) now show the actual fee for
+//          the selected destination, not a hardcoded $200.
+//
+// Downstream impact: app/api/checkout/route.js and app/api/webhook/route.js will
+//                    need follow-up commits to surface the actual fee amount in
+//                    Stripe metadata + owner SMS. Without those, Stripe still
+//                    charges the correct total (because totalPrice includes the
+//                    correct fee), but webhook SMS won't display the dollar value.
+
 import { useState, useEffect, useRef } from "react";
 
 // ── Product images (served from /images/) ──
@@ -47,20 +65,23 @@ const PACKAGES = [
   },
 ];
 
+// ── Lakes we serve, with distance-tiered white-glove pricing ──
+// whiteGloveFee = dollar amount for delivery/launch/retrieval at that lake.
+//                 null = quote only (currently just Lake Powell, which is 600+ mile round trip)
 const LOCATIONS = [
-  { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️", aisStatus: "clean" },
-  { id: "willard-bay", name: "Willard Bay", region: "Northern Utah", drive: "~35min", emoji: "🦅", aisStatus: "clean" },
-  { id: "echo", name: "Echo Reservoir", region: "Summit County", drive: "~45min", emoji: "🌊", aisStatus: "clean" },
-  { id: "rockport", name: "Rockport Reservoir", region: "Summit County", drive: "~50min", emoji: "🪨", aisStatus: "clean" },
-  { id: "east-canyon", name: "East Canyon Reservoir", region: "Morgan County", drive: "~50min", emoji: "🏞️", aisStatus: "clean" },
-  { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲", aisStatus: "clean" },
-  { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌", aisStatus: "clean" },
-  { id: "utah-lake", name: "Utah Lake", region: "Utah County", drive: "~1hr", emoji: "🐟", aisStatus: "clean" },
-  { id: "yuba", name: "Yuba Lake", region: "Central Utah", drive: "~2hr", emoji: "🏖️", aisStatus: "clean" },
-  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean", minDays: 2 },
-  { id: "flaming-gorge", name: "Flaming Gorge Reservoir", region: "Utah/Wyoming Border", drive: "~3.5hr", emoji: "🔥", aisStatus: "clean", minDays: 3 },
-  { id: "sand-hollow", name: "Sand Hollow Reservoir", region: "St. George / Hurricane", drive: "~4hr", emoji: "🌅", aisStatus: "clean", minDays: 3 },
-  { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️", aisStatus: "infested", minDays: 3, deconFee: 200 },
+  { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️", aisStatus: "clean", whiteGloveFee: 175 },
+  { id: "willard-bay", name: "Willard Bay", region: "Northern Utah", drive: "~35min", emoji: "🦅", aisStatus: "clean", whiteGloveFee: 150 },
+  { id: "echo", name: "Echo Reservoir", region: "Summit County", drive: "~45min", emoji: "🌊", aisStatus: "clean", whiteGloveFee: 175 },
+  { id: "rockport", name: "Rockport Reservoir", region: "Summit County", drive: "~50min", emoji: "🪨", aisStatus: "clean", whiteGloveFee: 225 },
+  { id: "east-canyon", name: "East Canyon Reservoir", region: "Morgan County", drive: "~50min", emoji: "🏞️", aisStatus: "clean", whiteGloveFee: 200 },
+  { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲", aisStatus: "clean", whiteGloveFee: 225 },
+  { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌", aisStatus: "clean", whiteGloveFee: 250 },
+  { id: "utah-lake", name: "Utah Lake", region: "Utah County", drive: "~1hr", emoji: "🐟", aisStatus: "clean", whiteGloveFee: 250 },
+  { id: "yuba", name: "Yuba Lake", region: "Central Utah", drive: "~2hr", emoji: "🏖️", aisStatus: "clean", whiteGloveFee: 400 },
+  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean", minDays: 2, whiteGloveFee: 450 },
+  { id: "flaming-gorge", name: "Flaming Gorge Reservoir", region: "Utah/Wyoming Border", drive: "~3.5hr", emoji: "🔥", aisStatus: "clean", minDays: 3, whiteGloveFee: 650 },
+  { id: "sand-hollow", name: "Sand Hollow Reservoir", region: "St. George / Hurricane", drive: "~4hr", emoji: "🌅", aisStatus: "clean", minDays: 3, whiteGloveFee: 750 },
+  { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️", aisStatus: "infested", minDays: 3, deconFee: 200, whiteGloveFee: null },
 ];
 
 // ── Holiday surcharges ──
@@ -219,7 +240,7 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
           const booked = isBooked(day);
           const holiday = isHoliday(day);
           const unavailable = past || booked;
-          
+
           // Compute the price to display under this date
           let dayPrice = null;
           if (day && pkg && !past) {
@@ -229,7 +250,7 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
             const holidayMatch = HOLIDAYS.find(h => mmdd >= h.start && mmdd <= h.end);
             dayPrice = baseRate + (holidayMatch ? holidayMatch.premium : 0);
           }
-          
+
           // Color for the price text — keep readable against the background
           const priceColor = !day ? "transparent"
             : booked ? "#EF4444"
@@ -237,7 +258,7 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
             : holiday ? "#DC2626"
             : wknd ? "#D97706"
             : "#94A3B8";
-          
+
           return (
             <div key={i} onClick={() => day && !unavailable && onSelectDate(new Date(year, month, day))}
               style={{
@@ -327,6 +348,15 @@ export default function JetSkiBooking() {
     }
   }, [pkg]);
 
+  // If the customer switches to a location that doesn't support white glove
+  // (currently just Lake Powell, which is quote-only), automatically turn off
+  // any previously-selected white-glove toggle so the price stays accurate.
+  useEffect(() => {
+    if (loc && loc.whiteGloveFee === null) {
+      setWhiteGlove(false);
+    }
+  }, [loc]);
+
   const handleDate = (d) => {
     if (dates.length === 0 || dates.length === 2) setDates([d]);
     else if (d < dates[0]) setDates([d]);
@@ -378,6 +408,7 @@ export default function JetSkiBooking() {
           experience: info.experience,
           smsOptIn: info.smsOptIn,
           whiteGlove: whiteGlove,
+          whiteGloveFee: whiteGloveFee,
           holidaySurcharge: holidayInfo.total,
           deconFee: deconFee,
           isLakePowell: isLakePowell,
@@ -401,7 +432,9 @@ export default function JetSkiBooking() {
   const days = dates.length === 2 ? daysBetween(dates[0], dates[1]) : dates.length === 1 ? 1 : 0;
   const basePrice = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0]) : 0;
   const holidayInfo = dates.length > 0 ? getHolidaySurcharge(dates[0], dates.length === 2 ? dates[1] : dates[0]) : { total: 0, holidays: [] };
-  const whiteGloveFee = whiteGlove ? 200 : 0;
+  // White-glove fee is now per-destination. Falls back to 0 if no location selected,
+  // toggle is off, or the location is quote-only (e.g. Lake Powell).
+  const whiteGloveFee = (whiteGlove && loc?.whiteGloveFee) ? loc.whiteGloveFee : 0;
   const isLakePowell = loc?.id === "lake-powell";
   const deconFee = isLakePowell ? 200 : 0;
   // Loyalty discount: 10% off base rental only (not white glove, decon, or holiday surcharge)
@@ -498,11 +531,11 @@ export default function JetSkiBooking() {
               <span style={{ fontSize: 20 }}>🤝</span>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>White Glove Delivery</div>
-                <div style={{ fontSize: 11, color: "#94A3B8" }}>We deliver, launch, and retrieve — $200</div>
+                <div style={{ fontSize: 11, color: "#94A3B8" }}>Starting at $150, varies by destination</div>
               </div>
             </div>
             <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
-              Skip the towing. We bring the watercraft to your lake, launch it, and pick it up when you're done. $200 flat fee within 45 min of Farmington; longer distances add fuel cost.
+              Skip the towing. We bring the watercraft to your lake, launch it, and pick it up when you're done. Pricing is location-based — nearby lakes start at $150. You'll see the exact fee for your chosen destination when you book.
             </div>
           </div>
 
@@ -732,53 +765,89 @@ export default function JetSkiBooking() {
               </div>
             )}
 
-            <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Add-On Service</div>
-              <div
-                onClick={() => setWhiteGlove(!whiteGlove)}
-                style={{
-                  border: whiteGlove ? "2px solid #16A34A" : "2px solid #E2E8F0",
-                  borderRadius: 14, padding: "16px 18px", cursor: "pointer",
-                  background: whiteGlove ? "rgba(22,163,74,0.04)" : "#fff",
-                  transition: "all 0.15s",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: 22 }}>🤝</span>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 600 }}>White Glove Delivery</div>
-                      <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>We deliver, launch & retrieve your watercraft</div>
+            {/* Add-On Service: White Glove Delivery
+                Only shown after a location is selected, so we know the per-destination fee.
+                Three states:
+                  1. No location yet → section hidden entirely
+                  2. Regular lake (whiteGloveFee is a number) → toggle with that fee
+                  3. Lake Powell (whiteGloveFee === null) → "Call for quote" card, no toggle */}
+            {loc && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Add-On Service</div>
+
+                {loc.whiteGloveFee === null ? (
+                  // Quote-only: Lake Powell. Show contact card instead of toggle.
+                  <div style={{
+                    border: "2px solid #E2E8F0",
+                    borderRadius: 14, padding: "16px 18px",
+                    background: "#fff",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 22 }}>🤝</span>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 600 }}>White Glove Delivery</div>
+                          <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>{loc.name} — call for quote</div>
+                        </div>
+                      </div>
+                      <a href="tel:+17148566576" style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        background: "#0C4A6E", color: "#fff", padding: "10px 14px",
+                        borderRadius: 10, textDecoration: "none", fontSize: 13, fontWeight: 600,
+                      }}>
+                        📞 Call
+                      </a>
+                    </div>
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #F1F5F9", fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
+                      Lake Powell deliveries are 600+ mile round-trips and quoted individually. Call us at (714) 856-5676 to discuss your trip and pricing.
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: whiteGlove ? "#16A34A" : "#0F172A" }}>+$200</div>
-                    <div style={{
-                      width: 24, height: 24, borderRadius: 6,
-                      border: whiteGlove ? "2px solid #16A34A" : "2px solid #CBD5E1",
-                      background: whiteGlove ? "#16A34A" : "#fff",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, color: "#fff", fontWeight: 700,
+                ) : (
+                  // Regular toggle with location-specific fee
+                  <div
+                    onClick={() => setWhiteGlove(!whiteGlove)}
+                    style={{
+                      border: whiteGlove ? "2px solid #16A34A" : "2px solid #E2E8F0",
+                      borderRadius: 14, padding: "16px 18px", cursor: "pointer",
+                      background: whiteGlove ? "rgba(22,163,74,0.04)" : "#fff",
                       transition: "all 0.15s",
-                    }}>
-                      {whiteGlove ? "✓" : ""}
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 22 }}>🤝</span>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 600 }}>White Glove Delivery</div>
+                          <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>We deliver, launch & retrieve at {loc.name}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: whiteGlove ? "#16A34A" : "#0F172A" }}>+${loc.whiteGloveFee}</div>
+                        <div style={{
+                          width: 24, height: 24, borderRadius: 6,
+                          border: whiteGlove ? "2px solid #16A34A" : "2px solid #CBD5E1",
+                          background: whiteGlove ? "#16A34A" : "#fff",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 14, color: "#fff", fontWeight: 700,
+                          transition: "all 0.15s",
+                        }}>
+                          {whiteGlove ? "✓" : ""}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                {whiteGlove && (
-                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(22,163,74,0.15)", fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
-                    We'll deliver your watercraft to the ramp, launch it, and pick it up when you're done. No towing needed — just show up and ride.
-                    <div style={{ marginTop: 8, padding: 8, background: "#FEF3C7", borderRadius: 6, fontSize: 11, color: "#92400E" }}>
-                      <strong>Note:</strong> $200 flat fee covers destinations within 45 min of Farmington (Pineview, Willard Bay, Echo, Jordanelle). For destinations beyond 45 min (Rockport, East Canyon, Deer Creek, Utah Lake, Bear Lake), actual round-trip towing fuel cost will be added and settled at pickup.
-                    </div>
+                    {whiteGlove && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(22,163,74,0.15)", fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
+                        We'll deliver your watercraft to the ramp at {loc.name}, launch it, and pick it up when you're done. No towing needed — just show up and ride. Fee covers all delivery, launch, and recovery costs; no additional fuel charges at pickup.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
+            )}
 
             <div style={{ marginTop: 16, padding: 14, background: "#F0F9FF", borderRadius: 12, border: "1px solid #DBEAFE" }}>
               <div style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.5 }}>
-                <strong>{whiteGlove ? "We deliver to the lake!" : "Pickup:"}</strong> {whiteGlove ? "We'll bring the watercraft to your chosen lake and launch it for you." : "Farmington, UT — you tow to the lake with your own vehicle. 2\" ball hitch and flat 4-prong light hookup required."}
+                <strong>{whiteGlove ? "We deliver to the lake!" : "Pickup:"}</strong> {whiteGlove ? `We'll bring the watercraft to ${loc?.name || "your chosen lake"} and launch it for you.` : "Farmington, UT — you tow to the lake with your own vehicle. 2\" ball hitch and flat 4-prong light hookup required."}
               </div>
             </div>
           </div>
@@ -831,9 +900,9 @@ export default function JetSkiBooking() {
                         <span>🎆 {h.name} surcharge</span><span>+${h.premium}/day</span>
                       </div>
                     ))}
-                    {whiteGlove && (
+                    {whiteGlove && whiteGloveFee > 0 && (
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#86EFAC" }}>
-                        <span>🤝 White glove delivery</span><span>+$200</span>
+                        <span>🤝 White glove — {loc.name}</span><span>+${whiteGloveFee}</span>
                       </div>
                     )}
                     {deconFee > 0 && (
@@ -1106,7 +1175,7 @@ export default function JetSkiBooking() {
                 {[
                   { l: `Rental (${days} day${days > 1 ? "s" : ""})`, v: `$${basePrice.toLocaleString()}` },
                   ...(holidayInfo.holidays.map(h => ({ l: `🎆 ${h.name} surcharge`, v: `+$${h.premium}/day`, color: "#DC2626" }))),
-                  ...(whiteGlove ? [{ l: "🤝 White glove delivery", v: "+$200", color: "#16A34A" }] : []),
+                  ...(whiteGlove && whiteGloveFee > 0 ? [{ l: `🤝 White glove — ${loc.name}`, v: `+$${whiteGloveFee}`, color: "#16A34A" }] : []),
                   ...(deconFee > 0 ? [{ l: "🦠 Lake Powell decontamination", v: `+$${deconFee}`, color: "#D97706" }] : []),
                   ...(loyaltyDiscount > 0 ? [{ l: "✨ Returning customer (10% off)", v: `-$${loyaltyDiscount}`, color: "#16A34A" }] : []),
                   { l: "Total due now", v: `$${totalPrice.toLocaleString()}`, bold: true },
