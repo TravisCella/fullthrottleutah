@@ -1,16 +1,13 @@
 // app/api/webhook/route.js
-// Version: 2026-05-30 — Restore working webhook (post-rollback recovery)
-// Last edited: May 30 2026
-// Feature: Restores the Stripe webhook handler that processes checkout.session.completed
-//          events. Writes booking to Google Sheets, creates calendar event, sends owner
-//          + customer SMS, sends confirmation email. NO new features added vs the
-//          May 23 baseline — this is a pure restoration. White-glove tracking,
-//          holiday surcharge logging, and email customization are NOT in this version.
-//          Those will come in subsequent versioned commits once this is verified working.
-//
-// Why this exists: Production webhook file was accidentally replaced with checkout-route
-//                  code at some point, causing every Stripe event to return HTTP 500.
-//                  Stripe was retrying failed events for ~24 hours. This restores function.
+// Version: 2026-05-30 — Add white-glove and Lake Powell flags to owner SMS
+// Last edited: May 30 2026 (afternoon update — builds on morning restoration)
+// Feature: Owner SMS now shows operational flags at-a-glance:
+//          - 🤝 WHITE GLOVE flag when customer chose white glove delivery
+//          - 🦠 LAKE POWELL flag + decon reminder when Lake Powell is the destination
+//          Also fixes a small display bug: multi-day bookings now show the date
+//          range (e.g. "2026-06-18 → 2026-06-23") instead of just the start date.
+//          All other behavior (sheet writing, calendar event, customer SMS, email)
+//          unchanged from morning restoration baseline.
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -142,6 +139,10 @@ export async function POST(request) {
         renter_phone: meta.renterPhone || meta.renter_phone || '',
         experience: meta.experience || '',
         sms_consent: meta.smsOptIn === 'true' || meta.sms_consent === 'true',
+        // NEW: operational flags pulled from Stripe metadata for owner SMS display
+        // and lib/sheets.js downstream consumption (column O writes YES/NO)
+        white_glove: meta.white_glove === 'true' || meta.whiteGlove === 'true',
+        is_lake_powell: meta.is_lake_powell === 'true' || meta.isLakePowell === 'true',
       };
 
       // Write to Google Sheets
@@ -173,11 +174,37 @@ export async function POST(request) {
         console.error('SMS error (non-fatal):', smsErr.message);
       }
 
-      // Send SMS alert to owner
+      // Send SMS alert to owner — now includes white-glove + Lake Powell flags
       try {
         const ownerPhone = process.env.OWNER_PHONE_NUMBER;
         if (ownerPhone) {
-          const ownerMsg = `🛎️ New booking!\n${booking.package}\n${booking.location}\n${booking.start_date}\nRenter: ${booking.renter_name} (${booking.renter_phone})\nPaid: $${booking.total_price}`;
+          // Build optional flag prefix for the first line
+          const flags = [];
+          if (booking.white_glove) flags.push('🤝 WHITE GLOVE');
+          if (booking.is_lake_powell) flags.push('🦠 LAKE POWELL');
+          const flagPrefix = flags.length > 0 ? ` ${flags.join(' ')}` : '';
+
+          // Show date range for multi-day bookings, single date otherwise
+          const dateLine = booking.end_date && booking.end_date !== booking.start_date
+            ? `${booking.start_date} → ${booking.end_date}`
+            : booking.start_date;
+
+          // Compose the SMS line by line
+          const ownerLines = [
+            `🛎️ New booking!${flagPrefix}`,
+            booking.package,
+            booking.location,
+            dateLine,
+            `Renter: ${booking.renter_name} (${booking.renter_phone})`,
+            `Paid: $${booking.total_price}`,
+          ];
+
+          // Add an operational reminder for Lake Powell rentals (decon required at return)
+          if (booking.is_lake_powell) {
+            ownerLines.push('🦠 Decon at return — Willard Bay');
+          }
+
+          const ownerMsg = ownerLines.join('\n');
           await sendSMS(ownerPhone, ownerMsg);
           console.log('SMS sent to owner:', ownerPhone);
         }
