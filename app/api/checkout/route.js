@@ -1,6 +1,18 @@
 // app/api/checkout/route.js
-// Version: 2026-05-29 — Fix body undefined error, add loyaltyDiscount, clean metadata
-// Last edited: May 29 2026
+// Version: 2026-05-30 — Forward whiteGloveFee to Stripe metadata
+// Last edited: May 30 2026 (afternoon — file 2 of 3 in distance-tiered white-glove rollout)
+// Feature: Receives the new whiteGloveFee field from booking.js (the per-destination
+//          dollar amount, e.g. $150 Pineview / $450 Bear Lake) and forwards it into
+//          Stripe payment_intent metadata as both whiteGloveFee (camelCase) and
+//          white_glove_fee (snake_case) for downstream compatibility. Also enhances
+//          the Stripe product name to include the fee amount, so "Spark Duo (White
+//          Glove $450)" appears in the Stripe dashboard line item — easier visual
+//          scanning when reviewing payments.
+//
+// Builds on: api-checkout-route_2026-05-29_fix-body-undefined.js (yesterday's fix)
+// Downstream: app/api/webhook/route.js (file 3 of 3) will read white_glove_fee
+//             from this metadata and surface the dollar amount in owner SMS.
+
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -23,6 +35,7 @@ export async function POST(request) {
       experience,
       smsOptIn,
       whiteGlove,
+      whiteGloveFee,
       holidaySurcharge,
       deconFee,
       isLakePowell,
@@ -72,6 +85,8 @@ export async function POST(request) {
           // Pricing detail flags
           whiteGlove: whiteGlove ? 'true' : 'false',
           white_glove: whiteGlove ? 'true' : 'false',
+          whiteGloveFee: whiteGloveFee?.toString() || '0',
+          white_glove_fee: (whiteGloveFee || 0).toString(),
           holidaySurcharge: holidaySurcharge?.toString() || '0',
           holiday_surcharge: (holidaySurcharge || 0).toString(),
           deconFee: deconFee?.toString() || '0',
@@ -96,7 +111,9 @@ export async function POST(request) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `${packageName}${whiteGlove ? ' (White Glove)' : ''}`,
+              // Include fee amount in product name when present, e.g. "Spark Duo (White Glove $450)"
+              // Falls back to plain "(White Glove)" if fee is somehow missing/0 (defensive)
+              name: `${packageName}${whiteGlove && whiteGloveFee > 0 ? ` (White Glove $${whiteGloveFee})` : whiteGlove ? ' (White Glove)' : ''}`,
               description: `${packageTagline} · ${location} · ${days} day${days > 1 ? 's' : ''} (${startDate}${endDate !== startDate ? ` - ${endDate}` : ''})`,
             },
             unit_amount: fullAmount,
