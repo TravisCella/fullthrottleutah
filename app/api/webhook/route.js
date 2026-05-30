@@ -1,13 +1,17 @@
 // app/api/webhook/route.js
-// Version: 2026-05-30 — Add white-glove and Lake Powell flags to owner SMS
-// Last edited: May 30 2026 (afternoon update — builds on morning restoration)
-// Feature: Owner SMS now shows operational flags at-a-glance:
-//          - 🤝 WHITE GLOVE flag when customer chose white glove delivery
-//          - 🦠 LAKE POWELL flag + decon reminder when Lake Powell is the destination
-//          Also fixes a small display bug: multi-day bookings now show the date
-//          range (e.g. "2026-06-18 → 2026-06-23") instead of just the start date.
-//          All other behavior (sheet writing, calendar event, customer SMS, email)
-//          unchanged from morning restoration baseline.
+// Version: 2026-05-30 — Add white-glove fee amount to owner SMS
+// Last edited: May 30 2026 (afternoon — file 3 of 3 in distance-tiered white-glove rollout)
+// Feature: Owner SMS white-glove flag now shows the dollar amount alongside the flag.
+//          Example: "🛎️ New booking! 🤝 WHITE GLOVE ($450)" for a Bear Lake delivery.
+//          Reads white_glove_fee from Stripe metadata (sent by checkout/route.js after
+//          today's earlier deploy). Falls back gracefully to plain "🤝 WHITE GLOVE"
+//          when fee is missing or zero — handles pre-deploy bookings without breaking.
+//
+// Builds on: api-webhook-route_2026-05-30_add-whiteglove-lakepowell-flags.js (morning version)
+// Completes: The white-glove project. With files 1, 2, and 3 all deployed, every booking
+//            now has end-to-end distance-tiered pricing visible to customer (booking.js),
+//            charged correctly through Stripe (checkout/route.js), and surfaced with the
+//            exact dollar amount in the owner SMS (this file).
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -139,9 +143,12 @@ export async function POST(request) {
         renter_phone: meta.renterPhone || meta.renter_phone || '',
         experience: meta.experience || '',
         sms_consent: meta.smsOptIn === 'true' || meta.sms_consent === 'true',
-        // NEW: operational flags pulled from Stripe metadata for owner SMS display
+        // Operational flags pulled from Stripe metadata for owner SMS display
         // and lib/sheets.js downstream consumption (column O writes YES/NO)
         white_glove: meta.white_glove === 'true' || meta.whiteGlove === 'true',
+        // NEW: actual fee amount (in dollars) so SMS can show "🤝 WHITE GLOVE ($450)"
+        // Falls back to 0 for old bookings made before today's checkout.js deploy
+        white_glove_fee: parseInt(meta.white_glove_fee || meta.whiteGloveFee || '0', 10),
         is_lake_powell: meta.is_lake_powell === 'true' || meta.isLakePowell === 'true',
       };
 
@@ -174,13 +181,17 @@ export async function POST(request) {
         console.error('SMS error (non-fatal):', smsErr.message);
       }
 
-      // Send SMS alert to owner — now includes white-glove + Lake Powell flags
+      // Send SMS alert to owner — includes white-glove fee + Lake Powell flags
       try {
         const ownerPhone = process.env.OWNER_PHONE_NUMBER;
         if (ownerPhone) {
           // Build optional flag prefix for the first line
           const flags = [];
-          if (booking.white_glove) flags.push('🤝 WHITE GLOVE');
+          if (booking.white_glove) {
+            // Include the fee amount when known ($450), fall back to plain flag for old bookings
+            const feeSuffix = booking.white_glove_fee > 0 ? ` ($${booking.white_glove_fee})` : '';
+            flags.push(`🤝 WHITE GLOVE${feeSuffix}`);
+          }
           if (booking.is_lake_powell) flags.push('🦠 LAKE POWELL');
           const flagPrefix = flags.length > 0 ? ` ${flags.join(' ')}` : '';
 
