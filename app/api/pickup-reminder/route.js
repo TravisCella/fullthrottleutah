@@ -4,8 +4,8 @@
 // Logic: find tomorrow's CONFIRMED bookings → SMS if opted in, email otherwise
 
 import { NextResponse } from 'next/server';
-import { getTomorrowsBookings } from '../../../../lib/sheets';
-import { sendSMS } from '../../../../lib/sms';
+import { getTomorrowsBookings } from '../../../../../lib/sheets';
+import { sendSMS } from '../../../../../lib/sms';
 
 // ─── SMS copy ────────────────────────────────────────────────────────────────
 // Target: ~160 chars. Direct, actionable, no filler.
