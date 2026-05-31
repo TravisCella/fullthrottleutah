@@ -5,8 +5,8 @@
 // Change: Domain verified at Resend, so reminders can now reach any customer (not just travis.cella@gmail.com).
 
 import { NextResponse } from 'next/server';
-import { getTomorrowsBookings } from '../../../../../lib/sheets';
-import { sendSMS } from '../../../../../lib/sms';
+import { getTomorrowsBookings } from '../../../../lib/sheets';
+import { sendSMS } from '../../../../lib/sms';
 
 // ─── SMS copy ────────────────────────────────────────────────────────────────
 // Target: ~160 chars. Direct, actionable, no filler.
