@@ -1,17 +1,8 @@
 // app/api/webhook/route.js
-// Version: 2026-05-30 — Add white-glove fee amount to owner SMS
-// Last edited: May 30 2026 (afternoon — file 3 of 3 in distance-tiered white-glove rollout)
-// Feature: Owner SMS white-glove flag now shows the dollar amount alongside the flag.
-//          Example: "🛎️ New booking! 🤝 WHITE GLOVE ($450)" for a Bear Lake delivery.
-//          Reads white_glove_fee from Stripe metadata (sent by checkout/route.js after
-//          today's earlier deploy). Falls back gracefully to plain "🤝 WHITE GLOVE"
-//          when fee is missing or zero — handles pre-deploy bookings without breaking.
-//
-// Builds on: api-webhook-route_2026-05-30_add-whiteglove-lakepowell-flags.js (morning version)
-// Completes: The white-glove project. With files 1, 2, and 3 all deployed, every booking
-//            now has end-to-end distance-tiered pricing visible to customer (booking.js),
-//            charged correctly through Stripe (checkout/route.js), and surfaced with the
-//            exact dollar amount in the owner SMS (this file).
+// Version: 2026-05-30 — Multi-phone owner SMS + white-glove fee display
+// Last edited: May 30 2026 (evening)
+// Change: Owner SMS now sends to ALL numbers in OWNER_PHONE_NUMBER env var (comma-separated).
+//         Supports Travis, wife, and son all receiving booking alerts simultaneously.
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -146,8 +137,8 @@ export async function POST(request) {
         // Operational flags pulled from Stripe metadata for owner SMS display
         // and lib/sheets.js downstream consumption (column O writes YES/NO)
         white_glove: meta.white_glove === 'true' || meta.whiteGlove === 'true',
-        // NEW: actual fee amount (in dollars) so SMS can show "🤝 WHITE GLOVE ($450)"
-        // Falls back to 0 for old bookings made before today's checkout.js deploy
+        // Actual fee amount (in dollars) so SMS can show "🤝 WHITE GLOVE ($450)"
+        // Falls back to 0 for old bookings made before distance-tiered deploy
         white_glove_fee: parseInt(meta.white_glove_fee || meta.whiteGloveFee || '0', 10),
         is_lake_powell: meta.is_lake_powell === 'true' || meta.isLakePowell === 'true',
       };
@@ -181,10 +172,11 @@ export async function POST(request) {
         console.error('SMS error (non-fatal):', smsErr.message);
       }
 
-      // Send SMS alert to owner — includes white-glove fee + Lake Powell flags
+      // Send SMS alert to owner team — includes white-glove fee + Lake Powell flags
+      // Supports multiple phone numbers via comma-separated OWNER_PHONE_NUMBER env var
       try {
-        const ownerPhone = process.env.OWNER_PHONE_NUMBER;
-        if (ownerPhone) {
+        const ownerPhones = (process.env.OWNER_PHONE_NUMBER || '').split(',').map(p => p.trim()).filter(Boolean);
+        if (ownerPhones.length > 0) {
           // Build optional flag prefix for the first line
           const flags = [];
           if (booking.white_glove) {
@@ -216,8 +208,12 @@ export async function POST(request) {
           }
 
           const ownerMsg = ownerLines.join('\n');
-          await sendSMS(ownerPhone, ownerMsg);
-          console.log('SMS sent to owner:', ownerPhone);
+
+          // Send to every phone number in the list (Travis, wife, son)
+          for (const phone of ownerPhones) {
+            await sendSMS(phone, ownerMsg);
+            console.log('SMS sent to owner:', phone);
+          }
         }
       } catch (smsErr) {
         console.error('Owner SMS error (non-fatal):', smsErr.message);
