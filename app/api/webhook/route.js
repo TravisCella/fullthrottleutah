@@ -1,8 +1,8 @@
 // app/api/webhook/route.js
-// Version: 2026-05-30 — Multi-phone owner SMS + white-glove fee display
-// Last edited: May 30 2026 (evening)
-// Change: Owner SMS now sends to ALL numbers in OWNER_PHONE_NUMBER env var (comma-separated).
-//         Supports Travis, wife, and son all receiving booking alerts simultaneously.
+// Version: 2026-05-31 — Switch email from onboarding@resend.dev to bookings@fullthrottleutah.com
+// Last edited: May 31 2026
+// Change: Domain verified at Resend, so we can now send to ANY recipient (not just travis.cella@gmail.com).
+//         This unblocks customer confirmation emails which were silently failing on the free-tier sender.
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -27,7 +27,7 @@ async function sendConfirmationEmail(booking) {
         'Authorization': `Bearer ${RESEND_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Full Throttle Utah <onboarding@resend.dev>',
+        from: 'Full Throttle Utah <bookings@fullthrottleutah.com>',
         to: booking.renter_email,
         subject: `Booking Confirmed — ${booking.package} | Full Throttle Utah`,
         html: `
