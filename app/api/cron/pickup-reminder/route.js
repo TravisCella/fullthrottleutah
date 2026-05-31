@@ -1,11 +1,12 @@
 // app/api/cron/pickup-reminder/route.js
-// Version: 2026-05-31 — 24-hour pickup reminder (SMS + email fallback)
+// Version: 2026-05-31 PM — Switch email from onboarding@resend.dev to bookings@fullthrottleutah.com
 // Triggered daily at 14:00 UTC (8:00 AM MDT) via Vercel cron
 // Logic: find tomorrow's CONFIRMED bookings → SMS if opted in, email otherwise
+// Change: Domain verified at Resend, so reminders can now reach any customer (not just travis.cella@gmail.com).
 
 import { NextResponse } from 'next/server';
-import { getTomorrowsBookings } from '../../../../lib/sheets';
-import { sendSMS } from '../../../../lib/sms';
+import { getTomorrowsBookings } from '../../../../../lib/sheets';
+import { sendSMS } from '../../../../../lib/sms';
 
 // ─── SMS copy ────────────────────────────────────────────────────────────────
 // Target: ~160 chars. Direct, actionable, no filler.
@@ -114,8 +115,6 @@ async function sendReminderEmail(booking) {
     return { ok: false, reason: 'no_resend_key' };
   }
 
-  const firstName = booking.renter_name.split(' ')[0];
-
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -123,7 +122,7 @@ async function sendReminderEmail(booking) {
       'Authorization': `Bearer ${RESEND_KEY}`,
     },
     body: JSON.stringify({
-      from: 'Full Throttle Utah <onboarding@resend.dev>',
+      from: 'Full Throttle Utah <bookings@fullthrottleutah.com>',
       to: booking.renter_email,
       subject: `⏰ Reminder: Your rental is tomorrow — ${booking.package} at ${booking.location}`,
       html: buildReminderEmailHTML(booking),
