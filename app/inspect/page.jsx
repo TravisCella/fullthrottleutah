@@ -1,5 +1,13 @@
 'use client';
 
+// app/inspect/page.jsx
+// Version: 2026-05-31 — Real AI vision damage detection
+// Last edited: May 31 2026 (late night)
+// Change: aiCompare() now calls the new /api/ai-compare server endpoint which uses
+//         Claude Sonnet 4.6 vision to analyze the actual photos. Previously it just
+//         compared the damage text fields and called itself "AI" — now it really IS AI.
+//         All other UI/flow unchanged. AI status note added to the compare screen.
+
 import { useState, useRef, useCallback, useEffect } from "react";
 
 const CUSTOMER_ZONES = [
@@ -65,7 +73,7 @@ function notifyBackend(record, inspectionId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       inspectionId,
-      type: record.role, // 'customer' or 'owner'
+      type: record.role,
       timestamp: ts(),
       customerName: record.customerName,
       machineName: record.machineName,
@@ -79,63 +87,44 @@ function notifyBackend(record, inspectionId) {
     }),
   }).catch(err => {
     console.error('Notify backend failed (non-fatal):', err);
-    // Inspection is still saved in Firebase even if notification fails
   });
 }
 
+// ─── REAL AI VISION COMPARISON ───────────────────────────────────────────────
+// Sends both inspections' photos to the /api/ai-compare server endpoint, which
+// uses Claude Sonnet 4.6 vision to analyze actual differences between check-out
+// and check-in. Returns null on error. Result shape matches the previous text-
+// based version so the UI doesn't change.
 function aiCompare(checkoutId, checkinId, cb) {
-  Promise.all([
-    fetch(`${DB_URL}/inspections/${checkoutId}.json`).then(r => r.json()),
-    fetch(`${DB_URL}/inspections/${checkinId}.json`).then(r => r.json()),
-  ]).then(([out, inn]) => {
-    if (!out || !inn) { cb(null); return; }
-    const findings = [];
-    const allZones = [...new Set([...Object.keys(out.zones || {}), ...Object.keys(inn.zones || {})])];
-    
-    for (const zoneIdx of allZones) {
-      const outZone = (out.zones || [])[zoneIdx];
-      const inZone = (inn.zones || [])[zoneIdx];
-      if (!outZone || !inZone) continue;
-      
-      const outDmg = outZone.damage || "None";
-      const inDmg = inZone.damage || "None";
-      
-      if (inDmg !== "None" && inDmg !== outDmg) {
-        findings.push({
-          zone: inZone.zone || outZone.zone,
-          severity: "damage",
-          note: `New damage reported: "${inDmg}" (was: "${outDmg}")`,
-        });
+  fetch('/api/ai-compare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checkoutId, checkinId }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (!data || !data.ok) {
+        console.error('AI compare failed:', data?.error || data);
+        cb(null);
+        return;
       }
-    }
-
-    if (inn.fuelOk === false) {
-      findings.push({ zone: "Fuel", severity: "fee", note: "Returned not full — refuel fee applies" });
-    }
-
-    const impellerZone = (inn.zones || []).find(z => z.zone === "Impeller inspection");
-    if (impellerZone && impellerZone.damage && impellerZone.damage !== "None") {
-      findings.push({ zone: "Impeller", severity: "critical", note: `Impeller damage: "${impellerZone.damage}"` });
-    }
-
-    const hullZone = (inn.zones || []).find(z => z.zone === "Hull underside");
-    if (hullZone && hullZone.damage && hullZone.damage !== "None") {
-      findings.push({ zone: "Hull underside", severity: "critical", note: `Hull damage: "${hullZone.damage}"` });
-    }
-
-    cb({
-      checkoutTime: out.timestamp,
-      checkinTime: inn.timestamp,
-      customer: out.customerName || inn.customerName,
-      machine: out.machineName || inn.machineName,
-      checkoutPhotos: out.photoCount || 0,
-      checkinPhotos: inn.photoCount || 0,
-      findings,
-      verdict: findings.some(f => f.severity === "critical") ? "CRITICAL" :
-               findings.some(f => f.severity === "damage") ? "DAMAGE_FOUND" :
-               findings.some(f => f.severity === "fee") ? "FEES_APPLY" : "CLEAR",
+      cb({
+        checkoutTime: data.checkoutTime,
+        checkinTime: data.checkinTime,
+        customer: data.customer,
+        machine: data.machine,
+        checkoutPhotos: data.checkoutPhotos,
+        checkinPhotos: data.checkinPhotos,
+        findings: data.findings || [],
+        verdict: data.verdict || 'CLEAR',
+        summary: data.summary || '',
+        tokensUsed: data.tokensUsed,
+      });
+    })
+    .catch(err => {
+      console.error('AI compare network error:', err);
+      cb(null);
     });
-  }).catch(() => cb(null));
 }
 
 function PhotoBtn({ onCapture, label }) {
@@ -188,10 +177,10 @@ export default function InspectionV2() {
   const [compareIn, setCompareIn] = useState("");
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const [impellerNotes, setImpellerNotes] = useState("");
   const [hourMeter, setHourMeter] = useState("");
   
-  // NEW: server-loaded recent inspections (replaces local session state)
   const [recentInspections, setRecentInspections] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
   const [recentSearch, setRecentSearch] = useState("");
@@ -205,7 +194,6 @@ export default function InspectionV2() {
   const cn = zn[cz?.id] || "";
   const done = Object.keys(zp).filter(k => (zp[k] || []).length > 0).length;
   
-  // Load recent inspections from server when entering home screen or compare mode
   useEffect(() => {
     if (role === null || compareMode) {
       loadRecentInspections();
@@ -253,7 +241,6 @@ export default function InspectionV2() {
     };
     upload(record, (ok, id) => {
       if (ok) {
-        // NEW: Notify backend (email + SMS owner, log to Sheets) — fire and forget
         notifyBackend(record, id);
         
         setSubmitted(prev => [...prev, { ...record, id, timestamp: ts() }]);
@@ -268,13 +255,19 @@ export default function InspectionV2() {
   const runCompare = () => {
     if (!compareOut.trim() || !compareIn.trim()) return;
     setAiLoading(true);
+    setAiError("");
+    setAiResult(null);
     aiCompare(compareOut.trim(), compareIn.trim(), result => {
-      setAiResult(result);
+      if (!result) {
+        setAiError("AI analysis failed. Check the inspection IDs and try again, or check Vercel logs.");
+      } else {
+        setAiResult(result);
+      }
       setAiLoading(false);
     });
   };
 
-  const reset = () => { setRole(null); setMode(null); setStep("machine"); setMachine(null); setZone(0); setFuelOk(null); setGlobalNote(""); setCompareMode(false); setAiResult(null); setCompareOut(""); setCompareIn(""); setHourMeter(""); };
+  const reset = () => { setRole(null); setMode(null); setStep("machine"); setMachine(null); setZone(0); setFuelOk(null); setGlobalNote(""); setCompareMode(false); setAiResult(null); setAiError(""); setCompareOut(""); setCompareIn(""); setHourMeter(""); };
 
   const accent = "#D85A30";
   const dark = "#111";
@@ -288,7 +281,6 @@ export default function InspectionV2() {
   const btn = (bgColor, color) => ({ padding: "13px 24px", border: "none", borderRadius: 12, background: bgColor, color, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", width: "100%", transition: "opacity 0.15s" });
   const outline = { padding: "11px 18px", border: `1.5px solid ${bdr}`, borderRadius: 12, background: "transparent", color: dark, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.2s" };
   
-  // Helper to render a recent inspection card with tap-to-use action
   function RecentCard({ insp, onTap, showSelectButtons, onUseAsCheckout, onUseAsCheckin }) {
     const isCustomer = insp.type === 'customer';
     return (
@@ -385,12 +377,11 @@ export default function InspectionV2() {
               <div style={{ width: 44, height: 44, borderRadius: 10, background: "#f0eaf7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🤖</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 15 }}>AI damage comparison</div>
-                <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>Compare check-out vs check-in photos</div>
+                <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>Claude Vision compares check-out vs check-in photos</div>
               </div>
               <span style={{ fontSize: 18, color: accent }}>→</span>
             </div>
 
-            {/* NEW: Server-loaded recent inspections (last 30 days) */}
             <div style={{ marginTop: 28 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>Recent inspections (30 days)</div>
@@ -423,9 +414,11 @@ export default function InspectionV2() {
           <div style={{ marginTop: 20 }}>
             <button onClick={reset} style={{ ...outline, padding: "6px 12px", fontSize: 12, marginBottom: 16 }}>← Back</button>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>🤖 AI damage comparison</div>
-            <div style={{ fontSize: 13, color: muted, marginBottom: 16 }}>Tap a recent inspection to autofill, or enter IDs manually.</div>
+            <div style={{ fontSize: 13, color: muted, marginBottom: 6 }}>Powered by Claude Sonnet 4.6 vision — analyzes the actual photos.</div>
+            <div style={{ fontSize: 11, color: muted, marginBottom: 16, background: "#f0eaf7", padding: "8px 10px", borderRadius: 6 }}>
+              ⏱️ Analysis takes 10-30 seconds. Cost ≈ $0.10 per comparison.
+            </div>
 
-            {/* NEW: Tappable recent inspections to autofill IDs */}
             <div style={{ marginBottom: 16 }}>
               <input value={recentSearch} onChange={e => setRecentSearch(e.target.value)}
                 placeholder="🔍 Search by customer name..."
@@ -471,28 +464,50 @@ export default function InspectionV2() {
             </div>
 
             <button onClick={runCompare} disabled={aiLoading || !compareOut.trim() || !compareIn.trim()} style={{ ...btn(accent, "#fff"), opacity: aiLoading || !compareOut.trim() || !compareIn.trim() ? 0.4 : 1 }}>
-              {aiLoading ? "⏳ Analyzing..." : "🤖 Run AI comparison"}
+              {aiLoading ? "🤖 Analyzing photos with Claude Vision..." : "🤖 Run AI comparison"}
             </button>
+
+            {aiError && (
+              <div style={{ marginTop: 16, background: "#fcebeb", border: `1.5px solid ${red}`, borderRadius: 10, padding: 12, fontSize: 13, color: red }}>
+                ⚠️ {aiError}
+              </div>
+            )}
 
             {aiResult && (
               <div style={{ marginTop: 20 }}>
                 <div style={{
-                  background: aiResult.verdict === "CLEAR" ? "#eaf7f0" : aiResult.verdict === "FEES_APPLY" ? "#fef3c7" : "#fcebeb",
-                  border: `1.5px solid ${aiResult.verdict === "CLEAR" ? green : aiResult.verdict === "FEES_APPLY" ? "#d97706" : red}`,
+                  background: aiResult.verdict === "CLEAR" ? "#eaf7f0" :
+                              aiResult.verdict === "MINOR" || aiResult.verdict === "FEES_APPLY" ? "#fef3c7" : "#fcebeb",
+                  border: `1.5px solid ${
+                    aiResult.verdict === "CLEAR" ? green :
+                    aiResult.verdict === "MINOR" || aiResult.verdict === "FEES_APPLY" ? "#d97706" : red
+                  }`,
                   borderRadius: 14, padding: 16, marginBottom: 16,
                 }}>
                   <div style={{ fontSize: 22, marginBottom: 6 }}>
-                    {aiResult.verdict === "CLEAR" ? "✅" : aiResult.verdict === "FEES_APPLY" ? "⚠️" : aiResult.verdict === "CRITICAL" ? "🚨" : "⚠️"}
+                    {aiResult.verdict === "CLEAR" ? "✅" :
+                     aiResult.verdict === "MINOR" ? "👀" :
+                     aiResult.verdict === "FEES_APPLY" ? "⛽" :
+                     aiResult.verdict === "CRITICAL" ? "🚨" : "⚠️"}
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: aiResult.verdict === "CLEAR" ? green : aiResult.verdict === "FEES_APPLY" ? "#92400e" : red }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color:
+                    aiResult.verdict === "CLEAR" ? green :
+                    aiResult.verdict === "MINOR" || aiResult.verdict === "FEES_APPLY" ? "#92400e" : red
+                  }}>
                     {aiResult.verdict === "CLEAR" ? "All clear — no damage detected" :
+                     aiResult.verdict === "MINOR" ? "Minor wear — review recommended" :
                      aiResult.verdict === "FEES_APPLY" ? "Fees apply — see details" :
                      aiResult.verdict === "CRITICAL" ? "Critical damage detected" :
                      "Damage found — review required"}
                   </div>
-                  <div style={{ fontSize: 12, color: muted }}>
+                  <div style={{ fontSize: 12, color: muted, marginBottom: aiResult.summary ? 8 : 0 }}>
                     {aiResult.customer} · {aiResult.machine}
                   </div>
+                  {aiResult.summary && (
+                    <div style={{ fontSize: 13, color: dark, lineHeight: 1.4, marginTop: 8, fontStyle: "italic" }}>
+                      "{aiResult.summary}"
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ background: card, border: `1px solid ${bdr}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
@@ -516,13 +531,24 @@ export default function InspectionV2() {
                       <div key={i} style={{ padding: "10px 0", borderBottom: i < aiResult.findings.length - 1 ? `1px solid ${bdr}` : "none", display: "flex", gap: 10 }}>
                         <div style={{
                           width: 28, height: 28, borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
-                          background: f.severity === "critical" ? "#fcebeb" : f.severity === "damage" ? "#fef3c7" : "#e8f4fd",
+                          background: f.severity === "critical" ? "#fcebeb" :
+                                      f.severity === "damage" ? "#fef3c7" :
+                                      f.severity === "minor" ? "#fef3c7" :
+                                      f.severity === "fee" ? "#e8f4fd" : "#f0ede6",
                         }}>
-                          {f.severity === "critical" ? "🚨" : f.severity === "damage" ? "⚠️" : "💰"}
+                          {f.severity === "critical" ? "🚨" :
+                           f.severity === "damage" ? "⚠️" :
+                           f.severity === "minor" ? "👀" :
+                           f.severity === "fee" ? "💰" : "·"}
                         </div>
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{f.zone}</div>
-                          <div style={{ fontSize: 12, color: muted, marginTop: 1 }}>{f.note}</div>
+                          <div style={{ fontSize: 12, color: muted, marginTop: 1, lineHeight: 1.4 }}>{f.note}</div>
+                          {f.confidence && (
+                            <div style={{ fontSize: 10, color: muted, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              {f.confidence} confidence
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -532,6 +558,12 @@ export default function InspectionV2() {
                 {aiResult.findings.length === 0 && (
                   <div style={{ textAlign: "center", padding: 20, color: green, fontSize: 13 }}>
                     No damage, no fees. Full deposit refund recommended.
+                  </div>
+                )}
+
+                {aiResult.tokensUsed && (
+                  <div style={{ marginTop: 12, fontSize: 10, color: muted, textAlign: "center" }}>
+                    Tokens: {aiResult.tokensUsed.input || 0} in / {aiResult.tokensUsed.output || 0} out
                   </div>
                 )}
               </div>
