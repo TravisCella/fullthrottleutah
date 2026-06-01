@@ -1,8 +1,12 @@
 // app/api/webhook/route.js
-// Version: 2026-05-31 — Switch email from onboarding@resend.dev to bookings@fullthrottleutah.com
-// Last edited: May 31 2026
-// Change: Domain verified at Resend, so we can now send to ANY recipient (not just travis.cella@gmail.com).
-//         This unblocks customer confirmation emails which were silently failing on the free-tier sender.
+// Version: 2026-05-31 LATE — Skip non-booking payments
+// Last edited: May 31 2026 (late evening)
+// Change: Added a guard that exits early when the Stripe checkout.session.completed event
+//         has no booking metadata. Without this, ANY successful payment (Payment Link, damage
+//         charge, single-ski manual charge, future ad-hoc invoices, etc.) was being treated
+//         as a new rental booking — writing a junk row to Sheets, creating an empty Calendar
+//         event, and firing an owner SMS with all fields blank ("Renter: ()  Paid: $192.5").
+//         Now: if there's no package in metadata, we acknowledge the event to Stripe and stop.
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -118,6 +122,18 @@ export async function POST(request) {
       if (!meta.renterName && session.metadata) {
         meta = { ...session.metadata, ...meta };
       }
+
+      // ─── GUARD: skip non-booking payments ────────────────────────────────
+      // Real bookings ALWAYS set packageName/package in metadata via app/api/checkout/route.js.
+      // Stripe Payment Links, hand-written invoices, damage charges, and any other ad-hoc
+      // payments do NOT have this metadata. Without this guard those would all fire the
+      // owner SMS as "🛎️ New booking! Renter: ()  Paid: $XXX" and pollute Sheet1.
+      const hasBookingMetadata = !!(meta.packageName || meta.package);
+      if (!hasBookingMetadata) {
+        console.log('[webhook] Skipping non-booking payment:', session.id, '— no package metadata');
+        return NextResponse.json({ received: true, skipped: 'non-booking-payment' });
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       const booking = {
         booking_id: session.id,
