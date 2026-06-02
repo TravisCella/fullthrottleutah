@@ -1,16 +1,33 @@
+// app/api/admin/update-booking/route.js
+// Version: 2026-06-02 — Auto-fire review request email after return
+// Last edited: June 2 2026
+//
+// Change from prior version:
+//   After successfully processing `mark_returned` or `cash_deposit_returned` action,
+//   fire the review request email via lib/review-email.js. Fire-and-forget — never
+//   blocks the booking update. Idempotent — review-email.js will skip if already sent
+//   (e.g., if refund-deposit already fired one for this rental).
+
 import Stripe from 'stripe';
+import { sendReviewRequest } from '../../../../lib/review-email';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Fire-and-forget review email
+function fireReviewRequestForBooking(piId) {
+  if (!piId) return;
+  sendReviewRequest(piId).catch(err => {
+    console.error('[update-booking] Review email fire-and-forget failed:', err.message);
+  });
+}
 
 export async function POST(request) {
   try {
     const { paymentIntentId, action, password, notes } = await request.json();
-    
-    // Auth check
+
     if (password !== process.env.ADMIN_PASSWORD) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
     if (!paymentIntentId || !action) {
       return Response.json({ error: 'Missing paymentIntentId or action' }, { status: 400 });
     }
@@ -20,7 +37,6 @@ export async function POST(request) {
       return Response.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    // Get current metadata
     const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
     const updates = { ...pi.metadata };
 
@@ -42,6 +58,12 @@ export async function POST(request) {
     }
 
     await stripe.paymentIntents.update(paymentIntentId, { metadata: updates });
+
+    // ── Fire review email if this action marks the rental as returned ────
+    // (Skips cash_deposit_received which is a pickup, not a return)
+    if (action === 'cash_deposit_returned' || action === 'mark_returned') {
+      fireReviewRequestForBooking(paymentIntentId);
+    }
 
     return Response.json({ success: true, action, metadata: updates });
   } catch (err) {
