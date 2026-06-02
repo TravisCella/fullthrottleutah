@@ -1,31 +1,20 @@
 // app/components/TestimonialsSection.jsx
-// Version: 2026-06-02 — Landing page testimonials section
-// Created: June 2 2026
+// Version: 2026-06-02 v2 — Refactored to fetch from API endpoint
+// Last edited: June 2 2026
 //
-// Drop-in server component for the homepage. Renders 4 most recent 5-star reviews
-// in a horizontally scrollable row (or grid on desktop), with LocalBusiness +
-// AggregateRating JSON-LD so Google can show the star rating in search results
-// for searches that land on the homepage.
+// Change from prior version: removed direct import of lib/sheets (which transitively
+// pulls in googleapis and its Node-only modules). Now fetches reviews from the
+// /api/public-reviews HTTP endpoint instead. Result: this component has zero
+// server-only npm dependencies, so it bundles cleanly for both server and (RSC payload).
 //
-// USAGE in your landing page (app/page.js):
+// Caching: the API endpoint has revalidate=300 set, and we pass revalidate=300 on the
+// fetch as well, so Sheets gets hit at most once per 5 min regardless of traffic.
 //
-//   import TestimonialsSection from './components/TestimonialsSection';
-//
-//   export default function Home() {
-//     return (
-//       <>
-//         {/* ... your existing landing page content ... */}
-//         <TestimonialsSection />
-//         {/* ... rest of landing page ... */}
-//       </>
-//     );
-//   }
-//
-// Caching: revalidate handled by Next.js — the parent page sets revalidate, OR you
-// can fetch reviews via getReviews directly in the parent page and pass them in
-// as a prop. This component just fetches on its own for simplicity.
-
-import { getReviews } from '../../lib/sheets';
+// Build-time behavior: at Vercel build time, the API endpoint isn't reachable yet
+// (deployment isn't live). The try/catch fallback renders with empty data, and the
+// component returns null when there are no reviews. After deployment, the first
+// page request triggers revalidation in the background, and subsequent requests
+// show real data.
 
 const NAVY = '#0C4A6E';
 const ORANGE = '#EA580C';
@@ -35,33 +24,38 @@ const TEXT = '#0F172A';
 const MUTED = '#64748B';
 const BORDER = '#E2E8F0';
 
-export default async function TestimonialsSection() {
-  // Pull ALL approved + publishable reviews for accurate aggregate stats
-  const allReviews = await getReviews({
-    status: 'approved',
-    allowPublishOnly: true,
-  });
+function getBaseUrl() {
+  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return 'http://localhost:3000';
+}
 
-  if (allReviews.length === 0) {
-    // No reviews yet — render nothing (don't show an empty "We have no reviews" section)
+async function fetchPublicReviews() {
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/public-reviews`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error('[TestimonialsSection] Failed to fetch reviews:', err.message);
+    return null;
+  }
+}
+
+export default async function TestimonialsSection() {
+  const data = await fetchPublicReviews();
+  if (!data || !data.reviews || data.reviews.length === 0) {
+    // No reviews yet, or fetch failed (e.g. at build time) — render nothing
     return null;
   }
 
-  const count = allReviews.length;
-  const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
-  const avg = totalRating / count;
-  const aggregateRating = avg.toFixed(1);
+  const { reviews: allReviews, count, aggregateRating } = data;
 
   // Featured = most recent 5-star reviews, max 4
-  const featured = allReviews
-    .filter(r => r.rating === 5)
-    .slice(0, 4);
-
-  // Fallback: if fewer than 2 five-star reviews exist, show the most recent regardless
+  const featured = allReviews.filter(r => r.rating === 5).slice(0, 4);
   const display = featured.length >= 2 ? featured : allReviews.slice(0, 4);
 
-  // JSON-LD for the homepage — LocalBusiness with AggregateRating.
-  // This is what gets you the gold stars under your business name in Google search.
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
@@ -101,7 +95,6 @@ export default async function TestimonialsSection() {
       />
 
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        {/* Section header */}
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div
             style={{
@@ -137,7 +130,6 @@ export default async function TestimonialsSection() {
           </p>
         </div>
 
-        {/* Review grid */}
         <div
           style={{
             display: 'grid',
@@ -151,7 +143,6 @@ export default async function TestimonialsSection() {
           ))}
         </div>
 
-        {/* See all reviews CTA */}
         <div style={{ textAlign: 'center' }}>
           <a
             href="/reviews"
@@ -175,8 +166,6 @@ export default async function TestimonialsSection() {
   );
 }
 
-// ─── Components ──────────────────────────────────────────────────────────────
-
 function ReviewCard({ review }) {
   return (
     <div
@@ -191,7 +180,6 @@ function ReviewCard({ review }) {
       }}
     >
       <Stars rating={review.rating} size={16} />
-
       <p
         style={{
           fontSize: 15,
@@ -199,7 +187,6 @@ function ReviewCard({ review }) {
           color: TEXT,
           margin: '12px 0 16px',
           flex: 1,
-          // Cap displayed length to keep cards visually balanced
           display: '-webkit-box',
           WebkitLineClamp: 5,
           WebkitBoxOrient: 'vertical',
@@ -208,7 +195,6 @@ function ReviewCard({ review }) {
       >
         "{review.review_text}"
       </p>
-
       <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{review.display_name}</div>
         <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
