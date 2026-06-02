@@ -1,20 +1,18 @@
 // app/booking.js
-// Version: 2026-05-30 — Distance-tiered white-glove pricing per location
-// Last edited: May 30 2026 (afternoon)
-// Feature: Replaces the flat $200 white-glove fee with per-destination pricing
-//          ranging from $150 (Willard Bay) to $750 (Sand Hollow). Lake Powell is
-//          now "Call for quote" — toggle is hidden and customer is shown phone
-//          number. Landing page card updated to "Starting at $150, varies by
-//          destination". White-glove toggle no longer appears until customer has
-//          selected a location. All in-flow price summaries (Step 1 toggle pill,
-//          Step 2 calendar summary, Step 5 review) now show the actual fee for
-//          the selected destination, not a hardcoded $200.
+// Version: 2026-06-02 — Life vest size selection
+// Last edited: June 2 2026
+// Feature: Adds a "Life Vests" section at the end of Step 4 (Info) that lets the
+//          customer pick the sizes they need (Infant, Youth, X-Small/Small, Adult
+//          Small, Medium, L/XL, Universal, XXL). Capped at the package's rider
+//          capacity (Spark Duo = 4, GTX Limited Duo = 6). Skippable — if the
+//          customer doesn't pick, we default to 2 Adult Mediums (one per operator).
+//          Selection is summarized in Step 5 review, passed to /api/checkout as
+//          vestSizes (JSON) + vestSummary (readable string), and surfaced in
+//          owner SMS, confirmation email, and Google Sheet column S.
 //
-// Downstream impact: app/api/checkout/route.js and app/api/webhook/route.js will
-//                    need follow-up commits to surface the actual fee amount in
-//                    Stripe metadata + owner SMS. Without those, Stripe still
-//                    charges the correct total (because totalPrice includes the
-//                    correct fee), but webhook SMS won't display the dollar value.
+// Builds on: 2026-05-30 distance-tiered white-glove pricing
+// Downstream: app/api/checkout/route.js and app/api/webhook/route.js receive
+//             and surface vest data. lib/sheets.js writes column S.
 
 import { useState, useEffect, useRef } from "react";
 
@@ -43,6 +41,7 @@ const PACKAGES = [
     weekend: 299,
     multiDay: { 2: 256, 3: 237, 4: 229, 5: 215 },
     deposit: 1000,
+    maxRiders: 4, // 2 skis × 2 riders each
     heroImg: "sparkHero",
     galleryImgs: ["sparkFront", "sparkSide", "sparkAngle"],
     accent: "#0EA5E9",
@@ -53,11 +52,12 @@ const PACKAGES = [
     name: "GTX Limited Duo",
     tagline: "2 × 2026 Sea-Doo GTX Limited 325",
     description: "The ultimate luxury ride. 325 HP, 10.25\" touchscreen, premium Bluetooth audio, massive swim platform. This is first class on the water.",
-    includes: ["2 Sea-Doo GTX Limited 325 HP", "Single trailer", "4 life preservers", "2 anchoring systems", "Safety flags", "Bluetooth audio"],
+    includes: ["2 Sea-Doo GTX Limited 325 HP", "Single trailer", "6 life preservers", "2 anchoring systems", "Safety flags", "Bluetooth audio"],
     weekday: 549,
     weekend: 649,
     multiDay: { 2: 522, 3: 483, 4: 467, 5: 439 },
     deposit: 1000,
+    maxRiders: 6, // 2 skis × 3 riders each (Sea-Doo GTX 325 is 3-up)
     heroImg: "gtxHero",
     galleryImgs: ["gtxStudio", "gtxWater", "gtxAction"],
     accent: "#B8860B",
@@ -66,8 +66,6 @@ const PACKAGES = [
 ];
 
 // ── Lakes we serve, with distance-tiered white-glove pricing ──
-// whiteGloveFee = dollar amount for delivery/launch/retrieval at that lake.
-//                 null = quote only (currently just Lake Powell, which is 600+ mile round trip)
 const LOCATIONS = [
   { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️", aisStatus: "clean", whiteGloveFee: 175 },
   { id: "willard-bay", name: "Willard Bay", region: "Northern Utah", drive: "~35min", emoji: "🦅", aisStatus: "clean", whiteGloveFee: 150 },
@@ -91,6 +89,60 @@ const HOLIDAYS = [
   { start: "08-29", end: "09-02", name: "Labor Day", premium: 75 },
   { start: "05-23", end: "05-27", name: "Memorial Day", premium: 75 },
 ];
+
+// ── Life vest sizes (matches inventory) ──
+// Order from largest to smallest for natural reading
+const VEST_SIZES = [
+  { key: "adult_xxl",       label: "Adult XX-Large",   hint: "90+ lbs" },
+  { key: "adult_l_xl",      label: "Adult L/XL",       hint: "" },
+  { key: "adult_universal", label: "Adult Universal",  hint: "90+ lbs" },
+  { key: "adult_medium",    label: "Adult Medium",     hint: "" },
+  { key: "adult_small",     label: "Adult Small",      hint: "" },
+  { key: "xs_s",            label: "X-Small / Small",  hint: "" },
+  { key: "youth",           label: "Youth",            hint: "50–90 lbs · kids" },
+  { key: "infant",          label: "Infant",           hint: "under 30 lbs" },
+];
+
+// Shorter labels for SMS/email/sheet output
+const SIZE_SHORT = {
+  adult_xxl:       "Adult XXL",
+  adult_l_xl:      "Adult L/XL",
+  adult_universal: "Adult Universal",
+  adult_medium:    "Adult M",
+  adult_small:     "Adult S",
+  xs_s:            "XS/S",
+  youth:           "Youth",
+  infant:          "Infant",
+};
+
+const EMPTY_VESTS = {
+  adult_xxl: 0,
+  adult_l_xl: 0,
+  adult_universal: 0,
+  adult_medium: 0,
+  adult_small: 0,
+  xs_s: 0,
+  youth: 0,
+  infant: 0,
+};
+
+// Default selection if customer skips this section: 2 Adult Mediums (one per operator)
+const DEFAULT_VESTS = { ...EMPTY_VESTS, adult_medium: 2 };
+
+// Build the readable summary string used in SMS, email, and Sheet.
+// e.g. "1 Adult XXL, 1 Adult M, 1 Youth (3 vests)"
+function formatVestSummary(sizes) {
+  const parts = [];
+  let total = 0;
+  for (const [key, count] of Object.entries(sizes)) {
+    if (count > 0) {
+      parts.push(`${count} ${SIZE_SHORT[key]}`);
+      total += count;
+    }
+  }
+  if (parts.length === 0) return "";
+  return `${parts.join(", ")} (${total} vest${total === 1 ? "" : "s"})`;
+}
 
 function getHolidaySurcharge(startDate, endDate) {
   if (!startDate) return { total: 0, holidays: [] };
@@ -241,17 +293,14 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
           const holiday = isHoliday(day);
           const unavailable = past || booked;
 
-          // Compute the price to display under this date
           let dayPrice = null;
           if (day && pkg && !past) {
             const baseRate = wknd ? pkg.weekend : pkg.weekday;
-            // Add holiday surcharge if applicable
             const mmdd = `${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const holidayMatch = HOLIDAYS.find(h => mmdd >= h.start && mmdd <= h.end);
             dayPrice = baseRate + (holidayMatch ? holidayMatch.premium : 0);
           }
 
-          // Color for the price text — keep readable against the background
           const priceColor = !day ? "transparent"
             : booked ? "#EF4444"
             : sel ? "#fff"
@@ -336,6 +385,7 @@ export default function JetSkiBooking() {
   const [whiteGlove, setWhiteGlove] = useState(false);
   const [isRepeatCustomer, setIsRepeatCustomer] = useState(false);
   const [checkingCustomer, setCheckingCustomer] = useState(false);
+  const [vestSizes, setVestSizes] = useState(EMPTY_VESTS);
 
   useEffect(() => { setFadeIn(false); const t = setTimeout(() => setFadeIn(true), 20); return () => clearTimeout(t); }, [step]);
 
@@ -357,6 +407,17 @@ export default function JetSkiBooking() {
     }
   }, [loc]);
 
+  // If user switches packages and has more vests selected than the new package
+  // can accommodate (e.g. they had 5 vests selected for GTX Duo and switch to
+  // Spark Duo which maxes at 4), clear the vest selection so they can re-pick.
+  useEffect(() => {
+    if (!pkg) return;
+    const total = Object.values(vestSizes).reduce((s, v) => s + v, 0);
+    if (total > pkg.maxRiders) {
+      setVestSizes(EMPTY_VESTS);
+    }
+  }, [pkg]);
+
   const handleDate = (d) => {
     if (dates.length === 0 || dates.length === 2) setDates([d]);
     else if (d < dates[0]) setDates([d]);
@@ -368,7 +429,6 @@ export default function JetSkiBooking() {
     setMo(m); setYr(y);
   };
 
-  // Check if customer is a returning customer when they finish typing email/phone
   const checkReturningCustomer = async () => {
     if (!info.email || !info.email.includes('@')) return;
     setCheckingCustomer(true);
@@ -381,16 +441,32 @@ export default function JetSkiBooking() {
       const data = await res.json();
       setIsRepeatCustomer(data.isRepeat || false);
     } catch (err) {
-      // Silently fail — don't block booking
       setIsRepeatCustomer(false);
     }
     setCheckingCustomer(false);
   };
 
+  // Vest selection helpers
+  const totalVests = Object.values(vestSizes).reduce((s, v) => s + v, 0);
+  const maxVests = pkg?.maxRiders || 4;
+  const incrementVest = (key) => {
+    if (totalVests >= maxVests) return;
+    setVestSizes(prev => ({ ...prev, [key]: prev[key] + 1 }));
+  };
+  const decrementVest = (key) => {
+    if (vestSizes[key] <= 0) return;
+    setVestSizes(prev => ({ ...prev, [key]: prev[key] - 1 }));
+  };
+  // The "effective" vest selection — uses the customer's choices if any, otherwise
+  // falls back to 2 Adult Mediums (the skippable default per the Phase 2 design).
+  const getEffectiveVests = () => totalVests === 0 ? DEFAULT_VESTS : vestSizes;
+  const effectiveVestSummary = formatVestSummary(getEffectiveVests());
+
   const handleCheckout = async () => {
     setPaying(true);
     setPayError(null);
     try {
+      const effective = getEffectiveVests();
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -412,6 +488,10 @@ export default function JetSkiBooking() {
           holidaySurcharge: holidayInfo.total,
           deconFee: deconFee,
           isLakePowell: isLakePowell,
+          loyaltyDiscount: loyaltyDiscount,
+          vestSizes: JSON.stringify(effective),
+          vestSummary: formatVestSummary(effective),
+          vestUsedDefault: totalVests === 0,
           waiverSigned: 'true',
           waiverDate: new Date().toISOString(),
         }),
@@ -432,15 +512,11 @@ export default function JetSkiBooking() {
   const days = dates.length === 2 ? daysBetween(dates[0], dates[1]) : dates.length === 1 ? 1 : 0;
   const basePrice = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0]) : 0;
   const holidayInfo = dates.length > 0 ? getHolidaySurcharge(dates[0], dates.length === 2 ? dates[1] : dates[0]) : { total: 0, holidays: [] };
-  // White-glove fee is now per-destination. Falls back to 0 if no location selected,
-  // toggle is off, or the location is quote-only (e.g. Lake Powell).
   const whiteGloveFee = (whiteGlove && loc?.whiteGloveFee) ? loc.whiteGloveFee : 0;
   const isLakePowell = loc?.id === "lake-powell";
   const deconFee = isLakePowell ? 200 : 0;
-  // Loyalty discount: 10% off base rental only (not white glove, decon, or holiday surcharge)
   const loyaltyDiscount = isRepeatCustomer ? Math.round(basePrice * 0.10) : 0;
   const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee - loyaltyDiscount;
-  // General min-days check — works for any lake that has a minDays field on it
   const minDaysRequired = loc?.minDays || 1;
   const meetsMinimum = days >= minDaysRequired;
 
@@ -448,7 +524,7 @@ export default function JetSkiBooking() {
     if (step === 0) return pkg;
     if (step === 1) return loc;
     if (step === 2) return dates.length >= 1 && meetsMinimum;
-    if (step === 3) return info.name && info.email && info.phone && info.experience;
+    if (step === 3) return info.name && info.email && info.phone && info.experience && totalVests <= maxVests;
     if (step === 4) return Object.values(waiverChecks).every(Boolean) && signature;
     if (step === 5) return true;
     return false;
@@ -765,18 +841,11 @@ export default function JetSkiBooking() {
               </div>
             )}
 
-            {/* Add-On Service: White Glove Delivery
-                Only shown after a location is selected, so we know the per-destination fee.
-                Three states:
-                  1. No location yet → section hidden entirely
-                  2. Regular lake (whiteGloveFee is a number) → toggle with that fee
-                  3. Lake Powell (whiteGloveFee === null) → "Call for quote" card, no toggle */}
             {loc && (
               <div style={{ marginTop: 20 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Add-On Service</div>
 
                 {loc.whiteGloveFee === null ? (
-                  // Quote-only: Lake Powell. Show contact card instead of toggle.
                   <div style={{
                     border: "2px solid #E2E8F0",
                     borderRadius: 14, padding: "16px 18px",
@@ -803,7 +872,6 @@ export default function JetSkiBooking() {
                     </div>
                   </div>
                 ) : (
-                  // Regular toggle with location-specific fee
                   <div
                     onClick={() => setWhiteGlove(!whiteGlove)}
                     style={{
@@ -999,6 +1067,94 @@ export default function JetSkiBooking() {
                 </div>
               </label>
             </div>
+
+            {/* ─── LIFE VEST SELECTION ────────────────────────────────────────
+                Skippable. If totalVests === 0 at checkout, we default to 2
+                Adult Mediums (one per operator). Capped at pkg.maxRiders. */}
+            <div style={{ marginTop: 14, border: "2px solid #E2E8F0", borderRadius: 12, padding: 16, background: "#fff" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span>🦺 Life Vests</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: "#94A3B8", letterSpacing: "0.05em", textTransform: "uppercase" }}>Optional</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748B", marginTop: 4, lineHeight: 1.5 }}>
+                    USCG-approved PFDs for all riders. Skip and we'll bring 2 Adult Mediums.
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: totalVests > maxVests ? "#DC2626" : "#0F172A", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                    {totalVests}<span style={{ fontSize: 13, color: "#94A3B8", fontWeight: 500 }}> / {maxVests}</span>
+                  </div>
+                  <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>Riders</div>
+                </div>
+              </div>
+
+              {totalVests > maxVests && (
+                <div style={{ fontSize: 11, color: "#991B1B", marginBottom: 12, padding: "8px 10px", background: "#FEE2E2", borderRadius: 6, fontWeight: 600 }}>
+                  {pkg?.name} fits {maxVests} riders max. Please reduce your selection by {totalVests - maxVests}.
+                </div>
+              )}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {VEST_SIZES.map(s => {
+                  const count = vestSizes[s.key];
+                  const isSel = count > 0;
+                  const canIncrement = totalVests < maxVests;
+                  return (
+                    <div key={s.key} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "10px 12px", borderRadius: 8,
+                      background: isSel ? "rgba(14,165,233,0.05)" : "#F8FAFC",
+                      border: isSel ? "1px solid #0EA5E9" : "1px solid #F1F5F9",
+                      transition: "all 0.15s",
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{s.label}</div>
+                        {s.hint && <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 1 }}>{s.hint}</div>}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <button
+                          onClick={() => decrementVest(s.key)}
+                          disabled={count === 0}
+                          aria-label={`Remove one ${s.label}`}
+                          style={{
+                            width: 30, height: 30, borderRadius: 6,
+                            border: "1px solid #CBD5E1", background: "#fff",
+                            cursor: count === 0 ? "not-allowed" : "pointer",
+                            fontSize: 18, fontWeight: 700, color: "#64748B",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            opacity: count === 0 ? 0.4 : 1,
+                            padding: 0, lineHeight: 1,
+                          }}
+                        >−</button>
+                        <div style={{ minWidth: 22, textAlign: "center", fontSize: 15, fontWeight: 700, color: isSel ? "#0EA5E9" : "#94A3B8" }}>
+                          {count}
+                        </div>
+                        <button
+                          onClick={() => incrementVest(s.key)}
+                          disabled={!canIncrement}
+                          aria-label={`Add one ${s.label}`}
+                          style={{
+                            width: 30, height: 30, borderRadius: 6,
+                            border: "1px solid #CBD5E1", background: "#fff",
+                            cursor: canIncrement ? "pointer" : "not-allowed",
+                            fontSize: 18, fontWeight: 700, color: "#64748B",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            opacity: canIncrement ? 1 : 0.4,
+                            padding: 0, lineHeight: 1,
+                          }}
+                        >+</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: 10, fontSize: 10, color: "#94A3B8", textAlign: "center", lineHeight: 1.5 }}>
+                Sizes subject to availability — we'll contact you if anything needs adjusting.
+              </div>
+            </div>
           </div>
         )}
 
@@ -1164,6 +1320,7 @@ export default function JetSkiBooking() {
                 { label: "Location", value: `${loc?.emoji} ${loc?.name}`, sub: whiteGlove ? "🤝 White glove delivery included" : isLakePowell ? "🦠 Decon performed at return" : loc?.drive + " from SLC" },
                 { label: "Dates", value: `${formatDate(dates[0])}${dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}`, sub: `${days} day${days > 1 ? "s" : ""} · Pickup 8AM · Return 8PM` },
                 { label: "Renter", value: info.name, sub: `${info.email} · ${info.phone} · ${info.experience}` },
+                { label: "Life Vests", value: effectiveVestSummary, sub: totalVests === 0 ? "Default selection — we'll bring 2 Adult Mediums" : `${totalVests} rider${totalVests === 1 ? "" : "s"} total` },
               ].map((row, i) => (
                 <div key={i} style={{ padding: "14px 18px", borderBottom: "1px solid #F1F5F9" }}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{row.label}</div>
@@ -1234,7 +1391,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); setIsRepeatCustomer(false); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); setIsRepeatCustomer(false); setVestSizes(EMPTY_VESTS); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
