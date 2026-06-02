@@ -1,6 +1,30 @@
 'use client';
 
+// app/admin/page.jsx
+// Version: 2026-06-01 — Graceful Stripe state-mismatch handling
+// Last edited: June 1 2026
+// Change: handleReleaseHold() and handleCaptureHold() now detect when the PaymentIntent
+//         was already canceled or already captured (typically because Travis took action
+//         in the Stripe Dashboard directly). Instead of surfacing the raw Stripe error
+//         message, the app treats it as success: marks the rental as returned, shows a
+//         friendly confirmation noting the action happened externally, and refreshes the
+//         booking list. Prevents the "stuck rental" problem where a booking shows as
+//         OUT · CARD HOLD forever after manual Stripe action.
+
 import { useState, useEffect } from 'react';
+
+// Helper — detect Stripe state-mismatch errors so we can recover gracefully
+function classifyStripeError(errorMsg) {
+  if (!errorMsg || typeof errorMsg !== 'string') return null;
+  const m = errorMsg.toLowerCase();
+  if (m.includes('status of canceled') || m.includes('status of `canceled`')) {
+    return 'already_canceled';
+  }
+  if (m.includes('status of succeeded') || m.includes('status of `succeeded`') || m.includes('already been captured')) {
+    return 'already_captured';
+  }
+  return null;
+}
 
 export default function AdminPage() {
   const [password, setPassword] = useState('');
@@ -119,6 +143,25 @@ export default function AdminPage() {
     setActionLoading(false);
   };
 
+  // Helper used by both release and capture paths to mark the rental complete
+  // when we discover Stripe state was changed externally (in the Dashboard).
+  const markReturnedInBackend = async (booking, notes) => {
+    try {
+      await fetch('/api/admin/update-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentIntentId: booking.paymentIntentId,
+          action: 'mark_returned',
+          password,
+          notes: notes || 'Marked returned after external Stripe action',
+        }),
+      });
+    } catch (e) {
+      console.warn('mark_returned follow-up failed:', e);
+    }
+  };
+
   const handleReleaseHold = async (booking) => {
     if (!confirm('Release the $1,000 hold? This refunds the customer entirely.')) return;
     setActionLoading(true);
@@ -134,24 +177,45 @@ export default function AdminPage() {
         }),
       });
       const data = await res.json();
+
       if (data.error) {
+        // ── GRACEFUL RECOVERY for external Stripe action ──
+        const stripeState = classifyStripeError(data.error);
+
+        if (stripeState === 'already_canceled') {
+          // Hold was already released — likely in the Stripe Dashboard.
+          // Treat as success: mark the rental returned so this booking doesn't
+          // get stuck showing "OUT · CARD HOLD" forever.
+          await markReturnedInBackend(booking, returnNotes || 'Hold released in Stripe Dashboard');
+          setActionSuccess('✅ Hold was already released in Stripe. Rental marked complete.');
+          await refreshBookings();
+          setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 3000);
+          setActionLoading(false);
+          return;
+        }
+
+        if (stripeState === 'already_captured') {
+          // Hold was already captured (charged) in Stripe. Mark rental returned
+          // but flag it differently so Travis knows the deposit was kept.
+          await markReturnedInBackend(booking, returnNotes || 'Hold captured in Stripe Dashboard');
+          setActionSuccess('⚠️ Hold was already captured in Stripe (deposit was charged). Rental marked complete.');
+          await refreshBookings();
+          setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 3500);
+          setActionLoading(false);
+          return;
+        }
+
+        // Anything else — show the raw error as before
         setActionError(data.error);
-      } else {
-        // Also mark the rental as returned
-        await fetch('/api/admin/update-booking', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            paymentIntentId: booking.paymentIntentId, 
-            action: 'mark_returned',
-            password,
-            notes: returnNotes || 'Clean return',
-          }),
-        });
-        setActionSuccess('✅ Hold released — customer charged $0');
-        await refreshBookings();
-        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
+        setActionLoading(false);
+        return;
       }
+
+      // Normal success path
+      await markReturnedInBackend(booking, returnNotes || 'Clean return');
+      setActionSuccess('✅ Hold released — customer charged $0');
+      await refreshBookings();
+      setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
     } catch (err) {
       setActionError('Connection error');
     }
@@ -185,23 +249,37 @@ export default function AdminPage() {
         }),
       });
       const data = await res.json();
+
       if (data.error) {
+        const stripeState = classifyStripeError(data.error);
+
+        if (stripeState === 'already_canceled') {
+          // The hold is gone — we can't capture from it. Tell Travis clearly.
+          setActionError('⚠️ Hold was already released (likely in Stripe Dashboard). Can\'t capture from a released hold. To charge for damage, create a new charge in Stripe using the customer\'s saved card.');
+          setActionLoading(false);
+          return;
+        }
+
+        if (stripeState === 'already_captured') {
+          // The capture already happened externally — just mark the rental complete.
+          await markReturnedInBackend(booking, `Capture already done in Stripe: ${damageReason}`);
+          setActionSuccess('✅ Hold was already captured in Stripe. Rental marked complete.');
+          await refreshBookings();
+          setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); }, 3000);
+          setActionLoading(false);
+          return;
+        }
+
         setActionError(data.error);
-      } else {
-        await fetch('/api/admin/update-booking', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            paymentIntentId: booking.paymentIntentId, 
-            action: 'mark_returned',
-            password,
-            notes: `Damage: ${damageReason} ($${amount})`,
-          }),
-        });
-        setActionSuccess(`✅ Captured $${amount} · $${1000 - amount} released`);
-        await refreshBookings();
-        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); }, 3000);
+        setActionLoading(false);
+        return;
       }
+
+      // Normal success path
+      await markReturnedInBackend(booking, `Damage: ${damageReason} ($${amount})`);
+      setActionSuccess(`✅ Captured $${amount} · $${1000 - amount} released`);
+      await refreshBookings();
+      setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); }, 3000);
     } catch (err) {
       setActionError('Connection error');
     }
