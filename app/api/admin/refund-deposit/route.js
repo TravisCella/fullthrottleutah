@@ -1,24 +1,17 @@
 // app/api/admin/refund-deposit/route.js
-// Version: 2026-06-01 — Direct metadata + graceful state mismatch handling
-// Last edited: June 1 2026
+// Version: 2026-06-02 — Auto-fire review request email after return
+// Last edited: June 2 2026
 //
-// Changes vs prior version:
-//   1. After a successful release OR capture, this endpoint now writes the FULL set of
-//      status metadata back to the PaymentIntent (rentalStatus, securityDepositStatus,
-//      returnTimestamp, etc.). Previously the admin app called update-booking as a
-//      separate follow-up — if that follow-up failed (network blip, timeout), the
-//      booking would stay stuck in "OUT · CARD HOLD" status even though Stripe had
-//      released the hold. The Leonardo issue from June 1 was a downstream symptom of
-//      this. Doing it inline removes the two-step dependency.
+// Change from prior version:
+//   After successfully marking a rental as returned (release path OR capture path),
+//   fire the review request email via lib/review-email.js. Fire-and-forget — never
+//   blocks the return action. Idempotent — review-email.js will skip if already sent.
 //
-//   2. Graceful recovery when the Stripe PaymentIntent is already in the target state
-//      (e.g., Travis canceled or captured it in the Stripe Dashboard directly). Instead
-//      of returning a raw Stripe error like "You cannot cancel this PaymentIntent
-//      because it has a status of canceled", the endpoint detects this, treats it as
-//      success, updates the metadata accordingly, and returns ok. The admin app's
-//      client-side now expects this behavior.
+// Prior version's behavior (graceful state handling, direct metadata writes) preserved.
 
 import Stripe from 'stripe';
+import { sendReviewRequest } from '../../../../lib/review-email';
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Detect Stripe state-mismatch errors so we can recover gracefully.
@@ -38,12 +31,10 @@ function classifyStripeStateError(err) {
 }
 
 // Write the full set of "rental returned" metadata onto a PaymentIntent in one call.
-// Used by both the success path and the recovery path so behavior is consistent.
 async function writeReturnMetadata(piId, { action, damageReason, capturedAmount, externalAction }) {
   const pi = await stripe.paymentIntents.retrieve(piId);
   const updates = { ...pi.metadata };
 
-  // Always set on a return — clean OR damage
   updates.rentalStatus = 'returned';
   updates.returnTimestamp = new Date().toISOString();
 
@@ -59,7 +50,6 @@ async function writeReturnMetadata(piId, { action, damageReason, capturedAmount,
   }
 
   if (externalAction) {
-    // Flag that the underlying Stripe action happened outside the admin app
     updates.externalStripeAction = 'true';
     updates.externalStripeActionAt = new Date().toISOString();
   }
@@ -68,11 +58,40 @@ async function writeReturnMetadata(piId, { action, damageReason, capturedAmount,
   return updates;
 }
 
+// Find the ORIGINAL booking PaymentIntent ID from the security-deposit hold's metadata.
+// The hold's metadata has originalCheckoutSession (the Stripe Checkout Session ID).
+// We need the PaymentIntent attached to that session, since that's where the booking
+// metadata (renterEmail, packageName, etc.) lives.
+async function findOriginalBookingPI(hold) {
+  const sessionId = hold?.metadata?.originalCheckoutSession;
+  if (!sessionId) return null;
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['payment_intent'],
+    });
+    return session.payment_intent?.id || null;
+  } catch (err) {
+    console.warn('[refund-deposit] Could not find original booking PI:', err.message);
+    return null;
+  }
+}
+
+// Fire review email — fire-and-forget, never throws into the caller.
+function fireReviewRequestForBooking(originalBookingPiId) {
+  if (!originalBookingPiId) {
+    console.log('[refund-deposit] No original booking PI ID, skipping review email');
+    return;
+  }
+  // Don't await — we don't want email latency or failure to affect the return action
+  sendReviewRequest(originalBookingPiId).catch(err => {
+    console.error('[refund-deposit] Review email fire-and-forget failed:', err.message);
+  });
+}
+
 export async function POST(request) {
   try {
     const { holdId, action, captureAmount, damageReason, password } = await request.json();
 
-    // Auth check
     if (password !== process.env.ADMIN_PASSWORD) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -94,24 +113,23 @@ export async function POST(request) {
         const state = classifyStripeStateError(err);
 
         if (state === 'already_canceled') {
-          // Hold was already released (likely in Stripe Dashboard).
-          // Fetch current state, mark rental returned, return success.
           result = await stripe.paymentIntents.retrieve(holdId);
           externalAction = true;
         } else if (state === 'already_captured') {
-          // Hold was already captured externally. We can't "release" a captured hold,
-          // but we should still mark the rental complete so it doesn't stay stuck.
           result = await stripe.paymentIntents.retrieve(holdId);
-          // Tell the caller this is a different state than what they asked for
           await writeReturnMetadata(holdId, {
             action: 'capture',
             capturedAmount: result.amount_received / 100,
             damageReason: 'Captured in Stripe Dashboard',
             externalAction: true,
           });
+          // Fire review email for the original booking
+          const origPiId = await findOriginalBookingPI(result);
+          fireReviewRequestForBooking(origPiId);
+
           return Response.json({
             success: true,
-            action: 'capture', // tell caller the real outcome
+            action: 'capture',
             holdId: result.id,
             status: result.status,
             amount: result.amount / 100,
@@ -120,13 +138,15 @@ export async function POST(request) {
             externalAction: true,
           });
         } else {
-          // Real error — bubble up
           throw err;
         }
       }
 
-      // Write metadata (booking now marked returned)
       await writeReturnMetadata(holdId, { action: 'release', externalAction });
+
+      // Fire review email for the original booking
+      const origPiId = await findOriginalBookingPI(result);
+      fireReviewRequestForBooking(origPiId);
 
       return Response.json({
         success: true,
@@ -161,13 +181,9 @@ export async function POST(request) {
       const state = classifyStripeStateError(err);
 
       if (state === 'already_captured') {
-        // Capture happened externally — just confirm and mark complete.
         result = await stripe.paymentIntents.retrieve(holdId);
         externalAction = true;
       } else if (state === 'already_canceled') {
-        // The hold is gone — can't capture from it. This is a real problem
-        // (Travis wanted to charge damage but lost the hold). Return a clear error
-        // so the admin UI can tell him to charge the saved card directly.
         return Response.json(
           {
             error:
@@ -181,7 +197,6 @@ export async function POST(request) {
       }
     }
 
-    // Write metadata (booking marked returned + damage details)
     const finalCapturedAmount = externalAction
       ? result.amount_received / 100
       : amountToCapture / 100;
@@ -192,6 +207,10 @@ export async function POST(request) {
       capturedAmount: finalCapturedAmount,
       externalAction,
     });
+
+    // Fire review email for the original booking
+    const origPiId = await findOriginalBookingPI(result);
+    fireReviewRequestForBooking(origPiId);
 
     return Response.json({
       success: true,
