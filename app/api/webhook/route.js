@@ -1,12 +1,14 @@
 // app/api/webhook/route.js
-// Version: 2026-05-31 LATE — Skip non-booking payments
-// Last edited: May 31 2026 (late evening)
-// Change: Added a guard that exits early when the Stripe checkout.session.completed event
-//         has no booking metadata. Without this, ANY successful payment (Payment Link, damage
-//         charge, single-ski manual charge, future ad-hoc invoices, etc.) was being treated
-//         as a new rental booking — writing a junk row to Sheets, creating an empty Calendar
-//         event, and firing an owner SMS with all fields blank ("Renter: ()  Paid: $192.5").
-//         Now: if there's no package in metadata, we acknowledge the event to Stripe and stop.
+// Version: 2026-06-02 — Surface life vest selection in SMS, email, and Sheet
+// Last edited: June 2 2026
+// Feature: Reads vest_summary from Stripe payment_intent metadata and (1) adds
+//          "🦺 Vests:" line to owner SMS, (2) adds Life Vests row to customer
+//          confirmation email, (3) passes summary through to lib/sheets.js so
+//          it can be written to Sheet1 column S. Also adds a brief reminder
+//          line for white-glove bookings since Travis is supplying vests for
+//          delivered rentals.
+//
+// Builds on: api-webhook-route_2026-05-31_skip-non-booking-payments.js
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -22,6 +24,11 @@ async function sendConfirmationEmail(booking) {
     console.log('No Resend API key, skipping email');
     return;
   }
+
+  // Build the optional life vest row — only shown if we have data for it
+  const vestRow = booking.vest_summary
+    ? `<tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">🦺 Life Vests</td><td style="padding: 8px; font-weight: 600;">${booking.vest_summary}</td></tr>`
+    : '';
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -48,6 +55,7 @@ async function sendConfirmationEmail(booking) {
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Location</td><td style="padding: 8px; font-weight: 600;">${booking.location}</td></tr>
                 <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Dates</td><td style="padding: 8px; font-weight: 600;">${booking.start_date}${booking.end_date !== booking.start_date ? ' → ' + booking.end_date : ''}</td></tr>
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Days</td><td style="padding: 8px; font-weight: 600;">${booking.days}</td></tr>
+                ${vestRow}
                 <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Rental Paid in Full</td><td style="padding: 8px; font-weight: 600; color: #16a34a;">$${booking.total_price}</td></tr>
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">$1,000 security deposit</td></tr>
               </table>
@@ -106,8 +114,6 @@ export async function POST(request) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
 
-      // Get the payment intent to access the metadata
-      // (Checkout route stores booking metadata in payment_intent.metadata)
       let meta = {};
       if (session.payment_intent) {
         try {
@@ -118,16 +124,11 @@ export async function POST(request) {
         }
       }
 
-      // Fall back to session metadata if payment_intent didn't have what we need
       if (!meta.renterName && session.metadata) {
         meta = { ...session.metadata, ...meta };
       }
 
       // ─── GUARD: skip non-booking payments ────────────────────────────────
-      // Real bookings ALWAYS set packageName/package in metadata via app/api/checkout/route.js.
-      // Stripe Payment Links, hand-written invoices, damage charges, and any other ad-hoc
-      // payments do NOT have this metadata. Without this guard those would all fire the
-      // owner SMS as "🛎️ New booking! Renter: ()  Paid: $XXX" and pollute Sheet1.
       const hasBookingMetadata = !!(meta.packageName || meta.package);
       if (!hasBookingMetadata) {
         console.log('[webhook] Skipping non-booking payment:', session.id, '— no package metadata');
@@ -137,7 +138,6 @@ export async function POST(request) {
 
       const booking = {
         booking_id: session.id,
-        // Support both new (camelCase) and old (snake_case) field names
         package: meta.packageName || meta.package || '',
         location: meta.location || '',
         start_date: meta.startDate || meta.start_date || '',
@@ -150,13 +150,12 @@ export async function POST(request) {
         renter_phone: meta.renterPhone || meta.renter_phone || '',
         experience: meta.experience || '',
         sms_consent: meta.smsOptIn === 'true' || meta.sms_consent === 'true',
-        // Operational flags pulled from Stripe metadata for owner SMS display
-        // and lib/sheets.js downstream consumption (column O writes YES/NO)
         white_glove: meta.white_glove === 'true' || meta.whiteGlove === 'true',
-        // Actual fee amount (in dollars) so SMS can show "🤝 WHITE GLOVE ($450)"
-        // Falls back to 0 for old bookings made before distance-tiered deploy
         white_glove_fee: parseInt(meta.white_glove_fee || meta.whiteGloveFee || '0', 10),
         is_lake_powell: meta.is_lake_powell === 'true' || meta.isLakePowell === 'true',
+        // Life vest fields (NEW)
+        vest_summary: meta.vestSummary || meta.vest_summary || '',
+        vest_used_default: meta.vest_used_default === 'true' || meta.vestUsedDefault === 'true',
       };
 
       // Write to Google Sheets
@@ -188,27 +187,22 @@ export async function POST(request) {
         console.error('SMS error (non-fatal):', smsErr.message);
       }
 
-      // Send SMS alert to owner team — includes white-glove fee + Lake Powell flags
-      // Supports multiple phone numbers via comma-separated OWNER_PHONE_NUMBER env var
+      // Send SMS alert to owner team — includes white-glove fee + Lake Powell flags + vests
       try {
         const ownerPhones = (process.env.OWNER_PHONE_NUMBER || '').split(',').map(p => p.trim()).filter(Boolean);
         if (ownerPhones.length > 0) {
-          // Build optional flag prefix for the first line
           const flags = [];
           if (booking.white_glove) {
-            // Include the fee amount when known ($450), fall back to plain flag for old bookings
             const feeSuffix = booking.white_glove_fee > 0 ? ` ($${booking.white_glove_fee})` : '';
             flags.push(`🤝 WHITE GLOVE${feeSuffix}`);
           }
           if (booking.is_lake_powell) flags.push('🦠 LAKE POWELL');
           const flagPrefix = flags.length > 0 ? ` ${flags.join(' ')}` : '';
 
-          // Show date range for multi-day bookings, single date otherwise
           const dateLine = booking.end_date && booking.end_date !== booking.start_date
             ? `${booking.start_date} → ${booking.end_date}`
             : booking.start_date;
 
-          // Compose the SMS line by line
           const ownerLines = [
             `🛎️ New booking!${flagPrefix}`,
             booking.package,
@@ -218,14 +212,19 @@ export async function POST(request) {
             `Paid: $${booking.total_price}`,
           ];
 
-          // Add an operational reminder for Lake Powell rentals (decon required at return)
+          // Add life vest line (NEW). Note "(default)" suffix if customer skipped section.
+          if (booking.vest_summary) {
+            const defaultTag = booking.vest_used_default ? ' (default)' : '';
+            ownerLines.push(`🦺 ${booking.vest_summary}${defaultTag}`);
+          }
+
+          // Lake Powell reminder
           if (booking.is_lake_powell) {
             ownerLines.push('🦠 Decon at return — Willard Bay');
           }
 
           const ownerMsg = ownerLines.join('\n');
 
-          // Send to every phone number in the list (Travis, wife, son)
           for (const phone of ownerPhones) {
             await sendSMS(phone, ownerMsg);
             console.log('SMS sent to owner:', phone);
@@ -235,7 +234,6 @@ export async function POST(request) {
         console.error('Owner SMS error (non-fatal):', smsErr.message);
       }
 
-      // Send confirmation email
       await sendConfirmationEmail(booking);
     }
 
