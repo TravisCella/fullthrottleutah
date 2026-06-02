@@ -1,15 +1,12 @@
 // app/reviews/page.jsx
-// Version: 2026-06-02 — Public reviews showcase page
-// Created: June 2 2026
+// Version: 2026-06-02 v2 — Refactored to fetch from API endpoint
+// Last edited: June 2 2026
 //
-// Server-rendered for SEO: Google crawls the actual review content in the HTML.
-// Includes Schema.org JSON-LD with individual Review items + AggregateRating so the
-// page is eligible for rich results (star ratings in search listings).
-// Revalidates every 5 minutes so new reviews appear without redeploys.
+// Change from prior version: removed direct import of lib/sheets (which transitively
+// pulls in googleapis and its Node-only modules). Now fetches reviews from the
+// /api/public-reviews HTTP endpoint instead. Same caching strategy as before.
 
-import { getReviews } from '../../lib/sheets';
-
-export const revalidate = 300; // 5 minutes
+export const revalidate = 300;
 
 export const metadata = {
   title: 'Customer Reviews | Full Throttle Utah',
@@ -22,7 +19,6 @@ export const metadata = {
   },
 };
 
-// Color palette — matches main site
 const NAVY = '#0C4A6E';
 const ORANGE = '#EA580C';
 const GOLD = '#F59E0B';
@@ -32,20 +28,34 @@ const TEXT = '#0F172A';
 const MUTED = '#64748B';
 const BORDER = '#E2E8F0';
 
+function getBaseUrl() {
+  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return 'http://localhost:3000';
+}
+
+async function fetchPublicReviews() {
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/public-reviews`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error('[ReviewsPage] Failed to fetch reviews:', err.message);
+    return null;
+  }
+}
+
 export default async function ReviewsPage() {
-  // Fetch public reviews directly from the data layer (faster than fetching our own API)
-  const reviews = await getReviews({
-    status: 'approved',
-    allowPublishOnly: true,
-  });
+  const data = await fetchPublicReviews();
 
-  const count = reviews.length;
-  const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0);
-  const avg = count > 0 ? totalRating / count : 0;
-  const aggregateRating = count > 0 ? avg.toFixed(1) : '0.0';
+  // Graceful fallback if fetch fails (e.g. during build)
+  const reviews = data?.reviews || [];
+  const count = data?.count || 0;
+  const aggregateRating = data?.aggregateRating || '0.0';
+  const avg = parseFloat(aggregateRating);
 
-  // Schema.org JSON-LD with individual Review items + AggregateRating.
-  // Google uses this to show our star rating in search results.
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
@@ -86,13 +96,11 @@ export default async function ReviewsPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: BG, color: TEXT, fontFamily: "'Outfit', system-ui, sans-serif" }}>
-      {/* JSON-LD for Google rich results — invisible to users */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Top nav bar */}
       <div style={{ background: BG, borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '16px 24px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <a href="/" style={{ color: '#fff', fontSize: 16, fontWeight: 700, letterSpacing: '-0.5px', textDecoration: 'none' }}>
@@ -110,7 +118,6 @@ export default async function ReviewsPage() {
         </div>
       </div>
 
-      {/* Hero / aggregate stats */}
       <div style={{ padding: '60px 24px 40px', textAlign: 'center' }}>
         <div style={{ maxWidth: 800, margin: '0 auto' }}>
           <h1 style={{ color: '#fff', fontSize: 'clamp(32px, 6vw, 48px)', fontWeight: 700, margin: '0 0 12px', letterSpacing: '-1px' }}>
@@ -139,7 +146,6 @@ export default async function ReviewsPage() {
         </div>
       </div>
 
-      {/* Reviews grid */}
       <div style={{ padding: '20px 24px 80px', background: '#F8FAFC', minHeight: '50vh' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', paddingTop: 40 }}>
           {count === 0 && (
@@ -168,7 +174,6 @@ export default async function ReviewsPage() {
         </div>
       </div>
 
-      {/* Footer CTA */}
       <div style={{ background: BG, padding: '60px 24px 80px', textAlign: 'center' }}>
         <h2 style={{ color: '#fff', fontSize: 28, fontWeight: 700, margin: '0 0 12px' }}>
           Ready for your own adventure?
@@ -190,8 +195,6 @@ export default async function ReviewsPage() {
   );
 }
 
-// ─── Components ──────────────────────────────────────────────────────────────
-
 function ReviewCard({ review }) {
   return (
     <div
@@ -207,7 +210,6 @@ function ReviewCard({ review }) {
       }}
     >
       <Stars rating={review.rating} size={16} />
-
       <p
         style={{
           fontSize: 15,
@@ -219,7 +221,6 @@ function ReviewCard({ review }) {
       >
         "{review.review_text}"
       </p>
-
       <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{review.display_name}</div>
         <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
@@ -249,8 +250,6 @@ function Stars({ rating, size = 16 }) {
     </div>
   );
 }
-
-// ─── Utilities ───────────────────────────────────────────────────────────────
 
 function toISODate(iso) {
   if (!iso) return new Date().toISOString().slice(0, 10);
