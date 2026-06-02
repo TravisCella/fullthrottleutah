@@ -1,3 +1,21 @@
+// app/api/inspection-submitted/route.js
+// Version: 2026-06-01 — Split owner phones + use verified email domain
+// Last edited: June 1 2026
+//
+// Changes vs prior version:
+//   1. sendInspectionSMS() now splits OWNER_PHONE_NUMBER on commas and sends to each
+//      number individually. Was passing the raw env var as one big "To" field, which
+//      caused Twilio error 21211 ("Invalid To Phone Number"). Mirrors the same pattern
+//      used by app/api/webhook/route.js for consistency.
+//   2. sendInspectionEmail() now sends from bookings@fullthrottleutah.com (verified
+//      domain at Resend) instead of onboarding@resend.dev. Without this, only Travis's
+//      own gmail received inspection emails — any other owner email added to OWNER_EMAIL
+//      would be blocked by Resend's free-tier sender restriction.
+//
+// Note: lib/sms.js was also hardened to split comma-separated strings itself, so even
+// if someone forgot to split here, it would still work. This explicit split is
+// belt-and-suspenders — clear intent at the call site.
+
 import { NextResponse } from 'next/server';
 import { sendSMS } from '../../../lib/sms';
 import { logInspection } from '../../../lib/sheets';
@@ -22,7 +40,7 @@ async function sendInspectionEmail(data) {
         'Authorization': `Bearer ${RESEND_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Full Throttle Inspect <onboarding@resend.dev>',
+        from: 'Full Throttle Inspect <bookings@fullthrottleutah.com>',
         to: OWNER_EMAIL,
         subject: `🔍 ${typeLabel} — ${data.customerName} · ${data.machineName}`,
         html: `
@@ -80,8 +98,18 @@ async function sendInspectionEmail(data) {
 }
 
 async function sendInspectionSMS(data) {
-  const ownerPhone = process.env.OWNER_PHONE_NUMBER;
-  if (!ownerPhone) return;
+  // Split comma-separated owner phones the same way webhook/route.js does.
+  // This is the FIX for Twilio error 21211 — passing the raw env var as a single
+  // "To" field with commas in it would fail with "Invalid 'To' Phone Number".
+  const ownerPhones = (process.env.OWNER_PHONE_NUMBER || '')
+    .split(',')
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  if (ownerPhones.length === 0) {
+    console.log('[inspection-submitted] No owner phone configured, skipping SMS');
+    return;
+  }
   
   const typeLabel = data.type === 'customer' ? 'CHECK-OUT' : 'CHECK-IN';
   
@@ -97,10 +125,15 @@ async function sendInspectionSMS(data) {
     `(Saved in inspection log)`,
   ].join('\n');
   
-  try {
-    await sendSMS(ownerPhone, msg);
-  } catch (err) {
-    console.error('Inspection SMS error:', err);
+  // Send to each owner phone individually (Travis, wife, son)
+  for (const phone of ownerPhones) {
+    try {
+      await sendSMS(phone, msg);
+      console.log('[inspection-submitted] SMS sent to owner:', phone);
+    } catch (err) {
+      console.error('[inspection-submitted] SMS error for', phone, ':', err);
+      // Continue with the remaining phones even if one fails
+    }
   }
 }
 
