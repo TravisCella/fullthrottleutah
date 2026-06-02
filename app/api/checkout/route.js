@@ -1,17 +1,16 @@
 // app/api/checkout/route.js
-// Version: 2026-05-30 — Forward whiteGloveFee to Stripe metadata
-// Last edited: May 30 2026 (afternoon — file 2 of 3 in distance-tiered white-glove rollout)
-// Feature: Receives the new whiteGloveFee field from booking.js (the per-destination
-//          dollar amount, e.g. $150 Pineview / $450 Bear Lake) and forwards it into
-//          Stripe payment_intent metadata as both whiteGloveFee (camelCase) and
-//          white_glove_fee (snake_case) for downstream compatibility. Also enhances
-//          the Stripe product name to include the fee amount, so "Spark Duo (White
-//          Glove $450)" appears in the Stripe dashboard line item — easier visual
-//          scanning when reviewing payments.
+// Version: 2026-06-02 — Pass life vest selection through to Stripe metadata
+// Last edited: June 2 2026
+// Feature: Receives vestSizes (JSON string of {size: count}), vestSummary
+//          (human-readable string like "1 Adult XXL, 1 Adult M (2 vests)"), and
+//          vestUsedDefault (boolean — true if the customer skipped the section
+//          and we filled in 2 Adult Mediums automatically). All forwarded to
+//          payment_intent.metadata in both camelCase and snake_case for
+//          downstream consumption by the webhook.
 //
-// Builds on: api-checkout-route_2026-05-29_fix-body-undefined.js (yesterday's fix)
-// Downstream: app/api/webhook/route.js (file 3 of 3) will read white_glove_fee
-//             from this metadata and surface the dollar amount in owner SMS.
+// Builds on: api-checkout-route_2026-05-30_pass-whiteglovefee.js
+// Downstream: app/api/webhook/route.js (file 3 of 3) reads vest_summary from
+//             metadata for owner SMS, customer email, and Google Sheet column S.
 
 import Stripe from 'stripe';
 
@@ -40,14 +39,15 @@ export async function POST(request) {
       deconFee,
       isLakePowell,
       loyaltyDiscount,
+      vestSizes,        // JSON string of {size_key: count}
+      vestSummary,      // Human-readable string
+      vestUsedDefault,  // true if customer skipped and we defaulted
       waiverSigned,
       waiverDate,
     } = data;
 
-    // Charge 100% of rental upfront (Stripe uses cents)
     const fullAmount = Math.round(totalPrice * 100);
 
-    // Create or retrieve customer so the card is saved for the $1,000 deposit hold at pickup
     let customer;
     const existingCustomers = await stripe.customers.list({ email: renterEmail, limit: 1 });
     if (existingCustomers.data.length > 0) {
@@ -67,7 +67,6 @@ export async function POST(request) {
       payment_method_types: ['card'],
       mode: 'payment',
       customer: customer.id,
-      // CRITICAL: This saves the card for future charges (the $1,000 hold at pickup)
       payment_intent_data: {
         setup_future_usage: 'off_session',
         metadata: {
@@ -95,6 +94,13 @@ export async function POST(request) {
           is_lake_powell: isLakePowell ? 'true' : 'false',
           loyaltyDiscount: loyaltyDiscount?.toString() || '0',
           loyalty_discount: (loyaltyDiscount || 0).toString(),
+          // Life vest selection (NEW)
+          vestSizes: vestSizes || '',
+          vest_sizes: vestSizes || '',
+          vestSummary: vestSummary || '',
+          vest_summary: vestSummary || '',
+          vestUsedDefault: vestUsedDefault ? 'true' : 'false',
+          vest_used_default: vestUsedDefault ? 'true' : 'false',
           // SMS consent (TCPA tracking)
           smsOptIn: smsOptIn ? 'true' : 'false',
           smsOptInDate: smsOptIn ? new Date().toISOString() : '',
@@ -111,8 +117,6 @@ export async function POST(request) {
           price_data: {
             currency: 'usd',
             product_data: {
-              // Include fee amount in product name when present, e.g. "Spark Duo (White Glove $450)"
-              // Falls back to plain "(White Glove)" if fee is somehow missing/0 (defensive)
               name: `${packageName}${whiteGlove && whiteGloveFee > 0 ? ` (White Glove $${whiteGloveFee})` : whiteGlove ? ' (White Glove)' : ''}`,
               description: `${packageTagline} · ${location} · ${days} day${days > 1 ? 's' : ''} (${startDate}${endDate !== startDate ? ` - ${endDate}` : ''})`,
             },
