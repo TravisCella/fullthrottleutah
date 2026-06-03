@@ -1,13 +1,13 @@
 // app/api/cron/pickup-reminder/route.js
-// Version: 2026-06-02 — Surface life vest selection in reminder SMS + email
-// Last edited: June 2 2026
-// Change: Both SMS and email now show what life vests we'll have ready, so
-//         the customer can spot-check before they show up. SMS adds a 🦺 line
-//         after the package line; email adds a Life Vests row to the details
-//         table. Data flows in via getTomorrowsBookings() (lib/sheets.js was
-//         updated 2026-06-02 to read Sheet1 column S).
+// Version: 2026-06-02 PM — Use selected pickup time in reminder SMS + email
+// Last edited: June 2 2026 (evening)
+// Change: SMS pickup line and email pickup section now use the customer's
+//         chosen pickup time (from Sheet column T via getTomorrowsBookings)
+//         instead of the hardcoded "8:00 AM". Email also shows the return
+//         time. Falls back to "8:00 AM" / "8:00 PM" defaults for any
+//         pre-feature bookings.
 //
-// Builds on: api-cron-pickup-reminder_2026-05-31_use-verified-domain-email.js
+// Builds on: api-cron-pickup-reminder_2026-06-02_surface-vest-data.js
 // Triggered daily at 14:00 UTC (8:00 AM MDT) via Vercel cron.
 
 import { NextResponse } from 'next/server';
@@ -24,7 +24,7 @@ function buildReminderSMS(booking) {
 
   const lines = [
     `Hi ${firstName}! Your Full Throttle Utah rental is TOMORROW.`,
-    `📍 Pickup: Farmington, UT — 8:00 AM`,
+    `📍 Pickup: Farmington, UT — ${booking.pickup_time_display || '8:00 AM'}`,
     `🛥️ ${booking.package} · ${booking.location} · ${dateDisplay}`,
   ];
 
@@ -39,8 +39,8 @@ function buildReminderSMS(booking) {
   lines.push(`❓ Questions? Text/call (801) 548-1273`);
 
   if (booking.white_glove) {
-    // Swap pickup line for delivery note
-    lines[1] = `🚚 White Glove delivery — we'll be in touch to confirm arrival time`;
+    // Swap pickup line for delivery note that uses chosen delivery time
+    lines[1] = `🚚 White Glove delivery — arriving at ${booking.pickup_time_display || '8:00 AM'}`;
   }
 
   return lines.join('\n');
@@ -58,20 +58,25 @@ function buildReminderEmailHTML(booking) {
     ? `<tr style="background:#fff;"><td style="padding:8px;color:#64748b;font-size:13px;">🦺 Life Vests</td><td style="padding:8px;font-weight:600;">${booking.vest_summary}</td></tr>`
     : '';
 
+  const pickupTimeDisplay = booking.pickup_time_display || '8:00 AM';
+  const returnTimeDisplay = booking.return_time_display || '8:00 PM';
+
   const pickupSection = booking.white_glove
     ? `<div style="background:#EFF6FF;padding:16px;border-radius:8px;margin:16px 0;">
         <strong style="color:#1E40AF;">🚚 White Glove Delivery</strong>
         <p style="color:#1E40AF;margin:8px 0 0 0;font-size:14px;line-height:1.5;">
-          We'll deliver directly to <strong>${booking.location}</strong>. 
-          We'll contact you shortly to confirm your exact arrival time. 
-          Have your $1,000 security deposit ready (card hold or cash).
+          We'll deliver directly to <strong>${booking.location}</strong>.<br/>
+          <strong>Arrival:</strong> ${pickupTimeDisplay}<br/>
+          <strong>Retrieval:</strong> ${returnTimeDisplay}<br/>
+          We'll text or call shortly to confirm. Have your $1,000 security deposit ready (card hold or cash).
         </p>
        </div>`
     : `<div style="background:#EFF6FF;padding:16px;border-radius:8px;margin:16px 0;">
         <strong style="color:#1E40AF;">📍 Pickup Details</strong>
         <p style="color:#1E40AF;margin:8px 0 0 0;font-size:14px;line-height:1.5;">
           <strong>Location:</strong> Farmington, UT (exact address provided at pickup)<br/>
-          <strong>Time:</strong> 8:00 AM sharp<br/>
+          <strong>Pickup Time:</strong> ${pickupTimeDisplay}<br/>
+          <strong>Return Time:</strong> ${returnTimeDisplay}<br/>
           <strong>Bring:</strong> Valid driver's license + vehicle with 2" ball hitch + flat 4-prong lights
         </p>
        </div>`;
