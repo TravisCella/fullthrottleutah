@@ -1,18 +1,19 @@
 // app/booking.js
-// Version: 2026-06-02 — Life vest size selection
-// Last edited: June 2 2026
-// Feature: Adds a "Life Vests" section at the end of Step 4 (Info) that lets the
-//          customer pick the sizes they need (Infant, Youth, X-Small/Small, Adult
-//          Small, Medium, L/XL, Universal, XXL). Capped at the package's rider
-//          capacity (Spark Duo = 4, GTX Limited Duo = 6). Skippable — if the
-//          customer doesn't pick, we default to 2 Adult Mediums (one per operator).
-//          Selection is summarized in Step 5 review, passed to /api/checkout as
-//          vestSizes (JSON) + vestSummary (readable string), and surfaced in
-//          owner SMS, confirmation email, and Google Sheet column S.
+// Version: 2026-06-02 PM — Pickup & return time selection
+// Last edited: June 2 2026 (evening)
+// Feature: Adds pickup time + return time selection to Step 2 (Dates), shown
+//          only once dates have been picked. 30-minute increments — pickup
+//          slots 6:00 AM to 6:00 PM, return slots 6:00 AM to 8:00 PM. Defaults
+//          to 8:00 AM pickup and 8:00 PM return (matches the prior hardcoded
+//          behavior). Labels adapt for white-glove ("Deliver to lake" /
+//          "Pick up from lake") vs self-tow ("Pickup at Farmington").
+//          Same-day rentals require pickup < return; multi-day allows any
+//          combination. Times flow through to Stripe metadata, Google Sheet
+//          (columns T + U), owner SMS, customer confirmation SMS, customer
+//          email, and the 24-hour pickup-reminder SMS + email.
 //
-// Builds on: 2026-05-30 distance-tiered white-glove pricing
-// Downstream: app/api/checkout/route.js and app/api/webhook/route.js receive
-//             and surface vest data. lib/sheets.js writes column S.
+// Builds on: 2026-06-02 life vest selection
+// Downstream: All 5 sibling files updated in same commit cycle.
 
 import { useState, useEffect, useRef } from "react";
 
@@ -142,6 +143,36 @@ function formatVestSummary(sizes) {
   }
   if (parts.length === 0) return "";
   return `${parts.join(", ")} (${total} vest${total === 1 ? "" : "s"})`;
+}
+
+// ── Pickup & return time slots (2026-06-02 PM) ──
+// Internal format: 24-hour "HH:MM" strings. Display format: 12-hour with AM/PM.
+function buildTimeSlots(startHour, endHour) {
+  const slots = [];
+  for (let h = startHour; h <= endHour; h++) {
+    slots.push(`${String(h).padStart(2, "0")}:00`);
+    if (h < endHour) slots.push(`${String(h).padStart(2, "0")}:30`);
+  }
+  return slots;
+}
+// Pickup: 6:00 AM through 6:00 PM (when Travis can hand off equipment)
+const PICKUP_SLOTS = buildTimeSlots(6, 18);
+// Return: 6:00 AM through 8:00 PM (when Travis can receive equipment back)
+const RETURN_SLOTS = buildTimeSlots(6, 20);
+
+function formatTime12h(t24) {
+  if (!t24 || !t24.includes(":")) return t24 || "";
+  const [hStr, mStr] = t24.split(":");
+  const h = parseInt(hStr, 10);
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${mStr} ${period}`;
+}
+
+function timeToMinutes(t24) {
+  if (!t24 || !t24.includes(":")) return 0;
+  const [h, m] = t24.split(":").map(Number);
+  return h * 60 + m;
 }
 
 function getHolidaySurcharge(startDate, endDate) {
@@ -386,6 +417,8 @@ export default function JetSkiBooking() {
   const [isRepeatCustomer, setIsRepeatCustomer] = useState(false);
   const [checkingCustomer, setCheckingCustomer] = useState(false);
   const [vestSizes, setVestSizes] = useState(EMPTY_VESTS);
+  const [pickupTime, setPickupTime] = useState("08:00");
+  const [returnTime, setReturnTime] = useState("20:00");
 
   useEffect(() => { setFadeIn(false); const t = setTimeout(() => setFadeIn(true), 20); return () => clearTimeout(t); }, [step]);
 
@@ -492,6 +525,10 @@ export default function JetSkiBooking() {
           vestSizes: JSON.stringify(effective),
           vestSummary: formatVestSummary(effective),
           vestUsedDefault: totalVests === 0,
+          pickupTime: pickupTime,
+          returnTime: returnTime,
+          pickupTimeDisplay: formatTime12h(pickupTime),
+          returnTimeDisplay: formatTime12h(returnTime),
           waiverSigned: 'true',
           waiverDate: new Date().toISOString(),
         }),
@@ -519,11 +556,16 @@ export default function JetSkiBooking() {
   const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee - loyaltyDiscount;
   const minDaysRequired = loc?.minDays || 1;
   const meetsMinimum = days >= minDaysRequired;
+  // For same-day rentals, pickup must come before return. Multi-day has no
+  // constraint (pickup Day 1 AM, return Day N PM regardless of clock time).
+  const timesValid = days <= 1
+    ? timeToMinutes(pickupTime) < timeToMinutes(returnTime)
+    : true;
 
   const canNext = () => {
     if (step === 0) return pkg;
     if (step === 1) return loc;
-    if (step === 2) return dates.length >= 1 && meetsMinimum;
+    if (step === 2) return dates.length >= 1 && meetsMinimum && timesValid;
     if (step === 3) return info.name && info.email && info.phone && info.experience && totalVests <= maxVests;
     if (step === 4) return Object.values(waiverChecks).every(Boolean) && signature;
     if (step === 5) return true;
@@ -987,6 +1029,80 @@ export default function JetSkiBooking() {
                 )}
               </div>
             )}
+
+            {/* ─── PICKUP & RETURN TIMES (2026-06-02 PM) ───────────────────
+                Shown as soon as the customer picks any date. Labels adapt for
+                white-glove (delivery to lake) vs. self-tow (Farmington pickup).
+                Defaults: 8 AM pickup, 8 PM return — same as the prior hardcoded
+                behavior, so existing language elsewhere stays accurate. */}
+            {dates.length > 0 && (
+              <div style={{ marginTop: 14, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
+                  ⏰ Pickup & Return Times
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748B", marginBottom: 6, display: "block" }}>
+                      {whiteGlove ? "Deliver to lake" : "Pickup at Farmington"}
+                    </label>
+                    <select
+                      value={pickupTime}
+                      onChange={(e) => setPickupTime(e.target.value)}
+                      style={{
+                        width: "100%", padding: "12px 10px", borderRadius: 10,
+                        border: timesValid ? "2px solid #E2E8F0" : "2px solid #DC2626",
+                        fontSize: 14, color: "#0F172A",
+                        background: "#fff", outline: "none",
+                        fontFamily: "'Outfit', sans-serif",
+                        cursor: "pointer",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {PICKUP_SLOTS.map(t => (
+                        <option key={t} value={t}>{formatTime12h(t)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#64748B", marginBottom: 6, display: "block" }}>
+                      {whiteGlove ? "Pick up from lake" : "Return to Farmington"}
+                    </label>
+                    <select
+                      value={returnTime}
+                      onChange={(e) => setReturnTime(e.target.value)}
+                      style={{
+                        width: "100%", padding: "12px 10px", borderRadius: 10,
+                        border: timesValid ? "2px solid #E2E8F0" : "2px solid #DC2626",
+                        fontSize: 14, color: "#0F172A",
+                        background: "#fff", outline: "none",
+                        fontFamily: "'Outfit', sans-serif",
+                        cursor: "pointer",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {RETURN_SLOTS.map(t => (
+                        <option key={t} value={t}>{formatTime12h(t)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {!timesValid && (
+                  <div style={{ fontSize: 11, color: "#991B1B", marginTop: 10, padding: "8px 10px", background: "#FEE2E2", borderRadius: 6, fontWeight: 600 }}>
+                    ⚠️ For same-day rentals, return time must be after pickup time.
+                  </div>
+                )}
+
+                <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 10, textAlign: "center", lineHeight: 1.5 }}>
+                  {whiteGlove
+                    ? `We'll confirm exact delivery & retrieval times by phone after you book.`
+                    : days > 1
+                    ? `Pickup on ${formatDate(dates[0])} · Return on ${dates.length === 2 ? formatDate(dates[1]) : formatDate(dates[0])}`
+                    : `Same-day rental — both times on ${formatDate(dates[0])}`}
+                </div>
+              </div>
+            )}
+
             <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 16 }}>
               <span style={{ fontSize: 11, color: "#94A3B8" }}>Tap start → end for multi-day</span>
             </div>
@@ -1318,7 +1434,7 @@ export default function JetSkiBooking() {
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, overflow: "hidden" }}>
               {[
                 { label: "Location", value: `${loc?.emoji} ${loc?.name}`, sub: whiteGlove ? "🤝 White glove delivery included" : isLakePowell ? "🦠 Decon performed at return" : loc?.drive + " from SLC" },
-                { label: "Dates", value: `${formatDate(dates[0])}${dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}`, sub: `${days} day${days > 1 ? "s" : ""} · Pickup 8AM · Return 8PM` },
+                { label: "Dates", value: `${formatDate(dates[0])}${dates.length === 2 ? ` → ${formatDate(dates[1])}` : ""}`, sub: `${days} day${days > 1 ? "s" : ""} · Pickup ${formatTime12h(pickupTime)} · Return ${formatTime12h(returnTime)}` },
                 { label: "Renter", value: info.name, sub: `${info.email} · ${info.phone} · ${info.experience}` },
                 { label: "Life Vests", value: effectiveVestSummary, sub: totalVests === 0 ? "Default selection — we'll bring 2 Adult Mediums" : `${totalVests} rider${totalVests === 1 ? "" : "s"} total` },
               ].map((row, i) => (
@@ -1377,7 +1493,7 @@ export default function JetSkiBooking() {
               <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Next Steps</div>
               {[
                 "Sign the digital waiver (link in your email)",
-                whiteGlove ? "We'll deliver to the lake — just show up and ride!" : "Arrive at Farmington pickup by 8:00 AM",
+                whiteGlove ? "We'll deliver to the lake — just show up and ride!" : `Arrive at Farmington pickup by ${formatTime12h(pickupTime)}`,
                 "Bring valid ID and a credit card OR $1,000 cash for security deposit",
                 `Security deposit ($1,000) will be held at pickup and released on safe return`,
               ].map((s, i) => (
@@ -1391,7 +1507,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); setIsRepeatCustomer(false); setVestSizes(EMPTY_VESTS); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setDone(false); setWhiteGlove(false); setIsRepeatCustomer(false); setVestSizes(EMPTY_VESTS); setPickupTime("08:00"); setReturnTime("20:00"); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
