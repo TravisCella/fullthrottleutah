@@ -1,14 +1,14 @@
 // app/api/webhook/route.js
-// Version: 2026-06-02 — Surface life vest selection in SMS, email, and Sheet
-// Last edited: June 2 2026
-// Feature: Reads vest_summary from Stripe payment_intent metadata and (1) adds
-//          "🦺 Vests:" line to owner SMS, (2) adds Life Vests row to customer
-//          confirmation email, (3) passes summary through to lib/sheets.js so
-//          it can be written to Sheet1 column S. Also adds a brief reminder
-//          line for white-glove bookings since Travis is supplying vests for
-//          delivered rentals.
+// Version: 2026-06-02 PM — Surface pickup & return times in SMS, email, Sheet
+// Last edited: June 2 2026 (evening)
+// Feature: Reads pickup_time, pickup_time_display, return_time, return_time_display
+//          from Stripe payment_intent metadata and (1) writes pickup_time +
+//          return_time to Sheet1 columns T + U via addBooking, (2) adds an
+//          "⏰ 8:00 AM → 8:00 PM" line to owner SMS, (3) adds Pickup Time +
+//          Return Time rows to customer confirmation email. lib/sms.js handles
+//          the renter SMS text using the same booking object.
 //
-// Builds on: api-webhook-route_2026-05-31_skip-non-booking-payments.js
+// Builds on: 2026-06-02 vest surfacing
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -29,6 +29,10 @@ async function sendConfirmationEmail(booking) {
   const vestRow = booking.vest_summary
     ? `<tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">🦺 Life Vests</td><td style="padding: 8px; font-weight: 600;">${booking.vest_summary}</td></tr>`
     : '';
+
+  // Pickup & return time rows — always shown (defaults to 8 AM / 8 PM if not selected)
+  const pickupRow = `<tr><td style="padding: 8px; color: #64748b; font-size: 13px;">⏰ Pickup Time</td><td style="padding: 8px; font-weight: 600;">${booking.pickup_time_display || '8:00 AM'}</td></tr>`;
+  const returnRow = `<tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">⏰ Return Time</td><td style="padding: 8px; font-weight: 600;">${booking.return_time_display || '8:00 PM'}</td></tr>`;
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -55,6 +59,8 @@ async function sendConfirmationEmail(booking) {
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Location</td><td style="padding: 8px; font-weight: 600;">${booking.location}</td></tr>
                 <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Dates</td><td style="padding: 8px; font-weight: 600;">${booking.start_date}${booking.end_date !== booking.start_date ? ' → ' + booking.end_date : ''}</td></tr>
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Days</td><td style="padding: 8px; font-weight: 600;">${booking.days}</td></tr>
+                ${pickupRow}
+                ${returnRow}
                 ${vestRow}
                 <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Rental Paid in Full</td><td style="padding: 8px; font-weight: 600; color: #16a34a;">$${booking.total_price}</td></tr>
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">$1,000 security deposit</td></tr>
@@ -156,6 +162,13 @@ export async function POST(request) {
         // Life vest fields (NEW)
         vest_summary: meta.vestSummary || meta.vest_summary || '',
         vest_used_default: meta.vest_used_default === 'true' || meta.vestUsedDefault === 'true',
+        // Pickup & return times (2026-06-02 PM)
+        // Both internal (24h "HH:MM") and display (12h "8:00 AM") forms stored.
+        // Falls back to historical defaults for pre-feature bookings.
+        pickup_time: meta.pickup_time || meta.pickupTime || '08:00',
+        return_time: meta.return_time || meta.returnTime || '20:00',
+        pickup_time_display: meta.pickup_time_display || meta.pickupTimeDisplay || '8:00 AM',
+        return_time_display: meta.return_time_display || meta.returnTimeDisplay || '8:00 PM',
       };
 
       // Write to Google Sheets
@@ -208,6 +221,7 @@ export async function POST(request) {
             booking.package,
             booking.location,
             dateLine,
+            `⏰ ${booking.pickup_time_display} → ${booking.return_time_display}`,
             `Renter: ${booking.renter_name} (${booking.renter_phone})`,
             `Paid: $${booking.total_price}`,
           ];
