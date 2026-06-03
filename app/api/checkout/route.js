@@ -1,16 +1,12 @@
 // app/api/checkout/route.js
-// Version: 2026-06-02 — Pass life vest selection through to Stripe metadata
-// Last edited: June 2 2026
-// Feature: Receives vestSizes (JSON string of {size: count}), vestSummary
-//          (human-readable string like "1 Adult XXL, 1 Adult M (2 vests)"), and
-//          vestUsedDefault (boolean — true if the customer skipped the section
-//          and we filled in 2 Adult Mediums automatically). All forwarded to
-//          payment_intent.metadata in both camelCase and snake_case for
-//          downstream consumption by the webhook.
+// Version: 2026-06-02 PM — Pass pickup & return times through to Stripe metadata
+// Last edited: June 2 2026 (evening)
+// Feature: Receives pickupTime + returnTime (24-hr "HH:MM" strings) and their
+//          display equivalents from booking.js, and writes both formats to
+//          payment_intent.metadata (camelCase + snake_case) so the webhook can
+//          surface them in SMS, email, Sheet, and the 24-hr reminder.
 //
-// Builds on: api-checkout-route_2026-05-30_pass-whiteglovefee.js
-// Downstream: app/api/webhook/route.js (file 3 of 3) reads vest_summary from
-//             metadata for owner SMS, customer email, and Google Sheet column S.
+// Builds on: 2026-06-02 vest data passthrough
 
 import Stripe from 'stripe';
 
@@ -42,6 +38,10 @@ export async function POST(request) {
       vestSizes,        // JSON string of {size_key: count}
       vestSummary,      // Human-readable string
       vestUsedDefault,  // true if customer skipped and we defaulted
+      pickupTime,        // 24-hr internal format "HH:MM" (e.g. "08:00")
+      returnTime,        // 24-hr internal format "HH:MM" (e.g. "20:00")
+      pickupTimeDisplay, // 12-hr display string (e.g. "8:00 AM")
+      returnTimeDisplay, // 12-hr display string (e.g. "8:00 PM")
       waiverSigned,
       waiverDate,
     } = data;
@@ -101,6 +101,15 @@ export async function POST(request) {
           vest_summary: vestSummary || '',
           vestUsedDefault: vestUsedDefault ? 'true' : 'false',
           vest_used_default: vestUsedDefault ? 'true' : 'false',
+          // Pickup & return times (2026-06-02 PM)
+          pickupTime: pickupTime || '08:00',
+          pickup_time: pickupTime || '08:00',
+          returnTime: returnTime || '20:00',
+          return_time: returnTime || '20:00',
+          pickupTimeDisplay: pickupTimeDisplay || '8:00 AM',
+          pickup_time_display: pickupTimeDisplay || '8:00 AM',
+          returnTimeDisplay: returnTimeDisplay || '8:00 PM',
+          return_time_display: returnTimeDisplay || '8:00 PM',
           // SMS consent (TCPA tracking)
           smsOptIn: smsOptIn ? 'true' : 'false',
           smsOptInDate: smsOptIn ? new Date().toISOString() : '',
