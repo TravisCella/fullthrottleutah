@@ -1,8 +1,14 @@
 // app/api/cron/pickup-reminder/route.js
-// Version: 2026-05-31 PM — Switch email from onboarding@resend.dev to bookings@fullthrottleutah.com
-// Triggered daily at 14:00 UTC (8:00 AM MDT) via Vercel cron
-// Logic: find tomorrow's CONFIRMED bookings → SMS if opted in, email otherwise
-// Change: Domain verified at Resend, so reminders can now reach any customer (not just travis.cella@gmail.com).
+// Version: 2026-06-02 — Surface life vest selection in reminder SMS + email
+// Last edited: June 2 2026
+// Change: Both SMS and email now show what life vests we'll have ready, so
+//         the customer can spot-check before they show up. SMS adds a 🦺 line
+//         after the package line; email adds a Life Vests row to the details
+//         table. Data flows in via getTomorrowsBookings() (lib/sheets.js was
+//         updated 2026-06-02 to read Sheet1 column S).
+//
+// Builds on: api-cron-pickup-reminder_2026-05-31_use-verified-domain-email.js
+// Triggered daily at 14:00 UTC (8:00 AM MDT) via Vercel cron.
 
 import { NextResponse } from 'next/server';
 import { getTomorrowsBookings } from '../../../../lib/sheets';
@@ -20,10 +26,17 @@ function buildReminderSMS(booking) {
     `Hi ${firstName}! Your Full Throttle Utah rental is TOMORROW.`,
     `📍 Pickup: Farmington, UT — 8:00 AM`,
     `🛥️ ${booking.package} · ${booking.location} · ${dateDisplay}`,
-    `💵 Bring $1,000 security deposit (card or cash)`,
-    `⛽ Return with FULL tank of 91-octane or fuel charges apply`,
-    `❓ Questions? Text/call (801) 548-1273`,
   ];
+
+  // NEW (2026-06-02): vest line — only added if data is present.
+  // Customer doesn't see the (default) tag here — that's an owner-only signal.
+  if (booking.vest_summary) {
+    lines.push(`🦺 Vests ready: ${booking.vest_summary}`);
+  }
+
+  lines.push(`💵 Bring $1,000 security deposit (card or cash)`);
+  lines.push(`⛽ Return with FULL tank of 91-octane or fuel charges apply`);
+  lines.push(`❓ Questions? Text/call (801) 548-1273`);
 
   if (booking.white_glove) {
     // Swap pickup line for delivery note
@@ -39,6 +52,11 @@ function buildReminderEmailHTML(booking) {
   const dateDisplay = booking.end_date && booking.end_date !== booking.start_date
     ? `${booking.start_date} → ${booking.end_date}`
     : booking.start_date;
+
+  // NEW (2026-06-02): optional Life Vests row — appended only when data present
+  const vestRow = booking.vest_summary
+    ? `<tr style="background:#fff;"><td style="padding:8px;color:#64748b;font-size:13px;">🦺 Life Vests</td><td style="padding:8px;font-weight:600;">${booking.vest_summary}</td></tr>`
+    : '';
 
   const pickupSection = booking.white_glove
     ? `<div style="background:#EFF6FF;padding:16px;border-radius:8px;margin:16px 0;">
@@ -71,6 +89,7 @@ function buildReminderEmailHTML(booking) {
           <tr><td style="padding:8px;color:#64748b;font-size:13px;">Package</td><td style="padding:8px;font-weight:600;">${booking.package}</td></tr>
           <tr style="background:#fff;"><td style="padding:8px;color:#64748b;font-size:13px;">Location</td><td style="padding:8px;font-weight:600;">${booking.location}</td></tr>
           <tr><td style="padding:8px;color:#64748b;font-size:13px;">Dates</td><td style="padding:8px;font-weight:600;">${dateDisplay}</td></tr>
+          ${vestRow}
           <tr style="background:#fff;"><td style="padding:8px;color:#64748b;font-size:13px;">Security Deposit Due</td><td style="padding:8px;font-weight:700;font-size:16px;color:#DC2626;">$1,000 (card or cash)</td></tr>
         </table>
 
@@ -164,13 +183,11 @@ export async function GET(request) {
     for (const booking of bookings) {
       try {
         if (booking.sms_opt_in && booking.renter_phone) {
-          // Customer opted in — send SMS
           const msg = buildReminderSMS(booking);
           await sendSMS(booking.renter_phone, msg);
           console.log(`[pickup-reminder] SMS sent → ${booking.renter_name} (${booking.renter_phone})`);
           smsSent++;
         } else if (booking.renter_email) {
-          // No SMS opt-in — send email instead
           const result = await sendReminderEmail(booking);
           if (result.ok) emailsSent++;
           else errors++;
