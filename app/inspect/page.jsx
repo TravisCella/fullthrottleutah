@@ -1,12 +1,17 @@
 'use client';
 
 // app/inspect/page.jsx
-// Version: 2026-05-31 — Real AI vision damage detection
-// Last edited: May 31 2026 (late night)
-// Change: aiCompare() now calls the new /api/ai-compare server endpoint which uses
-//         Claude Sonnet 4.6 vision to analyze the actual photos. Previously it just
-//         compared the damage text fields and called itself "AI" — now it really IS AI.
-//         All other UI/flow unchanged. AI status note added to the compare screen.
+// Version: 2026-06-03 — Lock down Firebase: writes go through server-side API route
+// Last edited: June 3 2026
+// Change: The upload() function no longer talks to Firebase directly. It now POSTs
+//         to /api/save-inspection, which writes to Firebase server-side using the
+//         FIREBASE_DATABASE_SECRET. This means the browser never sees the database
+//         URL anymore, and once Firebase rules are locked to deny direct access,
+//         the inspection records become tamper-proof.
+//         The DB_URL constant has been removed since no client code uses it.
+//         All other UI, flow, and feature logic unchanged.
+//
+// Builds on: 2026-05-31 real AI vision damage detection
 
 import { useState, useRef, useCallback, useEffect } from "react";
 
@@ -34,7 +39,8 @@ const MACHINES = [
   { id: "gtx-2", name: "GTX 325 #2", subtitle: "2026 Sea-Doo GTX Limited 325" },
 ];
 
-const DB_URL = "https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com";
+// NOTE: DB_URL removed in 2026-06-03 lockdown. Browser no longer talks to
+// Firebase directly — all writes flow through /api/save-inspection.
 
 function ts() {
   return new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
@@ -53,13 +59,30 @@ function compress(dataUrl, cb) {
   img.src = dataUrl;
 }
 
+// ─── 2026-06-03: writes now go through server-side API route ─────────────────
+// Browser POSTs the inspection record to /api/save-inspection, which generates
+// the ID + timestamp server-side and writes to Firebase using the database
+// secret. The cb signature (ok, id) is preserved so the rest of the page works
+// unchanged.
 function upload(record, cb) {
-  const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  fetch(`${DB_URL}/inspections/${id}.json`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...record, id, timestamp: ts() }),
-  }).then(() => cb(true, id)).catch(() => cb(false, null));
+  fetch('/api/save-inspection', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.ok && data.id) {
+        cb(true, data.id);
+      } else {
+        console.error('Save inspection failed:', data);
+        cb(false, null);
+      }
+    })
+    .catch(err => {
+      console.error('Save inspection network error:', err);
+      cb(false, null);
+    });
 }
 
 // Notify backend so it can email/SMS the owner AND log to Google Sheets
