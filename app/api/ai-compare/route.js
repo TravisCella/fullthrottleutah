@@ -1,18 +1,13 @@
 // app/api/ai-compare/route.js
-// Version: 2026-05-31 (initial) — Real AI vision damage detection
-// Created: May 31 2026 (late night)
-// Purpose: Compares check-out vs check-in photos from the Inspect app using Claude Sonnet 4.6
-//          vision. Replaces the previous text-only comparison that just diffed typed damage notes.
+// Version: 2026-06-03 — Auth Firebase reads with FIREBASE_DATABASE_SECRET
+// Last edited: June 3 2026
+// Change: Both Firebase Realtime DB fetches now pass ?auth=${FIREBASE_DATABASE_SECRET}
+//         so they continue to work after the rules are locked down to deny all
+//         unauthenticated access. No other behavior changed — same prompt, same
+//         model, same response shape.
 //
-// Flow:
-//   1. Client POSTs { checkoutId, checkinId }
-//   2. We fetch both inspection records from Firebase Realtime DB
-//   3. We send the photos (1 per zone per inspection) to Claude Vision with a structured prompt
-//   4. Claude returns JSON with findings per zone + verdict
-//   5. We layer in the fuel check (manual toggle) and return combined result
-//
-// Cost: ~$0.07-0.12 per comparison at current photo sizes + Claude Sonnet 4.6 pricing.
-// Required env: ANTHROPIC_API_KEY
+// Builds on: 2026-05-31 initial AI vision damage detection
+// Required env: ANTHROPIC_API_KEY, FIREBASE_DATABASE_SECRET (NEW)
 
 import { NextResponse } from 'next/server';
 
@@ -148,15 +143,26 @@ export async function POST(request) {
       );
     }
 
+    // 2026-06-03 — Firebase rules are now locked to deny direct access.
+    // We need the database secret to read inspection records server-side.
+    const dbSecret = process.env.FIREBASE_DATABASE_SECRET;
+    if (!dbSecret) {
+      return NextResponse.json(
+        { error: 'FIREBASE_DATABASE_SECRET is not configured on the server' },
+        { status: 500 }
+      );
+    }
+    const authParam = `?auth=${encodeURIComponent(dbSecret)}`;
+
     const { checkoutId, checkinId } = await request.json();
     if (!checkoutId || !checkinId) {
       return NextResponse.json({ error: 'Missing checkoutId or checkinId' }, { status: 400 });
     }
 
-    // Fetch both inspections from Firebase in parallel
+    // Fetch both inspections from Firebase in parallel — now with admin auth.
     const [outRes, inRes] = await Promise.all([
-      fetch(`${DB_URL}/inspections/${checkoutId}.json`),
-      fetch(`${DB_URL}/inspections/${checkinId}.json`),
+      fetch(`${DB_URL}/inspections/${checkoutId}.json${authParam}`),
+      fetch(`${DB_URL}/inspections/${checkinId}.json${authParam}`),
     ]);
     const out = await outRes.json();
     const inn = await inRes.json();
