@@ -1,17 +1,18 @@
 'use client';
 
 // app/inspect/page.jsx
-// Version: 2026-06-03 — Lock down Firebase: writes go through server-side API route
-// Last edited: June 3 2026
-// Change: The upload() function no longer talks to Firebase directly. It now POSTs
-//         to /api/save-inspection, which writes to Firebase server-side using the
-//         FIREBASE_DATABASE_SECRET. This means the browser never sees the database
-//         URL anymore, and once Firebase rules are locked to deny direct access,
-//         the inspection records become tamper-proof.
-//         The DB_URL constant has been removed since no client code uses it.
-//         All other UI, flow, and feature logic unchanged.
+// Version: 2026-06-05 — Show all recent inspections (no 10-item cap)
+// Last edited: June 5 2026
+// Change: The "Recent inspections (30 days)" lists in both the role-select
+//         screen and the AI compare mode previously sliced to 10 items with
+//         an "X more not shown" footer text. Removed both caps — the list
+//         now shows everything within the 30-day window. Header now also
+//         shows the total count so Travis knows how many are loaded.
+//         Pairs with lib/sheets.js 2026-06-05 which fixes the sort to be
+//         truly newest-first (the previous sort silently no-op'd due to
+//         JS Date parsing the human-readable timestamp string).
 //
-// Builds on: 2026-05-31 real AI vision damage detection
+// Builds on: 2026-06-03 Firebase lockdown
 
 import { useState, useRef, useCallback, useEffect } from "react";
 
@@ -407,7 +408,9 @@ export default function InspectionV2() {
 
             <div style={{ marginTop: 28 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Recent inspections (30 days)</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  Recent inspections{recentInspections.length > 0 ? ` (${recentInspections.length} in 30 days)` : ' (30 days)'}
+                </div>
                 <button onClick={loadRecentInspections} style={{ ...outline, padding: "4px 10px", fontSize: 11 }}>
                   {loadingRecent ? "..." : "↻"}
                 </button>
@@ -420,14 +423,9 @@ export default function InspectionV2() {
                   No recent inspections yet
                 </div>
               )}
-              {recentInspections.slice(0, 10).map((insp, i) => (
+              {recentInspections.map((insp, i) => (
                 <RecentCard key={i} insp={insp} showSelectButtons={false} />
               ))}
-              {recentInspections.length > 10 && (
-                <div style={{ textAlign: "center", fontSize: 11, color: muted, marginTop: 4 }}>
-                  {recentInspections.length - 10} more not shown
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -458,7 +456,6 @@ export default function InspectionV2() {
                          (insp.machineName || '').toLowerCase().includes(q) ||
                          (insp.inspectionId || '').toLowerCase().includes(q);
                 })
-                .slice(0, 10)
                 .map((insp, i) => (
                   <RecentCard
                     key={i}
