@@ -1,19 +1,20 @@
 // app/booking.js
-// Version: 2026-06-02 PM — Pickup & return time selection
-// Last edited: June 2 2026 (evening)
-// Feature: Adds pickup time + return time selection to Step 2 (Dates), shown
-//          only once dates have been picked. 30-minute increments — pickup
-//          slots 6:00 AM to 6:00 PM, return slots 6:00 AM to 8:00 PM. Defaults
-//          to 8:00 AM pickup and 8:00 PM return (matches the prior hardcoded
-//          behavior). Labels adapt for white-glove ("Deliver to lake" /
-//          "Pick up from lake") vs self-tow ("Pickup at Farmington").
-//          Same-day rentals require pickup < return; multi-day allows any
-//          combination. Times flow through to Stripe metadata, Google Sheet
-//          (columns T + U), owner SMS, customer confirmation SMS, customer
-//          email, and the 24-hour pickup-reminder SMS + email.
+// Version: 2026-06-06 — Spare vest fee + boat-capacity enforcement
+// Last edited: June 6 2026
+// Feature: Customers can now exceed the boat's rider capacity by buying up to
+//          2 "spare" vests at $15 each (e.g. 5 vests on a 4-rider Spark Duo for
+//          one backup vest in case one gets wet, sized wrong, etc.). Hard cap
+//          at maxRiders + 2. Server-side validation in /api/checkout enforces
+//          this independent of the client UI, so the prior bug — where a
+//          customer somehow checked out with 6 vests on a Spark Duo — cannot
+//          happen again regardless of how the browser state behaves.
 //
-// Builds on: 2026-06-02 life vest selection
-// Downstream: All 5 sibling files updated in same commit cycle.
+// IMPORTANT FRAMING: maxRiders is the USCG-rated rider capacity of the boat
+//                    (2 per Spark = 4 total; 3 per GTX = 6 total). Spare vests
+//                    are NOT extra riders — actual rider count must not exceed
+//                    boat capacity for safety/insurance/legal reasons.
+//
+// Builds on: 2026-06-02 PM pickup/return time selection
 
 import { useState, useEffect, useRef } from "react";
 
@@ -130,9 +131,18 @@ const EMPTY_VESTS = {
 // Default selection if customer skips this section: 2 Adult Mediums (one per operator)
 const DEFAULT_VESTS = { ...EMPTY_VESTS, adult_medium: 2 };
 
+// ── Spare vest economics (2026-06-06) ──
+// Customers can exceed boat capacity by buying spare vests. Hard cap on extras
+// keeps the request reasonable and protects against client-side bypass abuse.
+const EXTRA_VEST_FEE = 15;     // $ per spare vest beyond rated boat capacity
+const MAX_EXTRA_VESTS = 2;     // hard cap on spares — server enforces this too
+
 // Build the readable summary string used in SMS, email, and Sheet.
-// e.g. "1 Adult XXL, 1 Adult M, 1 Youth (3 vests)"
-function formatVestSummary(sizes) {
+// e.g. "1 Adult XXL, 1 Adult M, 1 Youth (3 vests)"  — under capacity
+// e.g. "3 Adult M, 2 Adult S (5 vests, 1 spare)"   — over capacity by 1
+//
+// `maxRiders` is the boat's USCG rider capacity; vests beyond that are spares.
+function formatVestSummary(sizes, maxRiders) {
   const parts = [];
   let total = 0;
   for (const [key, count] of Object.entries(sizes)) {
@@ -142,7 +152,12 @@ function formatVestSummary(sizes) {
     }
   }
   if (parts.length === 0) return "";
-  return `${parts.join(", ")} (${total} vest${total === 1 ? "" : "s"})`;
+  const cap = typeof maxRiders === "number" ? maxRiders : total;
+  const spareCount = Math.max(0, total - cap);
+  const detail = spareCount > 0
+    ? `${total} vest${total === 1 ? "" : "s"}, ${spareCount} spare`
+    : `${total} vest${total === 1 ? "" : "s"}`;
+  return `${parts.join(", ")} (${detail})`;
 }
 
 // ── Pickup & return time slots (2026-06-02 PM) ──
@@ -441,12 +456,15 @@ export default function JetSkiBooking() {
   }, [loc]);
 
   // If user switches packages and has more vests selected than the new package
-  // can accommodate (e.g. they had 5 vests selected for GTX Duo and switch to
-  // Spark Duo which maxes at 4), clear the vest selection so they can re-pick.
+  // can accommodate (including spare vest cap), clear the vest selection.
+  // 2026-06-06: now compares against maxRiders + MAX_EXTRA_VESTS so a 6-vest
+  // GTX selection auto-resets when user switches to Spark Duo (cap of 6 vests
+  // total: 4 riders + 2 spares).
   useEffect(() => {
     if (!pkg) return;
     const total = Object.values(vestSizes).reduce((s, v) => s + v, 0);
-    if (total > pkg.maxRiders) {
+    const cap = pkg.maxRiders + MAX_EXTRA_VESTS;
+    if (total > cap) {
       setVestSizes(EMPTY_VESTS);
     }
   }, [pkg]);
@@ -482,8 +500,12 @@ export default function JetSkiBooking() {
   // Vest selection helpers
   const totalVests = Object.values(vestSizes).reduce((s, v) => s + v, 0);
   const maxVests = pkg?.maxRiders || 4;
+  // 2026-06-06: hard cap is boat capacity + 2 spare vests
+  const maxTotalVests = maxVests + MAX_EXTRA_VESTS;
+  const spareVestCount = Math.max(0, totalVests - maxVests);
+  const extraVestFee = spareVestCount * EXTRA_VEST_FEE;
   const incrementVest = (key) => {
-    if (totalVests >= maxVests) return;
+    if (totalVests >= maxTotalVests) return; // hard cap including spares
     setVestSizes(prev => ({ ...prev, [key]: prev[key] + 1 }));
   };
   const decrementVest = (key) => {
@@ -493,7 +515,7 @@ export default function JetSkiBooking() {
   // The "effective" vest selection — uses the customer's choices if any, otherwise
   // falls back to 2 Adult Mediums (the skippable default per the Phase 2 design).
   const getEffectiveVests = () => totalVests === 0 ? DEFAULT_VESTS : vestSizes;
-  const effectiveVestSummary = formatVestSummary(getEffectiveVests());
+  const effectiveVestSummary = formatVestSummary(getEffectiveVests(), maxVests);
 
   const handleCheckout = async () => {
     setPaying(true);
@@ -523,8 +545,10 @@ export default function JetSkiBooking() {
           isLakePowell: isLakePowell,
           loyaltyDiscount: loyaltyDiscount,
           vestSizes: JSON.stringify(effective),
-          vestSummary: formatVestSummary(effective),
+          vestSummary: formatVestSummary(effective, pkg.maxRiders),
           vestUsedDefault: totalVests === 0,
+          spareVestCount: spareVestCount,
+          extraVestFee: extraVestFee,
           pickupTime: pickupTime,
           returnTime: returnTime,
           pickupTimeDisplay: formatTime12h(pickupTime),
@@ -553,7 +577,9 @@ export default function JetSkiBooking() {
   const isLakePowell = loc?.id === "lake-powell";
   const deconFee = isLakePowell ? 200 : 0;
   const loyaltyDiscount = isRepeatCustomer ? Math.round(basePrice * 0.10) : 0;
-  const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee - loyaltyDiscount;
+  // 2026-06-06: extraVestFee is added to total. Note: this is computed above
+  // when totalVests/maxVests/spareVestCount are derived.
+  const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee + extraVestFee - loyaltyDiscount;
   const minDaysRequired = loc?.minDays || 1;
   const meetsMinimum = days >= minDaysRequired;
   // For same-day rentals, pickup must come before return. Multi-day has no
@@ -566,7 +592,7 @@ export default function JetSkiBooking() {
     if (step === 0) return pkg;
     if (step === 1) return loc;
     if (step === 2) return dates.length >= 1 && meetsMinimum && timesValid;
-    if (step === 3) return info.name && info.email && info.phone && info.experience && totalVests <= maxVests;
+    if (step === 3) return info.name && info.email && info.phone && info.experience && totalVests <= maxTotalVests;
     if (step === 4) return Object.values(waiverChecks).every(Boolean) && signature;
     if (step === 5) return true;
     return false;
@@ -1000,7 +1026,7 @@ export default function JetSkiBooking() {
                     {days > 1 && <div style={{ fontSize: 11, opacity: 0.6 }}>${Math.round(totalPrice/days)}/day avg</div>}
                   </div>
                 </div>
-                {(holidayInfo.total > 0 || whiteGlove || deconFee > 0 || loyaltyDiscount > 0) && (
+                {(holidayInfo.total > 0 || whiteGlove || deconFee > 0 || loyaltyDiscount > 0 || extraVestFee > 0) && (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.15)", fontSize: 11, opacity: 0.7 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                       <span>Base rental</span><span>${basePrice.toLocaleString()}</span>
@@ -1018,6 +1044,11 @@ export default function JetSkiBooking() {
                     {deconFee > 0 && (
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#FCD34D" }}>
                         <span>🦠 Lake Powell decontamination</span><span>+${deconFee}</span>
+                      </div>
+                    )}
+                    {extraVestFee > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#FCD34D" }}>
+                        <span>🪖 Spare vest{spareVestCount === 1 ? "" : "s"} ({spareVestCount} × ${EXTRA_VEST_FEE})</span><span>+${extraVestFee}</span>
                       </div>
                     )}
                     {loyaltyDiscount > 0 && (
@@ -1186,7 +1217,11 @@ export default function JetSkiBooking() {
 
             {/* ─── LIFE VEST SELECTION ────────────────────────────────────────
                 Skippable. If totalVests === 0 at checkout, we default to 2
-                Adult Mediums (one per operator). Capped at pkg.maxRiders. */}
+                Adult Mediums (one per operator). Capped at pkg.maxRiders for
+                included vests; additional vests up to MAX_EXTRA_VESTS are
+                billed as $15 spares (2026-06-06). Boat capacity (USCG rated
+                riders per ski × number of skis) remains the hard limit on
+                actual rider count regardless of vest count. */}
             <div style={{ marginTop: 14, border: "2px solid #E2E8F0", borderRadius: 12, padding: 16, background: "#fff" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1195,20 +1230,34 @@ export default function JetSkiBooking() {
                     <span style={{ fontSize: 10, fontWeight: 600, color: "#94A3B8", letterSpacing: "0.05em", textTransform: "uppercase" }}>Optional</span>
                   </div>
                   <div style={{ fontSize: 11, color: "#64748B", marginTop: 4, lineHeight: 1.5 }}>
-                    USCG-approved PFDs for all riders. Skip and we'll bring 2 Adult Mediums.
+                    USCG-approved PFDs. {maxVests} included free (one per seat). Skip and we'll bring 2 Adult Mediums.
                   </div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: totalVests > maxVests ? "#DC2626" : "#0F172A", letterSpacing: "-0.02em", lineHeight: 1 }}>
-                    {totalVests}<span style={{ fontSize: 13, color: "#94A3B8", fontWeight: 500 }}> / {maxVests}</span>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                    {totalVests}
+                    <span style={{ fontSize: 13, color: "#94A3B8", fontWeight: 500 }}> / {maxVests}</span>
+                    {spareVestCount > 0 && (
+                      <span style={{ fontSize: 13, color: "#F59E0B", fontWeight: 700 }}> +{spareVestCount}</span>
+                    )}
                   </div>
-                  <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>Riders</div>
+                  <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>
+                    {spareVestCount > 0 ? "Riders + Spares" : "Riders"}
+                  </div>
                 </div>
               </div>
 
-              {totalVests > maxVests && (
+              {/* Spare vest fee notice — shows when at least 1 spare is being purchased */}
+              {spareVestCount > 0 && (
+                <div style={{ fontSize: 11, color: "#92400E", marginBottom: 12, padding: "8px 10px", background: "#FEF3C7", borderRadius: 6, lineHeight: 1.45 }}>
+                  <strong>🪖 {spareVestCount} spare vest{spareVestCount === 1 ? "" : "s"} (+${extraVestFee})</strong> — boat capacity stays at {maxVests} riders. Spares are backups (sizing, wet, rotation).
+                </div>
+              )}
+
+              {/* Hard cap reached — purely informational, the + buttons are also disabled */}
+              {totalVests >= maxTotalVests && (
                 <div style={{ fontSize: 11, color: "#991B1B", marginBottom: 12, padding: "8px 10px", background: "#FEE2E2", borderRadius: 6, fontWeight: 600 }}>
-                  {pkg?.name} fits {maxVests} riders max. Please reduce your selection by {totalVests - maxVests}.
+                  Maximum reached: {maxVests} riders + {MAX_EXTRA_VESTS} spare vests.
                 </div>
               )}
 
@@ -1216,7 +1265,10 @@ export default function JetSkiBooking() {
                 {VEST_SIZES.map(s => {
                   const count = vestSizes[s.key];
                   const isSel = count > 0;
-                  const canIncrement = totalVests < maxVests;
+                  const canIncrement = totalVests < maxTotalVests;
+                  // Visual cue: when adding the next vest would be a spare, show
+                  // a small "+$15" hint on the + button so the user knows the cost.
+                  const nextIsSpare = totalVests >= maxVests && totalVests < maxTotalVests;
                   return (
                     <div key={s.key} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1250,12 +1302,16 @@ export default function JetSkiBooking() {
                         <button
                           onClick={() => incrementVest(s.key)}
                           disabled={!canIncrement}
-                          aria-label={`Add one ${s.label}`}
+                          aria-label={`Add one ${s.label}${nextIsSpare ? " (spare, +$15)" : ""}`}
+                          title={nextIsSpare ? "Next vest is a spare (+$15)" : undefined}
                           style={{
+                            position: "relative",
                             width: 30, height: 30, borderRadius: 6,
-                            border: "1px solid #CBD5E1", background: "#fff",
+                            border: nextIsSpare ? "1px solid #F59E0B" : "1px solid #CBD5E1",
+                            background: nextIsSpare ? "rgba(245,158,11,0.06)" : "#fff",
                             cursor: canIncrement ? "pointer" : "not-allowed",
-                            fontSize: 18, fontWeight: 700, color: "#64748B",
+                            fontSize: 18, fontWeight: 700,
+                            color: nextIsSpare ? "#92400E" : "#64748B",
                             display: "flex", alignItems: "center", justifyContent: "center",
                             opacity: canIncrement ? 1 : 0.4,
                             padding: 0, lineHeight: 1,
@@ -1267,8 +1323,8 @@ export default function JetSkiBooking() {
                 })}
               </div>
 
-              <div style={{ marginTop: 10, fontSize: 10, color: "#94A3B8", textAlign: "center", lineHeight: 1.5 }}>
-                Sizes subject to availability — we'll contact you if anything needs adjusting.
+              <div style={{ marginTop: 10, padding: "8px 10px", background: "#F8FAFC", borderRadius: 6, fontSize: 10, color: "#64748B", lineHeight: 1.5, textAlign: "center" }}>
+                <strong>Boat capacity: {maxVests} riders</strong> ({pkg?.id === "gtx-duo" ? "3 per GTX × 2 skis" : "2 per Spark × 2 skis"}). Spare vests $15 each (max +{MAX_EXTRA_VESTS}). Actual rider count cannot exceed boat capacity.
               </div>
             </div>
           </div>
@@ -1450,6 +1506,7 @@ export default function JetSkiBooking() {
                   ...(holidayInfo.holidays.map(h => ({ l: `🎆 ${h.name} surcharge`, v: `+$${h.premium}/day`, color: "#DC2626" }))),
                   ...(whiteGlove && whiteGloveFee > 0 ? [{ l: `🤝 White glove — ${loc.name}`, v: `+$${whiteGloveFee}`, color: "#16A34A" }] : []),
                   ...(deconFee > 0 ? [{ l: "🦠 Lake Powell decontamination", v: `+$${deconFee}`, color: "#D97706" }] : []),
+                  ...(extraVestFee > 0 ? [{ l: `🪖 Spare vest${spareVestCount === 1 ? "" : "s"} (${spareVestCount} × $${EXTRA_VEST_FEE})`, v: `+$${extraVestFee}`, color: "#D97706" }] : []),
                   ...(loyaltyDiscount > 0 ? [{ l: "✨ Returning customer (10% off)", v: `-$${loyaltyDiscount}`, color: "#16A34A" }] : []),
                   { l: "Total due now", v: `$${totalPrice.toLocaleString()}`, bold: true },
                 ].map((r, i) => (
