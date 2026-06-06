@@ -1,14 +1,13 @@
 // app/api/webhook/route.js
-// Version: 2026-06-02 PM — Surface pickup & return times in SMS, email, Sheet
-// Last edited: June 2 2026 (evening)
-// Feature: Reads pickup_time, pickup_time_display, return_time, return_time_display
-//          from Stripe payment_intent metadata and (1) writes pickup_time +
-//          return_time to Sheet1 columns T + U via addBooking, (2) adds an
-//          "⏰ 8:00 AM → 8:00 PM" line to owner SMS, (3) adds Pickup Time +
-//          Return Time rows to customer confirmation email. lib/sms.js handles
-//          the renter SMS text using the same booking object.
+// Version: 2026-06-06 — Surface spare vest fee in SMS + email
+// Last edited: June 6 2026
+// Feature: Reads spare_vest_count and extra_vest_fee from Stripe metadata and
+//          surfaces them in owner SMS and customer email so it's clear when a
+//          customer was charged the $15 spare vest fee. The vest_summary text
+//          itself also already includes "(N vests, X spare)" formatting from
+//          booking.js so the Sheet column reflects it as well.
 //
-// Builds on: 2026-06-02 vest surfacing
+// Builds on: 2026-06-02 PM pickup/return times
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -162,6 +161,9 @@ export async function POST(request) {
         // Life vest fields (NEW)
         vest_summary: meta.vestSummary || meta.vest_summary || '',
         vest_used_default: meta.vest_used_default === 'true' || meta.vestUsedDefault === 'true',
+        // Spare vest fee (2026-06-06)
+        spare_vest_count: parseInt(meta.spare_vest_count || meta.spareVestCount || '0', 10),
+        extra_vest_fee: parseInt(meta.extra_vest_fee || meta.extraVestFee || '0', 10),
         // Pickup & return times (2026-06-02 PM)
         // Both internal (24h "HH:MM") and display (12h "8:00 AM") forms stored.
         // Falls back to historical defaults for pre-feature bookings.
@@ -227,9 +229,13 @@ export async function POST(request) {
           ];
 
           // Add life vest line (NEW). Note "(default)" suffix if customer skipped section.
+          // Adds "+$X spares" tag when at least one spare vest was purchased.
           if (booking.vest_summary) {
-            const defaultTag = booking.vest_used_default ? ' (default)' : '';
-            ownerLines.push(`🦺 ${booking.vest_summary}${defaultTag}`);
+            let suffix = booking.vest_used_default ? ' (default)' : '';
+            if (booking.extra_vest_fee > 0) {
+              suffix += ` +$${booking.extra_vest_fee} spares`;
+            }
+            ownerLines.push(`🦺 ${booking.vest_summary}${suffix}`);
           }
 
           // Lake Powell reminder
