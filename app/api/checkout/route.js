@@ -1,16 +1,30 @@
 // app/api/checkout/route.js
-// Version: 2026-06-02 PM — Pass pickup & return times through to Stripe metadata
-// Last edited: June 2 2026 (evening)
-// Feature: Receives pickupTime + returnTime (24-hr "HH:MM" strings) and their
-//          display equivalents from booking.js, and writes both formats to
-//          payment_intent.metadata (camelCase + snake_case) so the webhook can
-//          surface them in SMS, email, Sheet, and the 24-hr reminder.
+// Version: 2026-06-06 — Server-side vest validation + spare vest fee
+// Last edited: June 6 2026
+// Feature: Receives the new vest fee fields from booking.js (spareVestCount,
+//          extraVestFee) and validates everything server-side BEFORE creating
+//          the Stripe session. This means even if the client UI is bypassed
+//          (the 6-vest-on-Spark bug we saw), the server rejects bookings that
+//          exceed boat capacity + 2 spares. Also recalculates the expected fee
+//          server-side and rejects if the client's numbers don't match — so
+//          no one can manipulate the total by tampering with the request body.
 //
-// Builds on: 2026-06-02 vest data passthrough
+// Builds on: 2026-06-02 PM pickup/return times
 
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// ── Server-side source of truth for boat rider capacity (USCG-rated) ──
+// Must stay in sync with PACKAGES[].maxRiders in app/booking.js. Kept here
+// so the server can independently validate vest counts regardless of what
+// the client sends.
+const MAX_RIDERS_BY_PACKAGE = {
+  'Spark Duo': 4,         // 2 riders × 2 Sparks
+  'GTX Limited Duo': 6,   // 3 riders × 2 GTX 325s
+};
+const SPARE_VEST_FEE = 15;       // $ per spare vest beyond capacity
+const MAX_SPARE_VESTS = 2;       // hard cap on spares
 
 export async function POST(request) {
   try {
@@ -38,6 +52,8 @@ export async function POST(request) {
       vestSizes,        // JSON string of {size_key: count}
       vestSummary,      // Human-readable string
       vestUsedDefault,  // true if customer skipped and we defaulted
+      spareVestCount,   // # of vests beyond boat capacity (2026-06-06)
+      extraVestFee,     // $ fee for spares (2026-06-06)
       pickupTime,        // 24-hr internal format "HH:MM" (e.g. "08:00")
       returnTime,        // 24-hr internal format "HH:MM" (e.g. "20:00")
       pickupTimeDisplay, // 12-hr display string (e.g. "8:00 AM")
@@ -45,6 +61,55 @@ export async function POST(request) {
       waiverSigned,
       waiverDate,
     } = data;
+
+    // ─── 2026-06-06: Server-side vest validation ─────────────────────────
+    // Independent check so client-side UI bugs (or tampered requests) can't
+    // bypass boat capacity rules. This was added after a customer somehow
+    // checked out with 6 vests on a Spark Duo (rated for 4 riders + 2 spares
+    // max = 6 vests). The math here is the source of truth.
+    const maxRiders = MAX_RIDERS_BY_PACKAGE[packageName];
+    if (!maxRiders) {
+      return Response.json(
+        { error: `Unknown package: ${packageName}` },
+        { status: 400 }
+      );
+    }
+    const maxTotalVests = maxRiders + MAX_SPARE_VESTS;
+
+    // Parse and count the vest selection
+    let parsedVests = {};
+    try {
+      parsedVests = typeof vestSizes === 'string' ? JSON.parse(vestSizes) : (vestSizes || {});
+    } catch (e) {
+      return Response.json({ error: 'Invalid vestSizes payload' }, { status: 400 });
+    }
+    const serverTotalVests = Object.values(parsedVests).reduce(
+      (s, v) => s + (Number(v) || 0), 0
+    );
+
+    // Hard cap check — reject anything beyond capacity + 2 spares
+    if (serverTotalVests > maxTotalVests) {
+      console.error(
+        `[checkout] Rejecting booking: ${serverTotalVests} vests for ${packageName} (max ${maxTotalVests}). renter=${renterEmail}`
+      );
+      return Response.json(
+        {
+          error: `Vest selection exceeds boat capacity. ${packageName} allows up to ${maxRiders} riders + ${MAX_SPARE_VESTS} spare vests (${maxTotalVests} total). You selected ${serverTotalVests}.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Recompute the spare fee from scratch — the source of truth.
+    // If client-sent extraVestFee disagrees, we use the server value (no error).
+    const serverSpareCount = Math.max(0, serverTotalVests - maxRiders);
+    const serverExtraFee = serverSpareCount * SPARE_VEST_FEE;
+    if (Number(extraVestFee) !== serverExtraFee) {
+      console.warn(
+        `[checkout] Vest fee mismatch — client sent ${extraVestFee}, server computed ${serverExtraFee}. Using server value.`
+      );
+    }
+    // ──────────────────────────────────────────────────────────────────────
 
     const fullAmount = Math.round(totalPrice * 100);
 
@@ -101,6 +166,11 @@ export async function POST(request) {
           vest_summary: vestSummary || '',
           vestUsedDefault: vestUsedDefault ? 'true' : 'false',
           vest_used_default: vestUsedDefault ? 'true' : 'false',
+          // Spare vest fee (2026-06-06) — using server-computed values, not client
+          spareVestCount: serverSpareCount.toString(),
+          spare_vest_count: serverSpareCount.toString(),
+          extraVestFee: serverExtraFee.toString(),
+          extra_vest_fee: serverExtraFee.toString(),
           // Pickup & return times (2026-06-02 PM)
           pickupTime: pickupTime || '08:00',
           pickup_time: pickupTime || '08:00',
