@@ -1,13 +1,14 @@
 // app/api/webhook/route.js
-// Version: 2026-06-06 — Surface spare vest fee in SMS + email
+// Version: 2026-06-06 Phase 2 — Rental Agreement surfacing
 // Last edited: June 6 2026
-// Feature: Reads spare_vest_count and extra_vest_fee from Stripe metadata and
-//          surfaces them in owner SMS and customer email so it's clear when a
-//          customer was charged the $15 spare vest fee. The vest_summary text
-//          itself also already includes "(N vests, X spare)" formatting from
-//          booking.js so the Sheet column reflects it as well.
+// Feature: Reads the new rental agreement fields from Stripe metadata
+//          (agreement_signed, agreement_version, agreement_signed_at) and
+//          surfaces them: (1) booking object passed to addBooking writes
+//          rental_agreement_version → column V and rental_agreement_signed
+//          → column W in Sheet1; (2) customer confirmation email gets a
+//          new "Rental Agreement" row showing the version and signing date.
 //
-// Builds on: 2026-06-02 PM pickup/return times
+// Builds on: 2026-06-06 spare vest fee surfacing
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -32,6 +33,12 @@ async function sendConfirmationEmail(booking) {
   // Pickup & return time rows — always shown (defaults to 8 AM / 8 PM if not selected)
   const pickupRow = `<tr><td style="padding: 8px; color: #64748b; font-size: 13px;">⏰ Pickup Time</td><td style="padding: 8px; font-weight: 600;">${booking.pickup_time_display || '8:00 AM'}</td></tr>`;
   const returnRow = `<tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">⏰ Return Time</td><td style="padding: 8px; font-weight: 600;">${booking.return_time_display || '8:00 PM'}</td></tr>`;
+
+  // Rental Agreement row (Phase 2) — only shown if customer signed (will be true for all
+  // bookings after Phase 2 deploys; pre-Phase-2 bookings won't have this metadata)
+  const agreementRow = booking.rental_agreement_signed
+    ? `<tr><td style="padding: 8px; color: #64748b; font-size: 13px;">📜 Rental Agreement</td><td style="padding: 8px; font-weight: 600;">Signed ${booking.rental_agreement_version || 'v1.0.0'}</td></tr>`
+    : '';
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -61,6 +68,7 @@ async function sendConfirmationEmail(booking) {
                 ${pickupRow}
                 ${returnRow}
                 ${vestRow}
+                ${agreementRow}
                 <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Rental Paid in Full</td><td style="padding: 8px; font-weight: 600; color: #16a34a;">$${booking.total_price}</td></tr>
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">$1,000 security deposit</td></tr>
               </table>
@@ -171,6 +179,10 @@ export async function POST(request) {
         return_time: meta.return_time || meta.returnTime || '20:00',
         pickup_time_display: meta.pickup_time_display || meta.pickupTimeDisplay || '8:00 AM',
         return_time_display: meta.return_time_display || meta.returnTimeDisplay || '8:00 PM',
+        // ── Rental Agreement (Phase 2) ──
+        rental_agreement_signed: meta.agreement_signed === 'true' || meta.agreementSigned === 'true',
+        rental_agreement_version: meta.agreement_version || meta.agreementVersion || '',
+        rental_agreement_signed_at: meta.agreement_signed_at || meta.agreementSignedAt || '',
       };
 
       // Write to Google Sheets
