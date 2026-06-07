@@ -1,15 +1,13 @@
 // app/api/checkout/route.js
-// Version: 2026-06-06 — Server-side vest validation + spare vest fee
+// Version: 2026-06-06 Phase 2 — Rental Agreement metadata capture
 // Last edited: June 6 2026
-// Feature: Receives the new vest fee fields from booking.js (spareVestCount,
-//          extraVestFee) and validates everything server-side BEFORE creating
-//          the Stripe session. This means even if the client UI is bypassed
-//          (the 6-vest-on-Spark bug we saw), the server rejects bookings that
-//          exceed boat capacity + 2 spares. Also recalculates the expected fee
-//          server-side and rejects if the client's numbers don't match — so
-//          no one can manipulate the total by tampering with the request body.
+// Feature: Receives the new rental agreement fields from booking.js
+//          (agreementSigned, agreementVersion, agreementSignedAt,
+//          agreementChecksJson) and writes them to the PaymentIntent metadata
+//          so the webhook can surface them in the Sheet (columns V + W) and
+//          customer email. Builds on the existing waiver metadata capture.
 //
-// Builds on: 2026-06-02 PM pickup/return times
+// Builds on: 2026-06-06 vest validation
 
 import Stripe from 'stripe';
 
@@ -60,6 +58,11 @@ export async function POST(request) {
       returnTimeDisplay, // 12-hr display string (e.g. "8:00 PM")
       waiverSigned,
       waiverDate,
+      // ── Rental Agreement (Phase 2) ──
+      agreementSigned,
+      agreementVersion,
+      agreementSignedAt,
+      agreementChecksJson,
     } = data;
 
     // ─── 2026-06-06: Server-side vest validation ─────────────────────────
@@ -186,6 +189,16 @@ export async function POST(request) {
           // Waiver tracking
           waiverSigned: waiverSigned || 'false',
           waiverDate: waiverDate || '',
+          // ── Rental Agreement tracking (Phase 2) ──
+          // Both camelCase + snake_case for webhook compatibility
+          agreementSigned: agreementSigned || 'false',
+          agreement_signed: agreementSigned || 'false',
+          agreementVersion: agreementVersion || '',
+          agreement_version: agreementVersion || '',
+          agreementSignedAt: agreementSignedAt || '',
+          agreement_signed_at: agreementSignedAt || '',
+          // Note: agreementChecksJson can be 200+ chars; trim to Stripe's 500-char metadata limit
+          agreementChecksJson: (agreementChecksJson || '').slice(0, 490),
           // Status flags for admin dashboard
           securityDepositStatus: 'pending',
           rentalStatus: 'booked',
