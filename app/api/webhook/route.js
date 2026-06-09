@@ -1,14 +1,13 @@
 // app/api/webhook/route.js
-// Version: 2026-06-06 Phase 2 — Rental Agreement surfacing
+// Version: 2026-06-06 Phase 3 — Add clickable link to agreement view page
 // Last edited: June 6 2026
-// Feature: Reads the new rental agreement fields from Stripe metadata
-//          (agreement_signed, agreement_version, agreement_signed_at) and
-//          surfaces them: (1) booking object passed to addBooking writes
-//          rental_agreement_version → column V and rental_agreement_signed
-//          → column W in Sheet1; (2) customer confirmation email gets a
-//          new "Rental Agreement" row showing the version and signing date.
+// Feature: The "📜 Rental Agreement" row in the customer confirmation email
+//          now renders as a clickable link pointing to the new customer
+//          agreement view page (Phase 3) at /agreement/[bookingId]. This
+//          gives customers a permanent reference to their signed agreement
+//          right from their inbox.
 //
-// Builds on: 2026-06-06 spare vest fee surfacing
+// Builds on: 2026-06-06 Phase 2 surfacing
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -34,10 +33,10 @@ async function sendConfirmationEmail(booking) {
   const pickupRow = `<tr><td style="padding: 8px; color: #64748b; font-size: 13px;">⏰ Pickup Time</td><td style="padding: 8px; font-weight: 600;">${booking.pickup_time_display || '8:00 AM'}</td></tr>`;
   const returnRow = `<tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">⏰ Return Time</td><td style="padding: 8px; font-weight: 600;">${booking.return_time_display || '8:00 PM'}</td></tr>`;
 
-  // Rental Agreement row (Phase 2) — only shown if customer signed (will be true for all
-  // bookings after Phase 2 deploys; pre-Phase-2 bookings won't have this metadata)
+  // Rental Agreement row (Phase 3) — clickable link to the customer-facing
+  // agreement view page. Email clients render inline-styled <a> tags reliably.
   const agreementRow = booking.rental_agreement_signed
-    ? `<tr><td style="padding: 8px; color: #64748b; font-size: 13px;">📜 Rental Agreement</td><td style="padding: 8px; font-weight: 600;">Signed ${booking.rental_agreement_version || 'v1.0.0'}</td></tr>`
+    ? `<tr><td style="padding: 8px; color: #64748b; font-size: 13px;">📜 Rental Agreement</td><td style="padding: 8px; font-weight: 600;"><a href="https://www.fullthrottleutah.com/agreement/${booking.booking_id}" style="color: #0C4A6E; text-decoration: underline;">Signed ${booking.rental_agreement_version || 'v1.0.0'} — View</a></td></tr>`
     : '';
 
   try {
