@@ -1,20 +1,28 @@
 // app/components/TestimonialsSection.jsx
-// Version: 2026-06-02 v2 — Refactored to fetch from API endpoint
-// Last edited: June 2 2026
+// Version: 2026-06-09 — Direct data access (no HTTP roundtrip)
+// Last edited: June 9 2026
 //
-// Change from prior version: removed direct import of lib/sheets (which transitively
-// pulls in googleapis and its Node-only modules). Now fetches reviews from the
-// /api/public-reviews HTTP endpoint instead. Result: this component has zero
-// server-only npm dependencies, so it bundles cleanly for both server and (RSC payload).
+// Big architecture change: this component no longer HTTP-fetches /api/public-reviews.
+// It now imports getPublicReviewsWithStats() from lib/reviews directly and reads
+// the Sheet in-process when the server component renders.
 //
-// Caching: the API endpoint has revalidate=300 set, and we pass revalidate=300 on the
-// fetch as well, so Sheets gets hit at most once per 5 min regardless of traffic.
+// WHY THE CHANGE:
+// The previous HTTP-fetch approach was failing silently in production. Server
+// components calling their own API via HTTP has too many failure modes:
+//   - URL resolution (VERCEL_URL vs production domain mismatch)
+//   - Deployment protection / preview auth
+//   - ISR cache state (build-time fetch failed → cached null → never recovered)
+//   - Build vs runtime timing
 //
-// Build-time behavior: at Vercel build time, the API endpoint isn't reachable yet
-// (deployment isn't live). The try/catch fallback renders with empty data, and the
-// component returns null when there are no reviews. After deployment, the first
-// page request triggers revalidation in the background, and subsequent requests
-// show real data.
+// The new pattern is bulletproof. No network call. No env var dependency. No
+// caching ambiguity. Data flows in-process from Sheets → render.
+//
+// Caching: the underlying lib/reviews → lib/sheets path is invoked on every
+// render. To avoid hammering Sheets, we wrap the data access in `unstable_cache`
+// with a 5-minute TTL (same effective behavior as the prior `revalidate: 300`).
+
+import { unstable_cache } from 'next/cache';
+import { getPublicReviewsWithStats } from '../../lib/reviews';
 
 const NAVY = '#0C4A6E';
 const ORANGE = '#EA580C';
@@ -24,35 +32,33 @@ const TEXT = '#0F172A';
 const MUTED = '#64748B';
 const BORDER = '#E2E8F0';
 
-function getBaseUrl() {
-  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return 'http://localhost:3000';
-}
-
-async function fetchPublicReviews() {
-  try {
-    const res = await fetch(`${getBaseUrl()}/api/public-reviews`, {
-      next: { revalidate: 300 },
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    console.error('[TestimonialsSection] Failed to fetch reviews:', err.message);
-    return null;
-  }
-}
+// Cache reviews data for 5 minutes. Sheets only gets hit once per 5 min
+// regardless of how many page renders happen.
+const getCachedReviews = unstable_cache(
+  async () => getPublicReviewsWithStats(),
+  ['public-reviews-v1'],
+  { revalidate: 300, tags: ['reviews'] }
+);
 
 export default async function TestimonialsSection() {
-  const data = await fetchPublicReviews();
+  let data;
+  try {
+    data = await getCachedReviews();
+  } catch (err) {
+    console.error('[TestimonialsSection] Failed to load reviews:', err.message);
+    return null;
+  }
+
   if (!data || !data.reviews || data.reviews.length === 0) {
-    // No reviews yet, or fetch failed (e.g. at build time) — render nothing
+    // No reviews yet — render nothing on the home page (the dedicated
+    // /reviews page handles the empty state with a CTA).
     return null;
   }
 
   const { reviews: allReviews, count, aggregateRating } = data;
 
-  // Featured = most recent 5-star reviews, max 4
+  // Featured = most recent 5-star reviews, max 4. Fall back to whatever
+  // is available if we don't have at least 2 five-star reviews yet.
   const featured = allReviews.filter(r => r.rating === 5).slice(0, 4);
   const display = featured.length >= 2 ? featured : allReviews.slice(0, 4);
 
@@ -158,7 +164,7 @@ export default async function TestimonialsSection() {
               textDecoration: 'none',
             }}
           >
-            See all {count} reviews →
+            See all {count} review{count === 1 ? '' : 's'} →
           </a>
         </div>
       </div>
