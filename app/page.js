@@ -1,4 +1,4 @@
-'use client';
+
 // app/page.js
 // Version: 2026-06-09 — Actually remove 'use client' (was left over from prior edit)
 // Last edited: June 9 2026
