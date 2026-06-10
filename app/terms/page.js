@@ -1,156 +1,327 @@
-'use client'
+// app/terms/page.js
+// Version: 2026-06-09 Phase 4 v2 — SMS section matched to Twilio A2P 10DLC approval
+// Last edited: June 9 2026
+//
+// This page governs use of the website (fullthrottleutah.com). Distinct from:
+//   - Rental Agreement (signed at booking) — governs the rental transaction itself
+//   - Liability Waiver (signed at booking) — assumption of risk / release
+//   - Privacy Policy — data collection and SMS practices
+//
+// v2 update: Section 3 (SMS) now matches the exact language submitted to and
+// approved by The Campaign Registry (TCR) via Twilio. Campaign SID:
+// CMdf1d3daf96402c9d42d8a1c4bb7373f0. Categories, opt-in mechanism, and STOP
+// keyword all preserved verbatim from the Twilio campaign description.
 
-export default function Terms() {
+export const metadata = {
+  title: 'Terms of Use — Full Throttle Utah',
+  description: 'Terms of use governing the Full Throttle Utah website (fullthrottleutah.com).',
+};
+
+export default function TermsOfUse() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #F0F9FF 0%, #fff 100%)',
-      fontFamily: "'Outfit', sans-serif",
-      padding: '40px 24px',
+      background: '#0B1120',
+      fontFamily: "'Outfit', system-ui, sans-serif",
+      color: '#0F172A',
     }}>
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
-        <a href="/" style={{ color: '#0C4A6E', fontSize: 13, textDecoration: 'none', fontWeight: 600 }}>
-          ← Back to Full Throttle Utah
-        </a>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
+        rel="stylesheet"
+      />
 
-        <h1 style={{
-          fontFamily: "'Playfair Display', serif",
-          fontSize: 36, fontWeight: 700, marginTop: 24, marginBottom: 8,
-          color: '#0F172A', letterSpacing: '-0.03em',
-        }}>
-          Terms and Conditions
-        </h1>
-        <p style={{ fontSize: 13, color: '#94A3B8', marginBottom: 32 }}>
-          Last updated: May 25, 2026
-        </p>
+      {/* Header */}
+      <div style={{
+        background: '#0B1120',
+        color: '#fff',
+        padding: '32px 24px 24px',
+        textAlign: 'center',
+      }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <a href="/" style={{
+            color: '#FB923C',
+            fontSize: 13,
+            textDecoration: 'none',
+            fontWeight: 600,
+            display: 'inline-block',
+            marginBottom: 16,
+          }}>
+            ← Back to fullthrottleutah.com
+          </a>
+          <h1 style={{
+            fontFamily: "'Playfair Display', Georgia, serif",
+            fontSize: 32,
+            fontWeight: 700,
+            color: '#fff',
+            margin: '0 0 8px',
+            letterSpacing: '-0.01em',
+          }}>
+            Terms of Use
+          </h1>
+          <p style={{ color: '#94A3B8', fontSize: 14, margin: 0 }}>
+            Effective for website use · Last updated June 2026
+          </p>
+        </div>
+      </div>
 
+      {/* Important relationship card */}
+      <div style={{
+        maxWidth: 720,
+        margin: '16px auto 0',
+        padding: '0 20px',
+      }}>
         <div style={{
-          background: '#fff', borderRadius: 16, padding: 32,
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-          fontSize: 14, color: '#334155', lineHeight: 1.7,
+          background: '#0F172A',
+          borderRadius: 14,
+          padding: 20,
+          marginBottom: 16,
+          color: '#fff',
         }}>
-          <Section title="1. Agreement to Terms">
-            These Terms and Conditions govern your use of www.fullthrottleutah.com and your rental of personal watercraft and equipment from TW Assets LLC d/b/a Full Throttle Utah (&quot;Full Throttle Utah,&quot; &quot;we,&quot; or &quot;us&quot;). By booking a rental, you agree to be bound by these Terms, our Privacy Policy, and the Liability Waiver signed at the time of booking.
-          </Section>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#FB923C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+            Important
+          </div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: '#E2E8F0', margin: '0 0 10px' }}>
+            These Terms of Use govern your use of <strong>fullthrottleutah.com</strong>. They do <em>not</em> govern the terms of an actual rental.
+          </p>
+          <p style={{ fontSize: 13, color: '#CBD5E1', margin: 0 }}>
+            When you book a rental, you separately sign two additional documents — the <strong style={{ color: '#fff' }}>Liability Waiver</strong> and the <strong style={{ color: '#fff' }}>Rental Agreement</strong> — which govern the rental transaction itself.
+          </p>
+        </div>
+      </div>
 
-          <Section title="2. Eligibility">
-            <ul>
-              <li>Renter must be at least 18 years old to book and pay for a rental.</li>
-              <li>Renter must possess a valid driver&apos;s license at pickup.</li>
-              <li>Operator(s) must be at least 16 years old as required by Utah Code § 73-18-15.1.</li>
-              <li>Operators born after December 31, 1985 must have completed a Utah-approved boating safety course.</li>
-            </ul>
-          </Section>
+      {/* Body */}
+      <div style={{
+        maxWidth: 720,
+        margin: '0 auto',
+        padding: '0 20px 60px',
+      }}>
 
-          <Section title="3. Rental Process">
-            <ul>
-              <li><strong>Booking:</strong> Full payment of the rental fee is collected at the time of online booking via Stripe.</li>
-              <li><strong>Pickup:</strong> Rentals are picked up at our Farmington, UT location at 8:00 AM on the rental date unless other arrangements are made.</li>
-              <li><strong>Security deposit:</strong> A $1,000 refundable security deposit per package is due at pickup via card hold or cash.</li>
-              <li><strong>Return:</strong> Equipment must be returned by 8:00 PM on the final rental date, fully refueled, with all included accessories.</li>
-              <li><strong>Towing:</strong> Renter is responsible for transporting the equipment with a vehicle equipped with a 2&quot; ball hitch and flat 4-prong light hookup.</li>
-            </ul>
-          </Section>
+        {/* Section 1 */}
+        <Card>
+          <SectionHeading>1. Acceptance of Terms</SectionHeading>
+          <p style={paraStyle}>
+            By accessing or using fullthrottleutah.com (the "Site"), you agree to be bound by these Terms of Use. If you do not agree, do not use the Site.
+          </p>
+          <p style={paraStyle}>
+            We may update these Terms from time to time. Continued use of the Site after changes means you accept the updated Terms.
+          </p>
+        </Card>
 
-          <Section title="4. Security Deposit & Damage">
-            <ul>
-              <li>The $1,000 security deposit is refundable within 2 business days after return, subject to inspection.</li>
-              <li>Any damage, missing equipment, late return fees, or fuel charges will be deducted from the deposit.</li>
-              <li>Damage exceeding the deposit amount is the renter&apos;s responsibility, payable within 14 days of notification.</li>
-              <li>Renter is responsible for all damage occurring while the equipment is in their care, custody, or control, including during transport.</li>
-            </ul>
-          </Section>
+        {/* Section 2 */}
+        <Card>
+          <SectionHeading>2. Bookings and the Rental Agreement</SectionHeading>
+          <p style={paraStyle}>
+            When you complete a booking on this Site, you separately sign two documents in addition to these Terms:
+          </p>
+          <ul style={listStyle}>
+            <li><strong>Liability Waiver</strong> — covers assumption of risk and release of claims for personal injury</li>
+            <li><strong>Rental Agreement</strong> — covers the rental transaction (payment, deposit, damage, fuel, late return, cancellation, equipment use)</li>
+          </ul>
+          <p style={paraStyle}>
+            The Rental Agreement is the controlling document for your rental. If anything on this Site conflicts with the signed Rental Agreement, the Rental Agreement governs.
+          </p>
+          <p style={paraStyle}>
+            You can review your signed Rental Agreement at any time at <code style={codeStyle}>fullthrottleutah.com/agreement/[your-booking-id]</code> (the booking ID is included in your confirmation email).
+          </p>
+        </Card>
 
-          <Section title="5. Cancellation & Weather Policy">
-            <p><strong>General Cancellations (non-weather):</strong></p>
-            <ul>
-              <li><strong>48+ hours before reservation:</strong> Full refund to original payment method.</li>
-              <li><strong>24–48 hours before reservation:</strong> 50% refund, or full credit toward a future booking within the current season.</li>
-              <li><strong>Less than 24 hours / No-show:</strong> No refund.</li>
-            </ul>
-            <p><strong>Weather Cancellations:</strong></p>
-            <ul>
-              <li>If Full Throttle Utah determines that conditions are unsafe (thunderstorms/lightning, sustained high winds, heavy rain affecting visibility, or reservoir closures/advisories), we will contact you and offer a free reschedule to another available date or a full credit valid through the end of the current season.</li>
-              <li>Light rain, overcast skies, or brief passing showers do not qualify for weather cancellation.</li>
-              <li>We do not cancel based on weather forecasts alone. Weather decisions are made the morning of your reservation based on actual conditions.</li>
-            </ul>
-            <p><strong>Mid-Rental Weather Interruptions:</strong></p>
-            <ul>
-              <li>If severe weather develops during your rental and Full Throttle Utah determines it is unsafe to continue, your rental time will be paused.</li>
-              <li>Once conditions improve, your remaining time restarts.</li>
-              <li>If conditions do not improve, a prorated credit will be issued for unused rental time.</li>
-            </ul>
-            <p>For full details, see our <a href="/cancellation-policy" style={{ color: '#0C4A6E', textDecoration: 'none', fontWeight: 600 }}>Cancellation & Weather Policy</a> page.</p>
-          </Section>
+        {/* Section 3: SMS */}
+        <Card>
+          <SectionHeading>3. SMS Communications</SectionHeading>
+          <p style={paraStyle}>
+            When you book a rental on this Site, you may opt in to receive transactional SMS notifications from Full Throttle Utah (TW Assets LLC) at the phone number you provide. Customers explicitly opt in to receive SMS during the booking process at fullthrottleutah.com.
+          </p>
+          <p style={paraStyle}>
+            <strong>Message types include:</strong>
+          </p>
+          <ul style={listStyle}>
+            <li><strong>Booking confirmations</strong> — sent immediately after a booking is completed</li>
+            <li><strong>Pickup and return reminders</strong> — typically the day before pickup and the day of return</li>
+            <li><strong>Post-rental follow-ups</strong> — deposit refund confirmations and review requests</li>
+            <li><strong>Reservation updates</strong> — if changes to your booking become necessary</li>
+          </ul>
+          <p style={paraStyle}>
+            <strong>Frequency:</strong> Message frequency varies by booking but is typically 3-5 messages per rental.
+          </p>
+          <p style={paraStyle}>
+            <strong>Charges:</strong> Message and data rates may apply per your mobile carrier's plan. Carriers are not liable for delayed or undelivered messages.
+          </p>
+          <p style={paraStyle}>
+            <strong>Opt-out:</strong> Reply <strong>STOP</strong> to any message at any time to immediately stop receiving SMS from us. Reply <strong>HELP</strong> for assistance.
+          </p>
+          <p style={paraStyle}>
+            <strong>Consent is not required to book a rental.</strong> SMS opt-in is optional. If you do not opt in, you will receive booking confirmations and reminders via email only.
+          </p>
+        </Card>
 
-          <Section title="6. Liability Waiver">
-            All operators and passengers must sign a digital liability waiver before the rental begins. The waiver acknowledges the inherent risks of personal watercraft operation, releases Full Throttle Utah from liability for ordinary negligence, and requires renters to indemnify Full Throttle Utah against third-party claims. Utah law does not enforce parental waivers for minors (per Hawkins v. Peart); however, minors are still subject to age and certification requirements under state law.
-          </Section>
+        {/* Section 4: Acceptable Use */}
+        <Card>
+          <SectionHeading>4. Acceptable Use</SectionHeading>
+          <p style={paraStyle}>
+            You agree not to:
+          </p>
+          <ul style={listStyle}>
+            <li>Use the Site to make fraudulent bookings or submit false information</li>
+            <li>Attempt to access non-public areas of the Site or interfere with its operation</li>
+            <li>Use automated systems (bots, scrapers) to access the Site without our written permission</li>
+            <li>Use the Site in violation of any applicable law</li>
+          </ul>
+        </Card>
 
-          <Section title="7. Insurance">
-            <ul>
-              <li>Full Throttle Utah maintains commercial liability and physical damage insurance on its fleet.</li>
-              <li>Renter&apos;s personal auto/boat insurance may or may not extend to rented watercraft — renter is responsible for verifying coverage with their carrier.</li>
-              <li>Renter is responsible for damages or claims not covered by Full Throttle Utah&apos;s insurance.</li>
-            </ul>
-          </Section>
+        {/* Section 5: Intellectual Property */}
+        <Card>
+          <SectionHeading>5. Intellectual Property</SectionHeading>
+          <p style={paraStyle}>
+            All content on this Site — including the Full Throttle Utah name, logo, photographs, text, and design — is owned by TW Assets LLC or its licensors. You may not reproduce, distribute, or use any of it commercially without our written permission.
+          </p>
+          <p style={paraStyle}>
+            You may take screenshots for personal use (e.g., to share a booking confirmation with your group).
+          </p>
+        </Card>
 
-          <Section title="8. Prohibited Use">
-            <p>Renter shall not, and shall not permit any operator to:</p>
-            <ul>
-              <li>Operate the equipment under the influence of alcohol, drugs, or any impairing substance.</li>
-              <li>Use the equipment for commercial purposes, competitions, or sub-rental.</li>
-              <li>Operate in restricted, marked, or unsafe areas.</li>
-              <li>Operate without a USCG-approved personal flotation device worn by every rider.</li>
-              <li>Modify, repair, or attempt to modify the equipment.</li>
-              <li>Tow individuals or objects beyond manufacturer specifications.</li>
-            </ul>
-            <p>Violation of these terms may result in immediate termination of the rental, forfeiture of deposit, and liability for all resulting damages.</p>
-          </Section>
+        {/* Section 6: Disclaimer */}
+        <Card>
+          <SectionHeading>6. Disclaimer of Warranties</SectionHeading>
+          <p style={paraStyle}>
+            The Site is provided "as is" without warranties of any kind, either express or implied. We do not warrant that the Site will be uninterrupted, error-free, or free of viruses or other harmful components.
+          </p>
+          <p style={paraStyle}>
+            Pricing, availability, and equipment information displayed on the Site is for reference and may change. Your booking is confirmed only after payment is received and you receive a confirmation email.
+          </p>
+        </Card>
 
-          <Section title="9. SMS Communications">
-            By providing your phone number, you consent to receive transactional SMS messages from Full Throttle Utah regarding your reservation, including booking confirmations, reminders, and return notifications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out, HELP for help. See our Privacy Policy for details.
-          </Section>
+        {/* Section 7: Limitation */}
+        <Card>
+          <SectionHeading>7. Limitation of Liability (Website)</SectionHeading>
+          <p style={paraStyle}>
+            To the maximum extent permitted by Utah law, TW Assets LLC is not liable for any indirect, incidental, consequential, or punitive damages arising from your use of <em>the Site</em>.
+          </p>
+          <p style={paraStyle}>
+            For liability related to rentals themselves — including injury, equipment damage, and other rental-related claims — see the Liability Waiver and Rental Agreement.
+          </p>
+        </Card>
 
-          <Section title="10. Governing Law & Disputes">
-            These Terms are governed by the laws of the State of Utah, without regard to conflict of law principles. Any dispute arising from or relating to this rental shall be brought exclusively in the state or federal courts located in Davis County, Utah. The prevailing party in any litigation shall be entitled to recover reasonable attorney&apos;s fees and costs.
-          </Section>
+        {/* Section 8: Privacy */}
+        <Card>
+          <SectionHeading>8. Privacy</SectionHeading>
+          <p style={paraStyle}>
+            Our practices for collecting, using, and protecting your personal information are described in our <a href="/privacy-policy" style={{ color: '#0C4A6E', fontWeight: 600 }}>Privacy Policy</a>, which is incorporated into these Terms by reference.
+          </p>
+        </Card>
 
-          <Section title="11. Severability">
-            If any provision of these Terms is found unenforceable, the remaining provisions shall remain in full force and effect.
-          </Section>
+        {/* Section 9: Governing Law */}
+        <Card>
+          <SectionHeading>9. Governing Law and Venue</SectionHeading>
+          <p style={paraStyle}>
+            These Terms are governed by the laws of the State of Utah without regard to its conflicts of law principles. Any dispute arising from these Terms shall be resolved in the state or federal courts located in <strong>Davis County, Utah</strong>, and you consent to the personal jurisdiction of those courts.
+          </p>
+        </Card>
 
-          <Section title="12. Entire Agreement">
-            These Terms, the Privacy Policy, and the Liability Waiver signed at booking constitute the entire agreement between renter and Full Throttle Utah and supersede any prior agreements or representations.
-          </Section>
+        {/* Section 10: Severability */}
+        <Card>
+          <SectionHeading>10. Severability</SectionHeading>
+          <p style={paraStyle}>
+            If any provision of these Terms is found unenforceable, the remaining provisions remain in full force and effect.
+          </p>
+        </Card>
 
-          <Section title="13. Changes to Terms">
-            We may update these Terms from time to time. The &quot;Last updated&quot; date at the top reflects the most recent revision. Continued use of our services constitutes acceptance of any updated Terms.
-          </Section>
+        {/* Section 11: Contact */}
+        <Card>
+          <SectionHeading>11. Contact</SectionHeading>
+          <p style={paraStyle}>
+            Questions about these Terms?
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+            <a href="tel:+18015481273" style={contactBtnStyle('#EA580C')}>
+              📞 (801) 548-1273
+            </a>
+            <a href="mailto:bookings@fullthrottleutah.com" style={contactBtnStyle('#0C4A6E')}>
+              ✉️ bookings@fullthrottleutah.com
+            </a>
+          </div>
+        </Card>
 
-          <Section title="Contact">
-            <strong>Full Throttle Utah</strong> (TW Assets LLC d/b/a Full Throttle Utah)<br/>
-            Farmington, UT<br/>
-            Phone: (714) 856-5676<br/>
-            Website: www.fullthrottleutah.com
-          </Section>
+        {/* Footer */}
+        <div style={{
+          textAlign: 'center',
+          padding: '20px 0',
+          fontSize: 12,
+          color: '#94A3B8',
+        }}>
+          Full Throttle Utah · TW Assets LLC · Farmington, UT
         </div>
       </div>
     </div>
   );
 }
 
-function Section({ title, children }) {
+// ─── Shared styles ────────────────────────────────────────────────
+
+const paraStyle = {
+  fontSize: 14,
+  lineHeight: 1.6,
+  color: '#475569',
+  margin: '0 0 12px',
+};
+
+const listStyle = {
+  fontSize: 14,
+  lineHeight: 1.7,
+  color: '#475569',
+  paddingLeft: 22,
+  margin: '0 0 12px',
+};
+
+const codeStyle = {
+  background: '#F1F5F9',
+  padding: '2px 6px',
+  borderRadius: 4,
+  fontSize: 12,
+  fontFamily: 'monospace',
+  color: '#0F172A',
+};
+
+function Card({ children }) {
   return (
-    <div style={{ marginBottom: 28 }}>
-      <h2 style={{
-        fontFamily: "'Outfit', sans-serif",
-        fontSize: 17, fontWeight: 700,
-        color: '#0F172A', marginTop: 0, marginBottom: 12,
-      }}>{title}</h2>
-      <div>{children}</div>
+    <div style={{
+      background: '#fff',
+      borderRadius: 14,
+      padding: 24,
+      marginBottom: 16,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    }}>
+      {children}
     </div>
   );
+}
+
+function SectionHeading({ children }) {
+  return (
+    <h2 style={{
+      fontSize: 13,
+      fontWeight: 800,
+      color: '#0C4A6E',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      marginTop: 0,
+      marginBottom: 12,
+      paddingBottom: 6,
+      borderBottom: '1px solid #F1F5F9',
+    }}>
+      {children}
+    </h2>
+  );
+}
+
+function contactBtnStyle(color) {
+  return {
+    background: color,
+    color: '#fff',
+    padding: '10px 16px',
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 600,
+    textDecoration: 'none',
+    display: 'inline-block',
+  };
 }
