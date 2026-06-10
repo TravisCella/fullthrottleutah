@@ -1,13 +1,16 @@
 // app/api/checkout/route.js
-// Version: 2026-06-06 Phase 2 — Rental Agreement metadata capture
-// Last edited: June 6 2026
-// Feature: Receives the new rental agreement fields from booking.js
-//          (agreementSigned, agreementVersion, agreementSignedAt,
-//          agreementChecksJson) and writes them to the PaymentIntent metadata
-//          so the webhook can surface them in the Sheet (columns V + W) and
-//          customer email. Builds on the existing waiver metadata capture.
+// Version: 2026-06-06 Phase 3 — Dedupe metadata keys (under Stripe's 50-key cap)
+// Last edited: June 9 2026
+// Fix: A live booking failed with "Metadata can have up to 50 keys, but you've
+//      set 52" from Stripe. Cause: each new feature (white-glove, vest sizes,
+//      pickup times, spare fees, rental agreement) added BOTH camelCase and
+//      snake_case versions of its fields "for webhook compatibility" — 18
+//      duplicate pairs total, pushing us over the 50-key cap.
+//      Fix: drop all snake_case duplicates. Webhook reads camelCase first
+//      with snake_case as fallback, so existing bookings are unaffected.
+//      Brings active key count from 52 → 34.
 //
-// Builds on: 2026-06-06 vest validation
+// Builds on: 2026-06-06 Phase 2 agreement metadata
 
 import Stripe from 'stripe';
 
@@ -150,53 +153,37 @@ export async function POST(request) {
           endDate,
           days: days?.toString() || '1',
           // Pricing detail flags
+          // 2026-06-06 Phase 3 fix: removed snake_case duplicates to stay
+          // under Stripe's 50-key metadata cap. Webhook reads camelCase first
+          // with snake_case fallback, so existing bookings continue working.
           whiteGlove: whiteGlove ? 'true' : 'false',
-          white_glove: whiteGlove ? 'true' : 'false',
           whiteGloveFee: whiteGloveFee?.toString() || '0',
-          white_glove_fee: (whiteGloveFee || 0).toString(),
           holidaySurcharge: holidaySurcharge?.toString() || '0',
-          holiday_surcharge: (holidaySurcharge || 0).toString(),
           deconFee: deconFee?.toString() || '0',
-          decon_fee: (deconFee || 0).toString(),
           isLakePowell: isLakePowell ? 'true' : 'false',
-          is_lake_powell: isLakePowell ? 'true' : 'false',
           loyaltyDiscount: loyaltyDiscount?.toString() || '0',
-          loyalty_discount: (loyaltyDiscount || 0).toString(),
-          // Life vest selection (NEW)
+          // Life vest selection
           vestSizes: vestSizes || '',
-          vest_sizes: vestSizes || '',
           vestSummary: vestSummary || '',
-          vest_summary: vestSummary || '',
           vestUsedDefault: vestUsedDefault ? 'true' : 'false',
-          vest_used_default: vestUsedDefault ? 'true' : 'false',
-          // Spare vest fee (2026-06-06) — using server-computed values, not client
+          // Spare vest fee — server-computed values, not client
           spareVestCount: serverSpareCount.toString(),
-          spare_vest_count: serverSpareCount.toString(),
           extraVestFee: serverExtraFee.toString(),
-          extra_vest_fee: serverExtraFee.toString(),
-          // Pickup & return times (2026-06-02 PM)
+          // Pickup & return times
           pickupTime: pickupTime || '08:00',
-          pickup_time: pickupTime || '08:00',
           returnTime: returnTime || '20:00',
-          return_time: returnTime || '20:00',
           pickupTimeDisplay: pickupTimeDisplay || '8:00 AM',
-          pickup_time_display: pickupTimeDisplay || '8:00 AM',
           returnTimeDisplay: returnTimeDisplay || '8:00 PM',
-          return_time_display: returnTimeDisplay || '8:00 PM',
           // SMS consent (TCPA tracking)
           smsOptIn: smsOptIn ? 'true' : 'false',
           smsOptInDate: smsOptIn ? new Date().toISOString() : '',
           // Waiver tracking
           waiverSigned: waiverSigned || 'false',
           waiverDate: waiverDate || '',
-          // ── Rental Agreement tracking (Phase 2) ──
-          // Both camelCase + snake_case for webhook compatibility
+          // Rental Agreement tracking (Phase 2)
           agreementSigned: agreementSigned || 'false',
-          agreement_signed: agreementSigned || 'false',
           agreementVersion: agreementVersion || '',
-          agreement_version: agreementVersion || '',
           agreementSignedAt: agreementSignedAt || '',
-          agreement_signed_at: agreementSignedAt || '',
           // Note: agreementChecksJson can be 200+ chars; trim to Stripe's 500-char metadata limit
           agreementChecksJson: (agreementChecksJson || '').slice(0, 490),
           // Status flags for admin dashboard
