@@ -1,3 +1,4 @@
+'use client';
 // app/booking.js
 // Version: 2026-06-06 Phase 2 — Rental Agreement step added (Step 5)
 // Last edited: June 6 2026
