@@ -163,8 +163,26 @@ async function sendReminderEmail(booking) {
   return { ok: true };
 }
 
+// ─── Owner summary SMS ───────────────────────────────────────────────────────
+function buildOwnerSummary(bookings, targetDate) {
+  const header = `📅 FTU pickups tomorrow ${targetDate} (${bookings.length}):`;
+  const lines = bookings.map((b, i) => {
+    const time = b.pickup_time_display || '8:00 AM';
+    const wg = b.white_glove ? ' 🚚' : '';
+    return `${i + 1}. ${b.renter_name} — ${b.package} · ${b.location} @ ${time}${wg}`;
+  });
+  return [header, ...lines].join('\n');
+}
+
 // ─── Cron handler ────────────────────────────────────────────────────────────
 export async function GET(request) {
+  // Refuse to run if CRON_SECRET is not configured — an empty string would make
+  // the expected header "Bearer " which a blank token satisfies.
+  if (!process.env.CRON_SECRET) {
+    console.error('[pickup-reminder] CRON_SECRET is not set — refusing to run');
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
+  }
+
   // Verify this is called by Vercel cron (not a random public request)
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -172,17 +190,22 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const dateParam = searchParams.get('date');
+  const dateOverride = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null;
+
   let processed = 0;
   let smsSent = 0;
   let emailsSent = 0;
+  let ownerSmsSent = 0;
   let errors = 0;
 
   try {
-    const bookings = await getTomorrowsBookings();
+    const bookings = await getTomorrowsBookings(dateOverride);
 
     if (bookings.length === 0) {
       console.log('[pickup-reminder] No bookings tomorrow, nothing to do');
-      return NextResponse.json({ ok: true, processed: 0 });
+      return NextResponse.json({ ok: true, processed: 0, smsSent: 0, emailsSent: 0, ownerSmsSent: 0 });
     }
 
     for (const booking of bookings) {
@@ -207,8 +230,22 @@ export async function GET(request) {
       }
     }
 
-    console.log(`[pickup-reminder] Done — ${smsSent} SMS, ${emailsSent} emails, ${errors} errors`);
-    return NextResponse.json({ ok: true, processed, smsSent, emailsSent, errors });
+    const ownerPhones = process.env.OWNER_PHONE_NUMBER;
+    if (ownerPhones) {
+      try {
+        const targetDate = dateOverride || bookings[0]?.start_date || '';
+        const ownerMsg = buildOwnerSummary(bookings, targetDate);
+        await sendSMS(ownerPhones, ownerMsg);
+        console.log('[pickup-reminder] Owner summary SMS sent');
+        ownerSmsSent = 1;
+      } catch (err) {
+        console.error('[pickup-reminder] Owner summary SMS failed:', err.message);
+        errors++;
+      }
+    }
+
+    console.log(`[pickup-reminder] Done — ${smsSent} SMS, ${emailsSent} emails, ${ownerSmsSent} owner SMS, ${errors} errors`);
+    return NextResponse.json({ ok: true, processed, smsSent, emailsSent, ownerSmsSent, errors });
 
   } catch (err) {
     console.error('[pickup-reminder] Fatal error:', err.message);

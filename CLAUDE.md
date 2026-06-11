@@ -71,7 +71,7 @@ Pricing is computed inline: `calculatePrice()` for multi-day tiers, `getHolidayS
 
 ### Cron / reminders
 
-`/api/cron/pickup-reminder` fires SMS/email reminders for tomorrow's bookings. Reads from Sheet, triggered by Vercel Cron.
+`/api/cron/pickup-reminder` — fires daily at 14:00 UTC (8 AM MDT) via Vercel Cron. Reads Sheet1 for tomorrow's non-cancelled bookings (America/Denver timezone, DST-aware). Sends each opted-in renter an SMS reminder; sends renters without SMS opt-in a Resend email. After processing renters, sends ONE owner summary SMS to all `OWNER_PHONE_NUMBER` phones listing every pickup with name, package, lake, time, and white-glove flag. Sends nothing if no pickups tomorrow. Accepts `?date=YYYY-MM-DD` query param to override "tomorrow" for testing. Auth: `Authorization: Bearer CRON_SECRET`.
 
 ### Environment variables required
 
