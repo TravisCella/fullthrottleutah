@@ -1,20 +1,18 @@
 // app/agreement/[bookingId]/sign/SignAgreementClient.jsx
-// Version: 2026-06-10 — Interactive signing client
-// Created: June 10 2026
+// Version: 2026-06-10 v2 — Fixed to match actual agreement-text.js shapes
+// Last edited: June 10 2026
 //
-// This is the interactive UI for retroactive agreement signing. Mirrors the
-// gating + signature canvas pattern from Step 5 of the booking flow, but as
-// a standalone page rather than a wizard step.
+// v2 fix: My v1 assumed AGREEMENT_PREAMBLE was a string, AGREEMENT_SECTIONS
+// had {id, title, body} shape, AGREEMENT_CHECKBOXES had {id, label, body},
+// and AGREEMENT_APPENDIX was a string. None of those were correct — caused
+// React error #31 (object with keys {title, about}) when AGREEMENT_PREAMBLE
+// (which is actually { title, about: [...] }) was rendered as a JSX child.
 //
-// GATING (each step unlocks the next):
-//   1. User must scroll past the end of the agreement text
-//   2. Then 5 acknowledgment checkboxes activate
-//   3. Once all 5 are checked, signature canvas activates
-//   4. Once signature has ink, Submit button activates
-//
-// On submit, POSTs to /api/sign-agreement-retroactive which:
-//   - Writes signature PNG to Firebase
-//   - Updates Sheet columns V (agreement version) + W (signed = "YES")
+// Now matches the real shapes from lib/agreement-text.js:
+//   - AGREEMENT_PREAMBLE = { title, about: [strings] }
+//   - AGREEMENT_SECTIONS = [{ number, title, intro, clauses: [{ id, text, bullets, footer }] }]
+//   - AGREEMENT_CHECKBOXES = [{ id, label }] (no body)
+//   - AGREEMENT_APPENDIX = { title, intro, references: [strings], conflict }
 
 'use client';
 
@@ -169,7 +167,7 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
         border: '1px solid #E2E8F0',
         borderRadius: 12,
         padding: 20,
-        maxHeight: 360,
+        maxHeight: 420,
         overflowY: 'auto',
         marginBottom: 16,
         fontSize: 13,
@@ -187,30 +185,145 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
           Rental Agreement {agreementVersion}
         </div>
 
+        {/* PREAMBLE */}
         {AGREEMENT_PREAMBLE && (
-          <p style={{ marginTop: 0, marginBottom: 16, fontWeight: 500, color: SLATE_DARK }}>
-            {AGREEMENT_PREAMBLE}
-          </p>
+          <div style={{ marginBottom: 22 }}>
+            {AGREEMENT_PREAMBLE.title && (
+              <h2 style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: SLATE_DARK,
+                margin: '0 0 10px',
+                letterSpacing: '0.01em',
+              }}>
+                {AGREEMENT_PREAMBLE.title}
+              </h2>
+            )}
+            {Array.isArray(AGREEMENT_PREAMBLE.about) &&
+              AGREEMENT_PREAMBLE.about.map((paragraph, i) => (
+                <p key={i} style={{
+                  fontSize: 13,
+                  color: SLATE,
+                  lineHeight: 1.6,
+                  margin: '0 0 10px',
+                }}>
+                  {paragraph}
+                </p>
+              ))}
+          </div>
         )}
 
+        {/* SECTIONS */}
         {AGREEMENT_SECTIONS.map((section) => (
-          <div key={section.id} style={{ marginBottom: 16 }}>
+          <div key={section.number} style={{ marginBottom: 18 }}>
             <h3 style={{
               fontSize: 13,
               fontWeight: 700,
               color: SLATE_DARK,
               margin: '0 0 6px',
             }}>
-              {section.title}
+              {section.number}. {section.title}
             </h3>
-            <div style={{ whiteSpace: 'pre-wrap' }}>{section.body}</div>
+            {section.intro && (
+              <p style={{
+                fontSize: 13,
+                color: SLATE,
+                lineHeight: 1.6,
+                margin: '4px 0 8px',
+              }}>
+                {section.intro}
+              </p>
+            )}
+            {Array.isArray(section.clauses) && section.clauses.map((clause) => (
+              <div key={clause.id} style={{ marginBottom: 8 }}>
+                <p style={{
+                  fontSize: 13,
+                  color: SLATE,
+                  lineHeight: 1.6,
+                  margin: '0 0 4px',
+                }}>
+                  <strong style={{ color: SLATE_DARK, fontWeight: 600 }}>{clause.id}</strong> {clause.text}
+                </p>
+                {Array.isArray(clause.bullets) && clause.bullets.length > 0 && (
+                  <ul style={{
+                    margin: '4px 0 4px 20px',
+                    padding: 0,
+                    fontSize: 13,
+                    color: SLATE,
+                    lineHeight: 1.55,
+                  }}>
+                    {clause.bullets.map((b, i) => (
+                      <li key={i} style={{ marginBottom: 3 }}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+                {clause.footer && (
+                  <p style={{
+                    fontSize: 12,
+                    color: SLATE_LIGHT,
+                    fontStyle: 'italic',
+                    margin: '4px 0 0',
+                  }}>
+                    {clause.footer}
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         ))}
 
+        {/* APPENDIX */}
         {AGREEMENT_APPENDIX && (
-          <p style={{ marginTop: 16, fontSize: 12, fontStyle: 'italic', color: SLATE_LIGHT }}>
-            {AGREEMENT_APPENDIX}
-          </p>
+          <div style={{
+            marginTop: 18,
+            paddingTop: 14,
+            borderTop: '1px solid #E2E8F0',
+          }}>
+            {AGREEMENT_APPENDIX.title && (
+              <h3 style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: SLATE_DARK,
+                margin: '0 0 6px',
+              }}>
+                {AGREEMENT_APPENDIX.title}
+              </h3>
+            )}
+            {AGREEMENT_APPENDIX.intro && (
+              <p style={{
+                fontSize: 13,
+                color: SLATE,
+                lineHeight: 1.6,
+                margin: '0 0 8px',
+              }}>
+                {AGREEMENT_APPENDIX.intro}
+              </p>
+            )}
+            {Array.isArray(AGREEMENT_APPENDIX.references) &&
+              AGREEMENT_APPENDIX.references.length > 0 && (
+                <ul style={{
+                  margin: '4px 0 8px 20px',
+                  padding: 0,
+                  fontSize: 13,
+                  color: SLATE,
+                  lineHeight: 1.55,
+                }}>
+                  {AGREEMENT_APPENDIX.references.map((ref, i) => (
+                    <li key={i} style={{ marginBottom: 3 }}>{ref}</li>
+                  ))}
+                </ul>
+              )}
+            {AGREEMENT_APPENDIX.conflict && (
+              <p style={{
+                fontSize: 12,
+                color: SLATE_LIGHT,
+                fontStyle: 'italic',
+                margin: '8px 0 0',
+              }}>
+                {AGREEMENT_APPENDIX.conflict}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Scroll-completion sentinel */}
@@ -237,7 +350,6 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
             checked={checks[cb.id]}
             onChange={(v) => setChecks((prev) => ({ ...prev, [cb.id]: v }))}
             label={cb.label}
-            body={cb.body}
             disabled={!scrolledToBottom}
           />
         ))}
@@ -378,7 +490,7 @@ function ProgressIndicator({ scrolledToBottom, allChecked, hasSignature }) {
   );
 }
 
-function CheckboxCard({ checked, onChange, label, body, disabled }) {
+function CheckboxCard({ checked, onChange, label, disabled }) {
   return (
     <label
       style={{
@@ -407,15 +519,8 @@ function CheckboxCard({ checked, onChange, label, body, disabled }) {
           accentColor: '#16A34A',
         }}
       />
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: SLATE_DARK, marginBottom: body ? 4 : 0 }}>
-          {label}
-        </div>
-        {body && (
-          <div style={{ fontSize: 12, color: SLATE, lineHeight: 1.5 }}>
-            {body}
-          </div>
-        )}
+      <div style={{ fontSize: 14, fontWeight: 500, color: SLATE_DARK, lineHeight: 1.4 }}>
+        {label}
       </div>
     </label>
   );
