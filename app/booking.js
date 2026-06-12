@@ -515,9 +515,15 @@ export default function JetSkiBooking() {
   }, [step, agreementScrollComplete]);
 
   const handleDate = (d) => {
-    if (dates.length === 0 || dates.length === 2) setDates([d]);
-    else if (d < dates[0]) setDates([d]);
-    else setDates([dates[0], d]);
+    if (dates.length === 0) {
+      setDates([d]);
+    } else if (dates.length === 2 && d > dates[1]) {
+      setDates([dates[0], d]); // extend end — e.g. tap Jul 3, Jul 4, then Jul 5
+    } else if (dates.length === 1 && d >= dates[0]) {
+      setDates([dates[0], d]);
+    } else {
+      setDates([d]); // start fresh (clicked before start or within existing range)
+    }
   };
   const changeMo = (dir) => {
     let m = mo + dir, y = yr;
