@@ -102,7 +102,7 @@ UI validation is secondary — the server is the authoritative enforcement layer
 
 ## Critical pitfalls (each caused a real production incident)
 
-1. **WEBHOOK FILE:** `app/api/webhook/route.js` must contain `stripe.webhooks.constructEvent()`, never `stripe.checkout.sessions.create()`. It was once overwritten with checkout code and 13/17 webhook deliveries failed. Verify the file contents after any change touching it.
+1. **WEBHOOK FILE:** `app/api/webhook/route.js` must contain `stripe.webhooks.constructEvent()`, never `stripe.checkout.sessions.create()`. This has happened twice — both times via a vague "Update route.js" commit that saved checkout code to the wrong path. Each incident broke webhook processing for hours/days. **After any edit near this file, run:** `grep -c 'constructEvent' app/api/webhook/route.js` and confirm the result is ≥ 1 before pushing.
 2. **PACKAGE NAME MATCHING:** block/date matching must work in both directions: `a.includes(b) || b.includes(a)`.
 3. **DATES FROM SHEETS:** always go through `normalizeDate()` — raw values can be `"5/22/2026"` or `"2026-05-22"`.
 4. **FAVICON:** Next.js metadata `icons` is unreliable — keep explicit `<link>` tags in `layout.js` `<head>`.
