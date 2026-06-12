@@ -134,62 +134,67 @@ export async function POST(request) {
       });
     }
 
+    // Shared metadata attached to both the session and the payment intent.
+    // Session-level metadata is readable even for abandoned/expired sessions
+    // where no payment intent was created. Both objects: 34 keys (under the 50-key cap).
+    // 2026-06-06 Phase 3 fix: removed snake_case duplicates to stay under cap.
+    // Webhook reads camelCase first with snake_case fallback for older bookings.
+    const bookingMeta = {
+      // Renter info
+      renterName,
+      renterEmail,
+      renterPhone,
+      experience: experience || '',
+      // Booking details
+      packageName,
+      location,
+      startDate,
+      endDate,
+      days: days?.toString() || '1',
+      // Pricing detail flags
+      whiteGlove: whiteGlove ? 'true' : 'false',
+      whiteGloveFee: whiteGloveFee?.toString() || '0',
+      holidaySurcharge: holidaySurcharge?.toString() || '0',
+      deconFee: deconFee?.toString() || '0',
+      isLakePowell: isLakePowell ? 'true' : 'false',
+      loyaltyDiscount: loyaltyDiscount?.toString() || '0',
+      // Life vest selection
+      vestSizes: vestSizes || '',
+      vestSummary: vestSummary || '',
+      vestUsedDefault: vestUsedDefault ? 'true' : 'false',
+      // Spare vest fee — server-computed values, not client
+      spareVestCount: serverSpareCount.toString(),
+      extraVestFee: serverExtraFee.toString(),
+      // Pickup & return times
+      pickupTime: pickupTime || '08:00',
+      returnTime: returnTime || '20:00',
+      pickupTimeDisplay: pickupTimeDisplay || '8:00 AM',
+      returnTimeDisplay: returnTimeDisplay || '8:00 PM',
+      // SMS consent (TCPA tracking)
+      smsOptIn: smsOptIn ? 'true' : 'false',
+      smsOptInDate: smsOptIn ? new Date().toISOString() : '',
+      // Waiver tracking
+      waiverSigned: waiverSigned || 'false',
+      waiverDate: waiverDate || '',
+      // Rental Agreement tracking (Phase 2)
+      agreementSigned: agreementSigned || 'false',
+      agreementVersion: agreementVersion || '',
+      agreementSignedAt: agreementSignedAt || '',
+      // Note: agreementChecksJson can be 200+ chars; trim to Stripe's 500-char metadata limit
+      agreementChecksJson: (agreementChecksJson || '').slice(0, 490),
+      // Status flags for admin dashboard
+      securityDepositStatus: 'pending',
+      rentalStatus: 'booked',
+    };
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'payment',
       customer: customer.id,
+      metadata: bookingMeta,
       payment_intent_data: {
         setup_future_usage: 'off_session',
-        metadata: {
-          // Renter info
-          renterName,
-          renterEmail,
-          renterPhone,
-          experience: experience || '',
-          // Booking details
-          packageName,
-          location,
-          startDate,
-          endDate,
-          days: days?.toString() || '1',
-          // Pricing detail flags
-          // 2026-06-06 Phase 3 fix: removed snake_case duplicates to stay
-          // under Stripe's 50-key metadata cap. Webhook reads camelCase first
-          // with snake_case fallback, so existing bookings continue working.
-          whiteGlove: whiteGlove ? 'true' : 'false',
-          whiteGloveFee: whiteGloveFee?.toString() || '0',
-          holidaySurcharge: holidaySurcharge?.toString() || '0',
-          deconFee: deconFee?.toString() || '0',
-          isLakePowell: isLakePowell ? 'true' : 'false',
-          loyaltyDiscount: loyaltyDiscount?.toString() || '0',
-          // Life vest selection
-          vestSizes: vestSizes || '',
-          vestSummary: vestSummary || '',
-          vestUsedDefault: vestUsedDefault ? 'true' : 'false',
-          // Spare vest fee — server-computed values, not client
-          spareVestCount: serverSpareCount.toString(),
-          extraVestFee: serverExtraFee.toString(),
-          // Pickup & return times
-          pickupTime: pickupTime || '08:00',
-          returnTime: returnTime || '20:00',
-          pickupTimeDisplay: pickupTimeDisplay || '8:00 AM',
-          returnTimeDisplay: returnTimeDisplay || '8:00 PM',
-          // SMS consent (TCPA tracking)
-          smsOptIn: smsOptIn ? 'true' : 'false',
-          smsOptInDate: smsOptIn ? new Date().toISOString() : '',
-          // Waiver tracking
-          waiverSigned: waiverSigned || 'false',
-          waiverDate: waiverDate || '',
-          // Rental Agreement tracking (Phase 2)
-          agreementSigned: agreementSigned || 'false',
-          agreementVersion: agreementVersion || '',
-          agreementSignedAt: agreementSignedAt || '',
-          // Note: agreementChecksJson can be 200+ chars; trim to Stripe's 500-char metadata limit
-          agreementChecksJson: (agreementChecksJson || '').slice(0, 490),
-          // Status flags for admin dashboard
-          securityDepositStatus: 'pending',
-          rentalStatus: 'booked',
-        },
+        metadata: bookingMeta,
       },
       line_items: [
         {
