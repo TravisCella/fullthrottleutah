@@ -1,30 +1,29 @@
 // app/api/admin/charge-deposit/route.js
-// Version: 2026-06-01 — Idempotency + smart card selection + 3DS handling + specific errors
-// Last edited: June 1 2026
+// Version: 2026-06-13 — Fix silent step-4 skip + orphaned-hold repair
+// Last edited: June 13 2026
 //
-// Major improvements vs prior version:
-//   1. IDEMPOTENCY — checks for an existing active hold before creating a new one.
-//      Prevents the double-charge nightmare where a slow connection or accidental
-//      double-click could place TWO $1,000 holds on the customer's card.
+// ROOT CAUSE FIX:
+//   session.payment_intent can come back as a bare string ID (not the expanded
+//   object) when Stripe's expand silently degrades. In that case:
+//     originalPI?.id  →  undefined   (string has no .id property)
+//   The `if (originalPI?.id)` guard at step 4 evaluated to false, silently
+//   skipping the paymentIntents.update call. The hold was created and the
+//   admin UI showed success, but rentalStatus was never written — booking
+//   stayed "UPCOMING" forever.
 //
-//   2. SMART CARD SELECTION — uses the card fingerprint from the customer's original
-//      booking payment to pick the SAME card for the hold, instead of just grabbing
-//      data[0]. If that card is no longer on file, falls back to the most recently
-//      attached card. Avoids hold landing on a different card than the customer used.
+//   Fix: normalise originalPIId immediately after session retrieval using
+//   `typeof originalPI === 'string' ? originalPI : originalPI?.id`. Step 4
+//   now throws loudly if originalPIId is missing so it can never pass unnoticed.
 //
-//   3. 3DS / SCA HANDLING — when the bank requires authentication, Stripe still creates
-//      the PaymentIntent (in `requires_action` state). Previously we threw it away with
-//      a generic error. Now we preserve the PI ID + client_secret in the response so a
-//      future admin UI can handle the SCA flow (send auth link to customer, etc).
-//      For now Travis can fall back to cash, but the data is captured for later.
+// SELF-HEAL (orphaned holds):
+//   inspectExistingHold() now accepts customerId + sessionId and falls back to
+//   a Stripe PI list search when securityDepositHoldId is absent from the
+//   booking PI metadata. When it finds an orphaned requires_capture hold, it
+//   repairs the original PI metadata (rentalStatus, securityDepositStatus,
+//   securityDepositHoldId) before returning — admin console flips to
+//   "Out · Card Hold" after one refresh, and no duplicate charge is created.
 //
-//   4. SPECIFIC ERROR HANDLING — separate user-friendly messages for the common Stripe
-//      failure modes: card_declined, insufficient_funds, authentication_required,
-//      card_declined_authentication_required. Each suggests the right next step.
-//
-//   5. STALE METADATA RECOVERY — if a booking shows "held" in metadata but the actual
-//      hold PaymentIntent is canceled/succeeded/expired, we ignore the stale data and
-//      create a fresh hold. Prevents the system from being stuck because of bad state.
+// Builds on: 2026-06-01 version (idempotency + smart card selection + 3DS)
 
 import Stripe from 'stripe';
 
@@ -34,20 +33,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-// Find the most appropriate card to charge the hold against.
-// Strategy:
-//   1. Identify the card used in the original booking (by fingerprint)
-//   2. If that card is still on file, use it
-//   3. Otherwise use the most recently attached card
 async function selectBestCard(customerId, originalPI) {
-  // List ALL saved cards for this customer
   const allMethods = await stripe.paymentMethods.list({
     customer: customerId,
     type: 'card',
   });
   if (allMethods.data.length === 0) return null;
 
-  // Try to find the fingerprint of the card used for the original booking payment
   let originalFingerprint = null;
   if (originalPI?.payment_method) {
     try {
@@ -58,52 +50,76 @@ async function selectBestCard(customerId, originalPI) {
       const originalPM = await stripe.paymentMethods.retrieve(pmId);
       originalFingerprint = originalPM?.card?.fingerprint || null;
     } catch (e) {
-      // Original card may have been removed — that's fine, fall through to "most recent"
       console.warn('[charge-deposit] Could not retrieve original payment method:', e.message);
     }
   }
 
-  // Prefer the same card as the booking
   if (originalFingerprint) {
     const match = allMethods.data.find(pm => pm.card?.fingerprint === originalFingerprint);
     if (match) return match;
   }
 
-  // Fall back to the most recently attached card
   const sorted = [...allMethods.data].sort((a, b) => b.created - a.created);
   return sorted[0];
 }
 
 // Check whether this booking already has a hold in flight.
-// Returns one of:
-//   { state: 'active',       hold }   — there's a live uncaptured hold (don't create another!)
-//   { state: 'pending_3ds',  hold }   — there's a hold awaiting customer authentication
-//   { state: 'stale' }                — metadata says "held" but the actual PI is canceled/done
-//   null                              — no hold tracked
-async function inspectExistingHold(originalPIId) {
-  if (!originalPIId) return null;
-  try {
-    const originalPI = await stripe.paymentIntents.retrieve(originalPIId);
-    const holdId = originalPI.metadata?.securityDepositHoldId;
-    if (!holdId) return null;
-
-    const hold = await stripe.paymentIntents.retrieve(holdId);
-
-    if (hold.status === 'requires_capture') {
-      return { state: 'active', hold };
+//
+// Path A: read securityDepositHoldId from the original PI metadata.
+// Path B (new): if no holdId in metadata — meaning step 4 previously failed —
+//              search the customer's recent PIs for a deposit hold tagged with
+//              this session. Returns { orphaned: true } so the caller can repair
+//              the missing metadata before returning, preventing a double charge.
+//
+// Returns:
+//   { state: 'active',      hold, orphaned }  — live uncaptured hold
+//   { state: 'pending_3ds', hold }             — awaiting 3DS auth
+//   { state: 'stale',       hold }             — PI canceled/done; create fresh
+//   null                                        — no hold found
+async function inspectExistingHold(originalPIId, customerId, sessionId) {
+  // ── Path A: check recorded holdId in original PI metadata ──
+  if (originalPIId) {
+    try {
+      const originalPI = await stripe.paymentIntents.retrieve(originalPIId);
+      const holdId = originalPI.metadata?.securityDepositHoldId;
+      if (holdId) {
+        const hold = await stripe.paymentIntents.retrieve(holdId);
+        if (hold.status === 'requires_capture') {
+          return { state: 'active', hold, orphaned: false };
+        }
+        if (hold.status === 'requires_action') {
+          return { state: 'pending_3ds', hold };
+        }
+        return { state: 'stale', hold };
+      }
+    } catch (e) {
+      console.warn('[charge-deposit] inspectExistingHold (path A) failed:', e.message);
     }
-    if (hold.status === 'requires_action') {
-      return { state: 'pending_3ds', hold };
-    }
-    // canceled / succeeded / processing / requires_payment_method — metadata is stale
-    return { state: 'stale', hold };
-  } catch (e) {
-    console.warn('[charge-deposit] inspectExistingHold failed:', e.message);
-    return null;
   }
+
+  // ── Path B: no holdId in metadata — search by customer + session tag ──
+  // Catches the case where the hold was created but the PI metadata write failed.
+  if (customerId && sessionId) {
+    try {
+      const piList = await stripe.paymentIntents.list({ customer: customerId, limit: 20 });
+      const orphanedHold = piList.data.find(
+        pi =>
+          pi.status === 'requires_capture' &&
+          pi.metadata?.type === 'security_deposit_hold' &&
+          pi.metadata?.originalCheckoutSession === sessionId
+      );
+      if (orphanedHold) {
+        console.log('[charge-deposit] Found orphaned hold via customer search:', orphanedHold.id, 'for session', sessionId);
+        return { state: 'active', hold: orphanedHold, orphaned: true };
+      }
+    } catch (e) {
+      console.warn('[charge-deposit] inspectExistingHold (path B) failed:', e.message);
+    }
+  }
+
+  return null;
 }
 
-// Get the last 4 from a payment method (handles both string IDs and expanded objects)
 async function getCardLast4(paymentMethod) {
   if (!paymentMethod) return '****';
   if (typeof paymentMethod === 'object' && paymentMethod.card?.last4) {
@@ -126,7 +142,6 @@ export async function POST(request) {
   try {
     const { sessionId, password } = await request.json();
 
-    // Auth
     if (password !== process.env.ADMIN_PASSWORD) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -134,7 +149,6 @@ export async function POST(request) {
       return Response.json({ error: 'Missing sessionId' }, { status: 400 });
     }
 
-    // Get the original booking
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['payment_intent', 'customer'],
     });
@@ -142,27 +156,67 @@ export async function POST(request) {
     if (!customerId) {
       return Response.json({ error: 'No customer found on this booking' }, { status: 400 });
     }
-    const originalPI = session.payment_intent;
 
-    // ─── 1. IDEMPOTENCY CHECK ──────────────────────────────────────────
-    const existing = await inspectExistingHold(originalPI?.id);
+    // ROOT CAUSE FIX: normalise before any use.
+    // session.payment_intent is either an expanded PI object (normal) or a bare
+    // string ID (when Stripe expand degrades). The old code used originalPI?.id
+    // which is undefined on a string, silently skipping step 4.
+    const originalPI = session.payment_intent;
+    const originalPIId =
+      typeof originalPI === 'string' ? originalPI : (originalPI?.id ?? null);
+    // Keep the expanded object around for metadata spread and card fingerprint.
+    const expandedPI = typeof originalPI === 'object' ? originalPI : null;
+
+    // ─── 1. IDEMPOTENCY CHECK (with orphaned-hold repair) ─────────────────
+    const existing = await inspectExistingHold(originalPIId, customerId, sessionId);
 
     if (existing?.state === 'active') {
-      // There's already a live $1,000 hold — return it instead of creating another.
       const cardLast4 = await getCardLast4(existing.hold.payment_method);
+
+      // SELF-HEAL: orphaned hold means the hold PI exists in Stripe but the
+      // booking PI metadata was never updated (step 4 previously failed).
+      // Write the missing metadata now so the admin console status corrects
+      // itself — no new charge is created.
+      if (existing.orphaned && originalPIId) {
+        try {
+          // Re-fetch current metadata so we spread the freshest state.
+          const currentPI = await stripe.paymentIntents.retrieve(originalPIId);
+          await stripe.paymentIntents.update(originalPIId, {
+            metadata: {
+              ...currentPI.metadata,
+              securityDepositStatus: 'held',
+              securityDepositHoldId: existing.hold.id,
+              securityDepositMethod: 'card',
+              securityDepositCard: cardLast4,
+              rentalStatus: 'picked_up',
+              // Preserve original pickupTimestamp if it somehow got written; default to now.
+              pickupTimestamp: currentPI.metadata?.pickupTimestamp || new Date().toISOString(),
+            },
+          });
+          console.log('[charge-deposit] Orphaned hold metadata repaired for session', sessionId);
+        } catch (repairErr) {
+          // Non-fatal — the hold is valid and will NOT be duplicated.
+          // Log clearly so manual reconciliation is possible if needed.
+          console.error(
+            `[charge-deposit] REPAIR FAILED session=${sessionId} hold=${existing.hold.id}:`,
+            repairErr.message
+          );
+        }
+      }
+
       return Response.json({
         success: true,
         holdId: existing.hold.id,
         cardLast4,
         status: existing.hold.status,
         alreadyHeld: true,
-        note: 'Hold already exists for this booking — no new charge made.',
+        note: existing.orphaned
+          ? 'Orphaned hold found and metadata repaired — no new charge made.'
+          : 'Hold already exists for this booking — no new charge made.',
       });
     }
 
     if (existing?.state === 'pending_3ds') {
-      // Awaiting customer authentication — surface this so admin can resend the auth link
-      // (once we build that flow). For now, tell Travis what's happening.
       return Response.json(
         {
           success: false,
@@ -177,10 +231,10 @@ export async function POST(request) {
       );
     }
 
-    // existing?.state === 'stale' OR null → continue and create a fresh hold
+    // existing?.state === 'stale' OR null → create a fresh hold
 
-    // ─── 2. SMART CARD SELECTION ───────────────────────────────────────
-    const card = await selectBestCard(customerId, originalPI);
+    // ─── 2. SMART CARD SELECTION ───────────────────────────────────────────
+    const card = await selectBestCard(customerId, expandedPI);
     if (!card) {
       return Response.json(
         { error: 'No saved payment method found for this customer. Switch to cash deposit.' },
@@ -188,29 +242,26 @@ export async function POST(request) {
       );
     }
 
-    // ─── 3. CREATE THE HOLD ────────────────────────────────────────────
+    // ─── 3. CREATE THE HOLD ────────────────────────────────────────────────
     let depositHold;
     try {
       depositHold = await stripe.paymentIntents.create({
-        amount: 100000, // $1,000 in cents
+        amount: 100000,
         currency: 'usd',
         customer: customerId,
         payment_method: card.id,
         off_session: true,
         confirm: true,
-        capture_method: 'manual', // KEY: creates a hold, not a charge
+        capture_method: 'manual',
         description: `Security deposit hold for booking ${sessionId}`,
         metadata: {
           originalCheckoutSession: sessionId,
-          renterName: originalPI?.metadata?.renterName || '',
-          renterEmail: originalPI?.metadata?.renterEmail || '',
+          renterName: expandedPI?.metadata?.renterName || '',
+          renterEmail: expandedPI?.metadata?.renterEmail || '',
           type: 'security_deposit_hold',
         },
       });
     } catch (err) {
-      // ── 3a. 3DS / AUTHENTICATION REQUIRED ──
-      // Stripe creates the PaymentIntent in `requires_action` state when 3DS is needed.
-      // Preserve its ID + client_secret so a future SCA flow can handle authentication.
       if (
         err.code === 'authentication_required' ||
         err.code === 'card_declined_authentication_required'
@@ -232,7 +283,6 @@ export async function POST(request) {
         );
       }
 
-      // ── 3b. INSUFFICIENT FUNDS ──
       if (err.code === 'insufficient_funds' || err.decline_code === 'insufficient_funds') {
         return Response.json(
           {
@@ -244,7 +294,6 @@ export async function POST(request) {
         );
       }
 
-      // ── 3c. EXPIRED CARD ──
       if (err.decline_code === 'expired_card' || err.code === 'expired_card') {
         return Response.json(
           {
@@ -256,7 +305,6 @@ export async function POST(request) {
         );
       }
 
-      // ── 3d. GENERIC CARD DECLINE ──
       if (err.code === 'card_declined') {
         return Response.json(
           {
@@ -271,24 +319,37 @@ export async function POST(request) {
         );
       }
 
-      // ── 3e. UNKNOWN — bubble up ──
       throw err;
     }
 
-    // ─── 4. UPDATE ORIGINAL BOOKING METADATA ───────────────────────────
-    if (originalPI?.id) {
-      await stripe.paymentIntents.update(originalPI.id, {
-        metadata: {
-          ...originalPI.metadata,
-          securityDepositStatus: 'held',
-          securityDepositHoldId: depositHold.id,
-          securityDepositMethod: 'card',
-          securityDepositCard: card.card?.last4 || '****',
-          rentalStatus: 'picked_up',
-          pickupTimestamp: new Date().toISOString(),
-        },
-      });
+    // ─── 4. UPDATE ORIGINAL BOOKING METADATA ──────────────────────────────
+    // ROOT CAUSE FIX: originalPIId is normalised above — no silent skip possible.
+    // Throw loudly if it's missing: a hold now exists in Stripe and the admin
+    // must see an error rather than a false success with an orphaned hold.
+    if (!originalPIId) {
+      throw new Error(
+        `[charge-deposit] No PaymentIntent ID on session ${sessionId}. ` +
+        `Hold ${depositHold.id} was created — manually set rentalStatus=picked_up on the booking PI.`
+      );
     }
+
+    // Use the already-expanded metadata if available; otherwise fetch it so we
+    // don't accidentally wipe booking fields when spreading.
+    const currentMeta = expandedPI?.metadata
+      ? expandedPI.metadata
+      : (await stripe.paymentIntents.retrieve(originalPIId)).metadata || {};
+
+    await stripe.paymentIntents.update(originalPIId, {
+      metadata: {
+        ...currentMeta,
+        securityDepositStatus: 'held',
+        securityDepositHoldId: depositHold.id,
+        securityDepositMethod: 'card',
+        securityDepositCard: card.card?.last4 || '****',
+        rentalStatus: 'picked_up',
+        pickupTimestamp: new Date().toISOString(),
+      },
+    });
 
     return Response.json({
       success: true,
