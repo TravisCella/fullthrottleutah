@@ -11,6 +11,7 @@
 
 import Stripe from 'stripe';
 import { sendReviewRequest } from '../../../../lib/review-email';
+import { fireReturnNotification } from '../../../../lib/return-notification';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -69,7 +70,11 @@ async function findOriginalBookingPI(hold) {
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['payment_intent'],
     });
-    return session.payment_intent?.id || null;
+    // Normalise: payment_intent is either an expanded object or a bare string ID
+    // when Stripe's expand degrades. The old `session.payment_intent?.id` returned
+    // undefined on a string, silently dropping the PI ID and skipping notifications.
+    const pi = session.payment_intent;
+    return (typeof pi === 'string' ? pi : pi?.id) || null;
   } catch (err) {
     console.warn('[refund-deposit] Could not find original booking PI:', err.message);
     return null;
@@ -123,9 +128,15 @@ export async function POST(request) {
             damageReason: 'Captured in Stripe Dashboard',
             externalAction: true,
           });
-          // Fire review email for the original booking
+          // Fire review email + return notification for the original booking
           const origPiId = await findOriginalBookingPI(result);
           fireReviewRequestForBooking(origPiId);
+          fireReturnNotification(result, origPiId, {
+            action: 'capture',
+            capturedAmount: result.amount_received / 100,
+            releasedAmount: (result.amount - result.amount_received) / 100,
+            damageReason: null, // external Stripe Dashboard action — no reason to surface
+          });
 
           return Response.json({
             success: true,
@@ -144,9 +155,14 @@ export async function POST(request) {
 
       await writeReturnMetadata(holdId, { action: 'release', externalAction });
 
-      // Fire review email for the original booking
+      // Fire review email + return notification for the original booking
       const origPiId = await findOriginalBookingPI(result);
       fireReviewRequestForBooking(origPiId);
+      fireReturnNotification(result, origPiId, {
+        action: 'release',
+        capturedAmount: 0,
+        releasedAmount: result.amount / 100,
+      });
 
       return Response.json({
         success: true,
@@ -208,9 +224,15 @@ export async function POST(request) {
       externalAction,
     });
 
-    // Fire review email for the original booking
+    // Fire review email + return notification for the original booking
     const origPiId = await findOriginalBookingPI(result);
     fireReviewRequestForBooking(origPiId);
+    fireReturnNotification(result, origPiId, {
+      action: 'capture',
+      capturedAmount: finalCapturedAmount,
+      releasedAmount: (result.amount / 100) - finalCapturedAmount,
+      damageReason: externalAction ? null : damageReason,
+    });
 
     return Response.json({
       success: true,
