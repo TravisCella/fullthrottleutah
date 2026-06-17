@@ -14,6 +14,7 @@ import Stripe from 'stripe';
 import { addBooking } from '../../../lib/sheets';
 import { createBookingEvent } from '../../../lib/calendar';
 import { sendSMS, buildBookingConfirmationSMS } from '../../../lib/sms';
+import { getDepositAmount } from '../../../lib/deposit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -23,6 +24,9 @@ async function sendConfirmationEmail(booking) {
     console.log('No Resend API key, skipping email');
     return;
   }
+
+  const depositAmount = getDepositAmount(booking.package);
+  const depositDisplay = `$${depositAmount.toLocaleString()}`;
 
   // Build the optional life vest row — only shown if we have data for it
   const vestRow = booking.vest_summary
@@ -69,7 +73,7 @@ async function sendConfirmationEmail(booking) {
                 ${vestRow}
                 ${agreementRow}
                 <tr><td style="padding: 8px; color: #64748b; font-size: 13px;">Rental Paid in Full</td><td style="padding: 8px; font-weight: 600; color: #16a34a;">$${booking.total_price}</td></tr>
-                <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">$1,000 security deposit</td></tr>
+                <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">${depositDisplay} security deposit</td></tr>
               </table>
 
               <div style="background: #FEF3C7; padding: 16px; border-radius: 8px; margin: 16px 0;">
@@ -78,7 +82,7 @@ async function sendConfirmationEmail(booking) {
                   <li>Arrive at Farmington pickup point by 8:00 AM</li>
                   <li>Bring valid driver's license</li>
                   <li>Bring a vehicle with a 2" ball hitch and flat 4-prong light hookup</li>
-                  <li>Bring $1,000 security deposit (card hold or cash)</li>
+                  <li>Bring ${depositDisplay} security deposit (card hold or cash)</li>
                 </ol>
               </div>
 

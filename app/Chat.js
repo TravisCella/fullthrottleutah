@@ -23,7 +23,7 @@ GTX Limited Duo — 2 × 2026 Sea-Doo GTX Limited 325
 - 325 HP, 10.25" touchscreen, premium Bluetooth audio, massive swim platform
 - The ultimate luxury ride — first class on the water
 - Includes: 2 jet skis on single trailer, 4 life preservers, 2 anchoring systems, safety flags, Bluetooth audio
-- Security deposit: $1,000
+- Security deposit: $2,000
 
 HOLIDAY SURCHARGES:
 - July 4th (July 1-5): +$75/day

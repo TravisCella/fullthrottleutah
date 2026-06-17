@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server';
 import { getTomorrowsBookings } from '../../../../lib/sheets';
 import { sendSMS } from '../../../../lib/sms';
+import { getDepositAmount } from '../../../../lib/deposit';
 
 // ─── SMS copy ────────────────────────────────────────────────────────────────
 // Target: ~160 chars. Direct, actionable, no filler.
@@ -34,7 +35,7 @@ function buildReminderSMS(booking) {
     lines.push(`🦺 Vests ready: ${booking.vest_summary}`);
   }
 
-  lines.push(`💵 Bring $1,000 security deposit (card or cash)`);
+  lines.push(`💵 Bring $${getDepositAmount(booking.package).toLocaleString()} security deposit (card or cash)`);
   lines.push(`⛽ Return with FULL tank of 91-octane or fuel charges apply`);
   lines.push(`❓ Questions? Text/call (801) 548-1273`);
 
@@ -68,7 +69,7 @@ function buildReminderEmailHTML(booking) {
           We'll deliver directly to <strong>${booking.location}</strong>.<br/>
           <strong>Arrival:</strong> ${pickupTimeDisplay}<br/>
           <strong>Retrieval:</strong> ${returnTimeDisplay}<br/>
-          We'll text or call shortly to confirm. Have your $1,000 security deposit ready (card hold or cash).
+          We'll text or call shortly to confirm. Have your $${getDepositAmount(booking.package).toLocaleString()} security deposit ready (card hold or cash).
         </p>
        </div>`
     : `<div style="background:#EFF6FF;padding:16px;border-radius:8px;margin:16px 0;">
@@ -95,7 +96,7 @@ function buildReminderEmailHTML(booking) {
           <tr style="background:#fff;"><td style="padding:8px;color:#64748b;font-size:13px;">Location</td><td style="padding:8px;font-weight:600;">${booking.location}</td></tr>
           <tr><td style="padding:8px;color:#64748b;font-size:13px;">Dates</td><td style="padding:8px;font-weight:600;">${dateDisplay}</td></tr>
           ${vestRow}
-          <tr style="background:#fff;"><td style="padding:8px;color:#64748b;font-size:13px;">Security Deposit Due</td><td style="padding:8px;font-weight:700;font-size:16px;color:#DC2626;">$1,000 (card or cash)</td></tr>
+          <tr style="background:#fff;"><td style="padding:8px;color:#64748b;font-size:13px;">Security Deposit Due</td><td style="padding:8px;font-weight:700;font-size:16px;color:#DC2626;">$${getDepositAmount(booking.package).toLocaleString()} (card or cash)</td></tr>
         </table>
 
         ${pickupSection}
@@ -112,7 +113,7 @@ function buildReminderEmailHTML(booking) {
           <strong style="color:#166534;">✅ Quick Checklist</strong>
           <ul style="color:#166534;margin:8px 0 0 0;padding-left:20px;font-size:14px;line-height:1.8;">
             <li>Valid driver's license</li>
-            <li>$1,000 security deposit (card or cash)</li>
+            <li>$${getDepositAmount(booking.package).toLocaleString()} security deposit (card or cash)</li>
             ${!booking.white_glove ? '<li>Tow vehicle with 2" ball hitch + flat 4-prong lights</li>' : ''}
             <li>Sunscreen, water, and a great attitude</li>
           </ul>

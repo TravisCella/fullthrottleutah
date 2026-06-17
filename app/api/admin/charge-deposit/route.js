@@ -1,8 +1,27 @@
 // app/api/admin/charge-deposit/route.js
-// Version: 2026-06-13 — Fix silent step-4 skip + orphaned-hold repair
-// Last edited: June 13 2026
+// Version: 2026-06-16 — Deposit package-name resolution hardening
+// Last edited: June 16 2026
 //
-// ROOT CAUSE FIX:
+// NEW (this version):
+//   Two-change hardening around packageName resolution (step 3):
+//
+//   1. SESSION-METADATA FALLBACK — packageName now reads from four sources in
+//      priority order: expandedPI.metadata.packageName → expandedPI.metadata.package
+//      → session.metadata.packageName → session.metadata.package. The session-level
+//      fields are always populated by checkout (bookingMeta is written to both the
+//      session and the PI), so they survive even when Stripe's expand degrades and
+//      expandedPI is null. Mirrors the PI-first/session-fallback pattern documented
+//      in CLAUDE.md pitfall #5 and implemented in the webhook.
+//
+//   2. FAIL LOUD ON EMPTY PACKAGE — if packageName is still falsy after all four
+//      fallbacks, the route returns a 422 with an actionable admin message rather
+//      than silently defaulting to the Spark deposit amount. A missing package at
+//      this point means a Stripe-expand or data anomaly; silently holding $1,000
+//      on a $22K GTX machine is the exact outcome we're preventing.
+//
+// Builds on: 2026-06-13 (step-4 silent-skip fix + orphaned-hold repair)
+//
+// PRIOR VERSION NOTE:
 //   session.payment_intent can come back as a bare string ID (not the expanded
 //   object) when Stripe's expand silently degrades. In that case:
 //     originalPI?.id  →  undefined   (string has no .id property)
@@ -22,10 +41,9 @@
 //   repairs the original PI metadata (rentalStatus, securityDepositStatus,
 //   securityDepositHoldId) before returning — admin console flips to
 //   "Out · Card Hold" after one refresh, and no duplicate charge is created.
-//
-// Builds on: 2026-06-01 version (idempotency + smart card selection + 3DS)
 
 import Stripe from 'stripe';
+import { getDepositAmount } from '../../../../lib/deposit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -243,10 +261,35 @@ export async function POST(request) {
     }
 
     // ─── 3. CREATE THE HOLD ────────────────────────────────────────────────
+    // Resolve package name: PI metadata first (most authoritative), then session
+    // metadata as fallback for the known Stripe expand-degradation case where
+    // expandedPI is null. Both objects are populated with identical bookingMeta
+    // by checkout/route.js (lines 194–198). See CLAUDE.md pitfall #5.
+    const packageName = expandedPI?.metadata?.packageName
+                     || expandedPI?.metadata?.package
+                     || session.metadata?.packageName
+                     || session.metadata?.package
+                     || '';
+
+    // Fail loud: every checkout-originated booking has a package written. An
+    // empty value here means a Stripe-expand anomaly or corrupted metadata —
+    // silently defaulting to the Spark deposit would under-hold on a GTX booking.
+    if (!packageName) {
+      return Response.json(
+        {
+          error:
+            'Could not determine package for this booking — verify the booking and place the deposit hold manually.',
+        },
+        { status: 422 }
+      );
+    }
+
+    const depositAmount = getDepositAmount(packageName);
+
     let depositHold;
     try {
       depositHold = await stripe.paymentIntents.create({
-        amount: 100000,
+        amount: depositAmount * 100,
         currency: 'usd',
         customer: customerId,
         payment_method: card.id,
@@ -274,7 +317,7 @@ export async function POST(request) {
             holdId: failedPI?.id,
             clientSecret: failedPI?.client_secret,
             error:
-              "Customer's bank requires 3D Secure authentication for the $1,000 hold. For now: switch to cash deposit, or try a different card. (Full 3DS pickup flow can be built later — the PaymentIntent is preserved.)",
+              `Customer's bank requires 3D Secure authentication for the $${depositAmount.toLocaleString()} hold. For now: switch to cash deposit, or try a different card. (Full 3DS pickup flow can be built later — the PaymentIntent is preserved.)`,
             code: 'authentication_required',
             cardLast4: card.card?.last4 || '****',
             cardBrand: card.card?.brand,
@@ -286,7 +329,7 @@ export async function POST(request) {
       if (err.code === 'insufficient_funds' || err.decline_code === 'insufficient_funds') {
         return Response.json(
           {
-            error: `Card ending in ${card.card?.last4 || '****'} has insufficient funds for the $1,000 hold. Try a different card or switch to cash.`,
+            error: `Card ending in ${card.card?.last4 || '****'} has insufficient funds for the $${depositAmount.toLocaleString()} hold. Try a different card or switch to cash.`,
             code: 'insufficient_funds',
             cardLast4: card.card?.last4 || '****',
           },
@@ -357,6 +400,7 @@ export async function POST(request) {
       cardLast4: card.card?.last4 || '****',
       cardBrand: card.card?.brand,
       status: depositHold.status,
+      depositAmount,
     });
   } catch (err) {
     console.error('[charge-deposit] Unexpected error:', err);

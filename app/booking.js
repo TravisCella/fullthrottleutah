@@ -67,7 +67,7 @@ const PACKAGES = [
     weekday: 549,
     weekend: 649,
     multiDay: { 2: 522, 3: 483, 4: 467, 5: 439 },
-    deposit: 1000,
+    deposit: 2000,
     maxRiders: 6, // 2 skis × 3 riders each (Sea-Doo GTX 325 is 3-up)
     heroImg: "gtxHero",
     galleryImgs: ["gtxStudio", "gtxWater", "gtxAction"],
@@ -1407,7 +1407,7 @@ export default function JetSkiBooking() {
               { key: "rules", title: "Renter Obligations",
                 text: "I confirm that: I am at least 18 years old with valid ID. All operators will be 16+ per Utah Code §73-18-15.1. All riders will wear USCG-approved life vests at all times. I will not operate under the influence of alcohol or drugs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable boating laws." },
               { key: "damage", title: "Damage & Security Deposit",
-                text: "I accept financial responsibility for all damage to, loss of, or theft of the PWC and equipment during the rental period, regardless of fault. A $1,000 security deposit will be collected and refunded upon satisfactory return." },
+                text: `I accept financial responsibility for all damage to, loss of, or theft of the PWC and equipment during the rental period, regardless of fault. A $${(pkg?.deposit || 1000).toLocaleString()} security deposit will be collected and refunded upon satisfactory return.` },
               { key: "noInsurance", title: "No Insurance Provided",
                 text: "I understand that TW Assets LLC does not provide collision, liability, or personal injury insurance for renters, passengers, or third parties. I assume all financial risk for any uninsured loss." },
               { key: "ais", title: "Aquatic Invasive Species (AIS) Compliance",
@@ -1849,9 +1849,9 @@ export default function JetSkiBooking() {
                   </span>
                 </div>
                 <div style={{ marginTop: 12, padding: 12, background: "#FEF3C7", borderRadius: 10, border: "1px solid #FCD34D" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>🔐 At Pickup: $1,000 Security Deposit</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>🔐 At Pickup: ${(pkg?.deposit || 1000).toLocaleString()} Security Deposit</div>
                   <div style={{ fontSize: 11, color: "#92400E", lineHeight: 1.5 }}>
-                    A $1,000 security deposit will be held at pickup via card hold or accepted in cash. Released in full upon satisfactory return of the watercraft.
+                    A ${(pkg?.deposit || 1000).toLocaleString()} security deposit will be held at pickup via card hold or accepted in cash. Released in full upon satisfactory return of the watercraft.
                   </div>
                 </div>
               </div>
@@ -1879,8 +1879,8 @@ export default function JetSkiBooking() {
               {[
                 "Sign the digital waiver (link in your email)",
                 whiteGlove ? "We'll deliver to the lake — just show up and ride!" : `Arrive at Farmington pickup by ${formatTime12h(pickupTime)}`,
-                "Bring valid ID and a credit card OR $1,000 cash for security deposit",
-                `Security deposit ($1,000) will be held at pickup and released on safe return`,
+                `Bring valid ID and a credit card OR $${(pkg?.deposit || 1000).toLocaleString()} cash for security deposit`,
+                `Security deposit ($${(pkg?.deposit || 1000).toLocaleString()}) will be held at pickup and released on safe return`,
               ].map((s, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                   <div style={{

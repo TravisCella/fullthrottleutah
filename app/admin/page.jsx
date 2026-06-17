@@ -105,7 +105,7 @@ export default function AdminPage() {
       if (data.error) {
         setActionError(data.error);
       } else {
-        setActionSuccess(`✅ $1,000 held on card ending in ${data.cardLast4}`);
+        setActionSuccess(`✅ $${(data.depositAmount || 1000).toLocaleString()} held on card ending in ${data.cardLast4}`);
         await refreshBookings();
         setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
       }
@@ -163,7 +163,8 @@ export default function AdminPage() {
   };
 
   const handleReleaseHold = async (booking) => {
-    if (!confirm('Release the $1,000 hold? This refunds the customer entirely.')) return;
+    const dep = booking.packageName?.includes('GTX') ? 2000 : 1000;
+    if (!confirm(`Release the $${dep.toLocaleString()} hold? This refunds the customer entirely.`)) return;
     setActionLoading(true);
     setActionError(null);
     try {
@@ -223,16 +224,17 @@ export default function AdminPage() {
   };
 
   const handleCaptureHold = async (booking) => {
+    const dep = booking.packageName?.includes('GTX') ? 2000 : 1000;
     const amount = parseFloat(captureAmount);
-    if (!amount || amount < 1 || amount > 1000) {
-      setActionError('Enter a valid amount between $1 and $1,000');
+    if (!amount || amount < 1 || amount > dep) {
+      setActionError(`Enter a valid amount between $1 and $${dep.toLocaleString()}`);
       return;
     }
     if (!damageReason.trim()) {
       setActionError('Please describe the damage');
       return;
     }
-    if (!confirm(`Charge $${amount} from the deposit? Remaining $${1000 - amount} will be released back to the customer.`)) return;
+    if (!confirm(`Charge $${amount} from the deposit? Remaining $${dep - amount} will be released back to the customer.`)) return;
     
     setActionLoading(true);
     setActionError(null);
@@ -277,7 +279,7 @@ export default function AdminPage() {
 
       // Normal success path
       await markReturnedInBackend(booking, `Damage: ${damageReason} ($${amount})`);
-      setActionSuccess(`✅ Captured $${amount} · $${1000 - amount} released`);
+      setActionSuccess(`✅ Captured $${amount} · $${dep - amount} released`);
       await refreshBookings();
       setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); }, 3000);
     } catch (err) {
@@ -463,6 +465,9 @@ export default function AdminPage() {
                     {b.isTestBooking && (
                       <span style={{ fontSize: 9, fontWeight: 700, color: '#92400E', background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em' }}>TEST</span>
                     )}
+                    {b.inSheet === false && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: '#991B1B', background: '#FEE2E2', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em', flexShrink: 0 }}>⚠ NO SHEET</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: '#64748B' }}>{b.packageName || '—'} {b.location ? `· ${b.location}` : ''}</div>
                 </div>
@@ -529,30 +534,37 @@ export default function AdminPage() {
               )}
 
               {/* PICKUP ACTIONS - if booking is "booked" status */}
-              {selectedBooking.rentalStatus === 'booked' && !actionSuccess && (
+              {selectedBooking.rentalStatus === 'booked' && !actionSuccess && (() => {
+                const depAmt = selectedBooking.packageName?.includes('GTX') ? 2000 : 1000;
+                const depLabel = `$${depAmt.toLocaleString()}`;
+                return (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Pickup — Security Deposit</div>
-                  
+
                   <button
                     onClick={() => handleChargeDeposit(selectedBooking)}
                     disabled={actionLoading}
                     style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10, opacity: actionLoading ? 0.5 : 1 }}
                   >
-                    {actionLoading ? 'Processing...' : '💳 Place $1,000 Card Hold'}
+                    {actionLoading ? 'Processing...' : `💳 Place ${depLabel} Card Hold`}
                   </button>
-                  
+
                   <button
                     onClick={() => handleCashDeposit(selectedBooking)}
                     disabled={actionLoading}
                     style={{ width: '100%', padding: 16, borderRadius: 12, border: '2px solid #16A34A', background: '#fff', color: '#16A34A', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
                   >
-                    💵 Cash Deposit Received ($1,000)
+                    💵 Cash Deposit Received ({depLabel})
                   </button>
                 </div>
-              )}
+                );
+              })()}
 
               {/* RETURN ACTIONS - if booking is "picked_up" */}
-              {selectedBooking.rentalStatus === 'picked_up' && !actionSuccess && (
+              {selectedBooking.rentalStatus === 'picked_up' && !actionSuccess && (() => {
+                const depAmt = selectedBooking.packageName?.includes('GTX') ? 2000 : 1000;
+                const depLabel = `$${depAmt.toLocaleString()}`;
+                return (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Return — Handle Deposit</div>
 
@@ -563,14 +575,14 @@ export default function AdminPage() {
                         disabled={actionLoading}
                         style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', background: '#16A34A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10, opacity: actionLoading ? 0.5 : 1 }}
                       >
-                        ✓ Release $1,000 Hold (clean return)
+                        ✓ Release {depLabel} Hold (clean return)
                       </button>
 
                       <div style={{ background: '#FEF3C7', borderRadius: 12, padding: 14, marginTop: 14 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#92400E', marginBottom: 10 }}>Or charge for damage:</div>
                         <input
                           type="number"
-                          placeholder="Amount to charge (max $1000)"
+                          placeholder={`Amount to charge (max ${depLabel})`}
                           value={captureAmount}
                           onChange={e => setCaptureAmount(e.target.value)}
                           style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #FCD34D', fontSize: 14, marginBottom: 8, boxSizing: 'border-box', outline: 'none' }}
@@ -612,7 +624,8 @@ export default function AdminPage() {
                     </>
                   )}
                 </div>
-              )}
+                );
+              })()}
 
               {/* COMPLETED - no actions */}
               {selectedBooking.rentalStatus === 'returned' && (

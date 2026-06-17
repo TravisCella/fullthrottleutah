@@ -14,6 +14,7 @@
 
 import Stripe from 'stripe';
 import { sendReviewRequest } from '../../../../lib/review-email';
+import { getDepositAmount } from '../../../../lib/deposit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -74,7 +75,7 @@ export async function POST(request) {
       updates.securityDepositMethod = 'cash';
       updates.rentalStatus = 'picked_up';
       updates.pickupTimestamp = new Date().toISOString();
-      updates.cashDepositAmount = '1000';
+      updates.cashDepositAmount = String(getDepositAmount(pi.metadata?.packageName || pi.metadata?.package));
     } else if (action === 'cash_deposit_returned') {
       updates.securityDepositStatus = 'released';
       updates.rentalStatus = 'returned';

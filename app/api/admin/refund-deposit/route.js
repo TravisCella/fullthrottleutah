@@ -177,10 +177,13 @@ export async function POST(request) {
     }
 
     // ─── CAPTURE FLOW ─────────────────────────────────────────────────────────
-    const amountToCapture = Math.round((captureAmount || 1000) * 100);
+    const holdPI = await stripe.paymentIntents.retrieve(holdId);
+    const maxCaptureAmount = holdPI.amount; // in cents — equals the deposit for this package
 
-    if (amountToCapture > 100000) {
-      return Response.json({ error: 'Cannot capture more than $1,000' }, { status: 400 });
+    const amountToCapture = Math.round((captureAmount || (maxCaptureAmount / 100)) * 100);
+
+    if (amountToCapture > maxCaptureAmount) {
+      return Response.json({ error: `Cannot capture more than $${(maxCaptureAmount / 100).toLocaleString()}` }, { status: 400 });
     }
     if (amountToCapture < 100) {
       return Response.json({ error: 'Minimum capture is $1.00' }, { status: 400 });
