@@ -299,6 +299,7 @@ export async function POST(request) {
         description: `Security deposit hold for booking ${sessionId}`,
         metadata: {
           originalCheckoutSession: sessionId,
+          originalPaymentIntentId: originalPIId,
           renterName: expandedPI?.metadata?.renterName || '',
           renterEmail: expandedPI?.metadata?.renterEmail || '',
           type: 'security_deposit_hold',

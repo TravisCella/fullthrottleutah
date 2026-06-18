@@ -12,6 +12,7 @@
 import Stripe from 'stripe';
 import { sendReviewRequest } from '../../../../lib/review-email';
 import { fireReturnNotification } from '../../../../lib/return-notification';
+import { findOriginalBookingPI } from '../../../../lib/find-booking-pi';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -94,28 +95,6 @@ async function writeReturnMetadata(piId, { action, damageReason, capturedAmount,
   return updates;
 }
 
-// Find the ORIGINAL booking PaymentIntent ID from the security-deposit hold's metadata.
-// The hold's metadata has originalCheckoutSession (the Stripe Checkout Session ID).
-// We need the PaymentIntent attached to that session, since that's where the booking
-// metadata (renterEmail, packageName, etc.) lives.
-async function findOriginalBookingPI(hold) {
-  const sessionId = hold?.metadata?.originalCheckoutSession;
-  if (!sessionId) return null;
-  try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['payment_intent'],
-    });
-    // Normalise: payment_intent is either an expanded object or a bare string ID
-    // when Stripe's expand degrades. The old `session.payment_intent?.id` returned
-    // undefined on a string, silently dropping the PI ID and skipping notifications.
-    const pi = session.payment_intent;
-    return (typeof pi === 'string' ? pi : pi?.id) || null;
-  } catch (err) {
-    console.warn('[refund-deposit] Could not find original booking PI:', err.message);
-    return null;
-  }
-}
-
 // Fire review email — fire-and-forget, never throws into the caller.
 function fireReviewRequestForBooking(originalBookingPiId) {
   if (!originalBookingPiId) {
@@ -164,7 +143,7 @@ export async function POST(request) {
             externalAction: true,
           });
           // Fire review email + return notification for the original booking
-          const origPiId = await findOriginalBookingPI(result);
+          const origPiId = await findOriginalBookingPI(result, stripe);
           await writeReturnedToBookingPI(origPiId, {
             action: 'capture',
             capturedAmount: result.amount_received / 100,
@@ -195,7 +174,7 @@ export async function POST(request) {
       await writeReturnMetadata(holdId, { action: 'release', externalAction });
 
       // Fire review email + return notification for the original booking
-      const origPiId = await findOriginalBookingPI(result);
+      const origPiId = await findOriginalBookingPI(result, stripe);
       await writeReturnedToBookingPI(origPiId, { action: 'release' });
       fireReviewRequestForBooking(origPiId);
       fireReturnNotification(result, origPiId, {
@@ -268,7 +247,7 @@ export async function POST(request) {
     });
 
     // Fire review email + return notification for the original booking
-    const origPiId = await findOriginalBookingPI(result);
+    const origPiId = await findOriginalBookingPI(result, stripe);
     await writeReturnedToBookingPI(origPiId, {
       action: 'capture',
       capturedAmount: finalCapturedAmount,
