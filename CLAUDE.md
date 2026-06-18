@@ -16,6 +16,20 @@ Env vars live in `.env.local` (pull via `vercel env pull`). Never commit or prin
 
 There are no tests or linters configured.
 
+## Environment & Secrets
+
+- Production secrets in `.env.local` are intentionally empty locally; do **not** attempt live API calls (e.g., Stripe, Resend, Twilio) unless the user has confirmed secrets are populated. Use code-based inference and ask the user for required values when needed.
+
+## Code Standards
+
+- Enforce precise null-safety on all edits: use optional chaining (`?.`), explicit `typeof` guards before property access on values that may be strings or objects, and never assume an expanded Stripe object is non-null.
+- Use relative URLs (not hardcoded `https://fullthrottleutah.com`) for any internal navigation or deep-link `returnUrl` construction.
+
+## Git Workflow
+
+- Produce clean, atomic commits scoped to the feature or fix at hand. After committing, offer to push and confirm before doing so.
+- On branches that touch booking/checkout/webhook, always run `npm run build` and `grep -c 'constructEvent' app/api/webhook/route.js` (must be ≥ 1) before pushing.
+
 ## Architecture
 
 **Full Throttle Utah** is a Next.js 14 (App Router) jet ski rental booking site for TW Assets LLC (Farmington, UT). Mobile-first, deployed on Vercel.
