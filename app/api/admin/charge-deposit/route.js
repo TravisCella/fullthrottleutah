@@ -158,7 +158,7 @@ async function getCardLast4(paymentMethod) {
 
 export async function POST(request) {
   try {
-    const { sessionId, password } = await request.json();
+    const { sessionId, password, inspectionId } = await request.json();
 
     if (password !== process.env.ADMIN_PASSWORD) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -391,6 +391,7 @@ export async function POST(request) {
         securityDepositCard: card.card?.last4 || '****',
         rentalStatus: 'picked_up',
         pickupTimestamp: new Date().toISOString(),
+        ...(inspectionId ? { checkoutInspectionId: inspectionId } : {}),
       },
     });
 

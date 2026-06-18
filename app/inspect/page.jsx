@@ -1,18 +1,26 @@
 'use client';
 
 // app/inspect/page.jsx
-// Version: 2026-06-05 — Show all recent inspections (no 10-item cap)
-// Last edited: June 5 2026
-// Change: The "Recent inspections (30 days)" lists in both the role-select
-//         screen and the AI compare mode previously sliced to 10 items with
-//         an "X more not shown" footer text. Removed both caps — the list
-//         now shows everything within the 30-day window. Header now also
-//         shows the total count so Travis knows how many are loaded.
-//         Pairs with lib/sheets.js 2026-06-05 which fixes the sort to be
-//         truly newest-first (the previous sort silently no-op'd due to
-//         JS Date parsing the human-readable timestamp string).
+// Version: 2026-06-18 — Checkout deep-link return: Inspect → admin
+// Last edited: June 18 2026
 //
-// Builds on: 2026-06-03 Firebase lockdown
+// Changes:
+//   On mount, reads sid / mode / returnUrl from window.location.search via
+//   useEffect (not useSearchParams — avoids App Router Suspense requirement).
+//   URL params are NOT stripped; they survive a mobile refresh mid-inspection
+//   so context is preserved if the operator navigates away and comes back.
+//
+//   On the done screen, when returnUrl is present AND mode === 'checkout',
+//   a primary "✅ Inspection complete → Place $1,000 hold" button is rendered
+//   alongside the existing Next machine / Done options. The operator controls
+//   when to tap it — for a Duo they inspect both skis first.
+//
+//   On click: collects all submitted inspection IDs from this session,
+//   performs a same-origin + /admin pathname guard, appends inspectionId to
+//   the returnUrl, and navigates. Standalone /inspect visits have no returnUrl
+//   so the button never appears.
+//
+// Builds on: 2026-06-05 (show all recent inspections, no 10-item cap)
 
 import { useState, useRef, useCallback, useEffect } from "react";
 
@@ -91,7 +99,7 @@ function notifyBackend(record, inspectionId) {
   const damageNotes = (record.zones || [])
     .filter(z => z.damage && z.damage !== "None" && z.damage.trim() !== "")
     .map(z => `${z.zone}: ${z.damage}`);
-  
+
   return fetch('/api/inspection-submitted', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -204,10 +212,25 @@ export default function InspectionV2() {
   const [aiError, setAiError] = useState("");
   const [impellerNotes, setImpellerNotes] = useState("");
   const [hourMeter, setHourMeter] = useState("");
-  
+
   const [recentInspections, setRecentInspections] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
   const [recentSearch, setRecentSearch] = useState("");
+
+  // Deep-link params from admin check-out flow.
+  // Read on mount via useEffect (not useSearchParams — avoids Suspense requirement).
+  // NOT stripped from the URL so a mobile refresh mid-inspection preserves context.
+  const [deepLink, setDeepLink] = useState({ sid: null, mode: null, returnUrl: null });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get('sid');
+    const dlMode = params.get('mode');
+    const returnUrl = params.get('returnUrl');
+    if (sid || dlMode || returnUrl) {
+      setDeepLink({ sid, mode: dlMode, returnUrl });
+    }
+  }, []);
 
   const zones = role === "owner" ? OWNER_ZONES : CUSTOMER_ZONES;
   const mk = machine?.id || "";
@@ -217,13 +240,13 @@ export default function InspectionV2() {
   const cp = zp[cz?.id] || [];
   const cn = zn[cz?.id] || "";
   const done = Object.keys(zp).filter(k => (zp[k] || []).length > 0).length;
-  
+
   useEffect(() => {
     if (role === null || compareMode) {
       loadRecentInspections();
     }
   }, [role, compareMode]);
-  
+
   function loadRecentInspections() {
     setLoadingRecent(true);
     fetch('/api/recent-inspections?days=30')
@@ -266,7 +289,7 @@ export default function InspectionV2() {
     upload(record, (ok, id) => {
       if (ok) {
         notifyBackend(record, id);
-        
+
         setSubmitted(prev => [...prev, { ...record, id, timestamp: ts() }]);
         setPhotos(p => { const n = { ...p }; delete n[mk]; return n; });
         setNotes(p => { const n = { ...p }; delete n[mk]; return n; });
@@ -274,6 +297,22 @@ export default function InspectionV2() {
       }
       setUploading(false);
     });
+  };
+
+  // Navigate back to admin with all inspection IDs from this session.
+  // Same-origin + /admin pathname guard prevents open-redirect abuse.
+  const handleReturnToAdmin = () => {
+    if (!deepLink.returnUrl) return;
+    const ids = submitted.map(s => s.id).filter(Boolean).join(',');
+    try {
+      const target = new URL(deepLink.returnUrl, window.location.origin);
+      if (target.origin !== window.location.origin) return;
+      if (!target.pathname.startsWith('/admin')) return;
+      target.searchParams.set('inspectionId', ids);
+      window.location.href = target.toString();
+    } catch {
+      // malformed returnUrl — silently ignore
+    }
   };
 
   const runCompare = () => {
@@ -304,7 +343,7 @@ export default function InspectionV2() {
 
   const btn = (bgColor, color) => ({ padding: "13px 24px", border: "none", borderRadius: 12, background: bgColor, color, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", width: "100%", transition: "opacity 0.15s" });
   const outline = { padding: "11px 18px", border: `1.5px solid ${bdr}`, borderRadius: 12, background: "transparent", color: dark, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.2s" };
-  
+
   function RecentCard({ insp, onTap, showSelectButtons, onUseAsCheckout, onUseAsCheckin }) {
     const isCustomer = insp.type === 'customer';
     return (
@@ -444,7 +483,7 @@ export default function InspectionV2() {
               <input value={recentSearch} onChange={e => setRecentSearch(e.target.value)}
                 placeholder="🔍 Search by customer name..."
                 style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${bdr}`, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 8 }} />
-              
+
               <div style={{ fontSize: 11, fontWeight: 600, color: muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 Recent inspections {recentInspections.length > 0 ? `(${recentInspections.length})` : ''}
               </div>
@@ -769,7 +808,7 @@ export default function InspectionV2() {
                   <button onClick={() => navigator.clipboard?.writeText(submitted[submitted.length - 1].id)}
                     style={{ ...outline, padding: "5px 12px", fontSize: 11 }}>📋 Copy ID</button>
                 </div>
-                
+
                 <div style={{ background: "#eaf7f0", border: `1px solid ${green}`, borderRadius: 8, padding: 10, marginBottom: 16, fontSize: 11, color: green, textAlign: "left" }}>
                   ✅ Saved to inspection log. {role === "owner" ? "Owner email + SMS sent." : "Owner has been notified."}
                 </div>
@@ -780,6 +819,16 @@ export default function InspectionV2() {
               <div style={{ background: "#e8f4fd", borderRadius: 10, padding: 14, marginBottom: 20, fontSize: 12, color: "#1e40af", lineHeight: 1.5, textAlign: "left" }}>
                 <strong>Your photos protect you.</strong> They're saved with your inspection ID above. If there's any damage dispute, this ID links to your photos.
               </div>
+            )}
+
+            {/* Return-to-admin button — only shown when launched from admin check-out flow */}
+            {deepLink.returnUrl && deepLink.mode === 'checkout' && (
+              <button
+                onClick={handleReturnToAdmin}
+                style={{ ...btn('#0C4A6E', '#fff'), marginBottom: 12, maxWidth: 340, margin: '0 auto 12px' }}
+              >
+                ✅ Inspection complete → Place $1,000 hold
+              </button>
             )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxWidth: 300, margin: "0 auto" }}>

@@ -1,15 +1,28 @@
 'use client';
 
 // app/admin/page.jsx
-// Version: 2026-06-01 — Graceful Stripe state-mismatch handling
-// Last edited: June 1 2026
-// Change: handleReleaseHold() and handleCaptureHold() now detect when the PaymentIntent
-//         was already canceled or already captured (typically because Travis took action
-//         in the Stripe Dashboard directly). Instead of surfacing the raw Stripe error
-//         message, the app treats it as success: marks the rental as returned, shows a
-//         friendly confirmation noting the action happened externally, and refreshes the
-//         booking list. Prevents the "stuck rental" problem where a booking shows as
-//         OUT · CARD HOLD forever after manual Stripe action.
+// Version: 2026-06-18 — Checkout deep-link: Inspect app → admin return flow
+// Last edited: June 18 2026
+//
+// Changes:
+//   1. INSPECT DEEP LINK — "Open Inspection App" link moved into the
+//      rentalStatus==='booked' panel only (not shown for picked_up/returned).
+//      href now carries ?sid, ?mode=checkout, and a ?returnUrl that brings
+//      Inspect back to /admin?focus={sessionId}&checkedOut=1[&inspectionId=X].
+//      Label changed to "Check Out — Open Inspection →".
+//
+//   2. DEEP-LINK RETURN HANDLING — on load, reads focus / checkedOut /
+//      inspectionId from the URL. When present: auto-opens the matching
+//      booking panel, shows a persistent toast banner, visually pulses the
+//      "Place Card Hold" button. URL params are stripped immediately via
+//      history.replaceState so a hard refresh doesn't re-fire the toast.
+//
+//   3. handleChargeDeposit now forwards inspectionId (if stashed in state)
+//      to /api/admin/charge-deposit so the PI metadata records which
+//      inspection drove this check-out.
+//
+// Builds on: 2026-06-01 (graceful Stripe state-mismatch handling)
+// Prior: 2026-06-17 (inSheet NO SHEET badge)
 
 import { useState, useEffect } from 'react';
 
@@ -43,6 +56,11 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [hideTests, setHideTests] = useState(true);
 
+  // Deep-link state — set from URL params on load, cleared after deposit hold is placed
+  const [pendingInspectionToast, setPendingInspectionToast] = useState(null); // { sessionId, renterName }
+  const [inspectionId, setInspectionId] = useState(null);
+  const [deepLinkParams, setDeepLinkParams] = useState(null);
+
   // Check for saved password on mount
   useEffect(() => {
     const saved = sessionStorage.getItem('ftu_admin_pass');
@@ -51,6 +69,40 @@ export default function AdminPage() {
       handleLogin(saved);
     }
   }, []);
+
+  // Parse deep-link URL params on mount and strip them immediately so a
+  // refresh doesn't re-fire the toast. Actual booking panel open happens
+  // in the effect below once bookings have loaded.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const focus = params.get('focus');
+    if (!focus) return;
+    const checkedOut = params.get('checkedOut');
+    const inspId = params.get('inspectionId');
+    if (inspId) setInspectionId(inspId);
+    setDeepLinkParams({ focus, checkedOut, inspectionId: inspId });
+    history.replaceState(null, '', window.location.pathname);
+  }, []);
+
+  // Once bookings are loaded and deep-link params are stashed, open the
+  // matching booking panel and set the toast. Clears deepLinkParams so
+  // this only fires once even if bookings are refreshed later.
+  useEffect(() => {
+    if (!deepLinkParams || !bookings.length) return;
+    const { focus, checkedOut } = deepLinkParams;
+    const booking = bookings.find(b => b.sessionId === focus);
+    if (!booking) return;
+    setSelectedBooking(booking);
+    setActionError(null);
+    setActionSuccess(null);
+    setCaptureAmount('');
+    setDamageReason('');
+    setReturnNotes('');
+    if (checkedOut === '1') {
+      setPendingInspectionToast({ sessionId: focus, renterName: booking.renterName });
+    }
+    setDeepLinkParams(null);
+  }, [bookings, deepLinkParams]);
 
   const handleLogin = async (pwd) => {
     const pwdToUse = pwd || password;
@@ -96,16 +148,20 @@ export default function AdminPage() {
     setActionError(null);
     setActionSuccess(null);
     try {
+      const body = { sessionId: booking.sessionId, password };
+      if (inspectionId) body.inspectionId = inspectionId;
       const res = await fetch('/api/admin/charge-deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: booking.sessionId, password }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.error) {
         setActionError(data.error);
       } else {
         setActionSuccess(`✅ $${(data.depositAmount || 1000).toLocaleString()} held on card ending in ${data.cardLast4}`);
+        setPendingInspectionToast(null);
+        setInspectionId(null);
         await refreshBookings();
         setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
       }
@@ -123,10 +179,10 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/update-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          paymentIntentId: booking.paymentIntentId, 
+        body: JSON.stringify({
+          paymentIntentId: booking.paymentIntentId,
           action: 'cash_deposit_received',
-          password 
+          password
         }),
       });
       const data = await res.json();
@@ -171,10 +227,10 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/refund-deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          holdId: booking.securityDepositHoldId, 
+        body: JSON.stringify({
+          holdId: booking.securityDepositHoldId,
           action: 'release',
-          password 
+          password
         }),
       });
       const data = await res.json();
@@ -235,19 +291,19 @@ export default function AdminPage() {
       return;
     }
     if (!confirm(`Charge $${amount} from the deposit? Remaining $${dep - amount} will be released back to the customer.`)) return;
-    
+
     setActionLoading(true);
     setActionError(null);
     try {
       const res = await fetch('/api/admin/refund-deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          holdId: booking.securityDepositHoldId, 
+        body: JSON.stringify({
+          holdId: booking.securityDepositHoldId,
           action: 'capture',
           captureAmount: amount,
           damageReason,
-          password 
+          password
         }),
       });
       const data = await res.json();
@@ -296,8 +352,8 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/update-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          paymentIntentId: booking.paymentIntentId, 
+        body: JSON.stringify({
+          paymentIntentId: booking.paymentIntentId,
           action: 'cash_deposit_returned',
           password,
           notes: returnNotes || 'Cash returned',
@@ -350,7 +406,7 @@ export default function AdminPage() {
   const statusBadge = (booking) => {
     const status = booking.rentalStatus;
     const depStatus = booking.securityDepositStatus;
-    
+
     if (status === 'returned') {
       return { label: 'COMPLETED', color: '#16A34A', bg: 'rgba(22,163,74,0.1)' };
     }
@@ -359,16 +415,46 @@ export default function AdminPage() {
       if (depStatus === 'cash_held') return { label: 'OUT · CASH HELD', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' };
       return { label: 'OUT', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' };
     }
-    
+
     const today = new Date(); today.setHours(0,0,0,0);
     const startDate = booking.startDate ? new Date(booking.startDate + ' ' + new Date().getFullYear()) : null;
-    
+
     return { label: 'UPCOMING', color: '#D97706', bg: 'rgba(217,119,6,0.1)' };
   };
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'system-ui, sans-serif', paddingBottom: 40 }}>
-      <div style={{ background: '#0B1120', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Keyframe for card-hold pulse — only injected when a deep-link return is active */}
+      {pendingInspectionToast && (
+        <style>{`
+          @keyframes ftu-hold-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(14,165,233,0.6); }
+            50%       { box-shadow: 0 0 0 8px rgba(14,165,233,0); }
+          }
+          .ftu-hold-pulse { animation: ftu-hold-pulse 1.4s ease-in-out 4; }
+        `}</style>
+      )}
+
+      {/* Inspection-complete toast — fixed banner, zIndex above the panel (50) */}
+      {pendingInspectionToast && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 60,
+          background: '#0C4A6E', color: '#fff',
+          padding: '14px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>
+            ✅ Inspection complete for {pendingInspectionToast.renterName} — place the deposit hold to finish check-out.
+          </span>
+          <button
+            onClick={() => setPendingInspectionToast(null)}
+            style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}
+          >×</button>
+        </div>
+      )}
+
+      <div style={{ background: '#0B1120', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: pendingInspectionToast ? 52 : 0 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Full Throttle Admin</div>
           <div style={{ fontSize: 11, color: '#94A3B8' }}>{bookings.length} bookings · {bookings.filter(b => b.rentalStatus !== 'returned').length} active</div>
@@ -537,14 +623,21 @@ export default function AdminPage() {
               {selectedBooking.rentalStatus === 'booked' && !actionSuccess && (() => {
                 const depAmt = selectedBooking.packageName?.includes('GTX') ? 2000 : 1000;
                 const depLabel = `$${depAmt.toLocaleString()}`;
+                const isCheckoutFocus = pendingInspectionToast?.sessionId === selectedBooking.sessionId;
                 return (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Pickup — Security Deposit</div>
 
                   <button
+                    className={isCheckoutFocus ? 'ftu-hold-pulse' : undefined}
                     onClick={() => handleChargeDeposit(selectedBooking)}
                     disabled={actionLoading}
-                    style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10, opacity: actionLoading ? 0.5 : 1 }}
+                    style={{
+                      width: '100%', padding: 16, borderRadius: 12, border: 'none',
+                      background: isCheckoutFocus ? '#0369A1' : '#0C4A6E',
+                      color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                      marginBottom: 10, opacity: actionLoading ? 0.5 : 1,
+                    }}
                   >
                     {actionLoading ? 'Processing...' : `💳 Place ${depLabel} Card Hold`}
                   </button>
@@ -556,6 +649,14 @@ export default function AdminPage() {
                   >
                     💵 Cash Deposit Received ({depLabel})
                   </button>
+
+                  {/* Deep-link: Check Out button — opens Inspect with booking context */}
+                  <a
+                    href={`/inspect?sid=${selectedBooking.sessionId}&mode=checkout&returnUrl=${encodeURIComponent('/admin?focus=' + selectedBooking.sessionId + '&checkedOut=1')}`}
+                    style={{ display: 'block', width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#F8FAFC', color: '#0C4A6E', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 14, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}
+                  >
+                    Check Out — Open Inspection →
+                  </a>
                 </div>
                 );
               })()}
@@ -638,14 +739,6 @@ export default function AdminPage() {
                   )}
                 </div>
               )}
-
-              {/* Link to inspection */}
-              <a
-                href="/inspect"
-                style={{ display: 'block', width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#F8FAFC', color: '#0C4A6E', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 16, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}
-              >
-                Open Inspection App →
-              </a>
             </div>
           </div>
         </div>
