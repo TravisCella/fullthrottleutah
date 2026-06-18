@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/pickup-reminder",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/return-reminder",
+      "schedule": "0 15 * * *"
     }
   ]
 }
