@@ -61,6 +61,9 @@ export default function AdminPage() {
   const [inspectionId, setInspectionId] = useState(null);
   const [deepLinkParams, setDeepLinkParams] = useState(null);
 
+  // Booking reset confirmation state
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+
   // Check for saved password on mount
   useEffect(() => {
     const saved = sessionStorage.getItem('ftu_admin_pass');
@@ -373,6 +376,31 @@ export default function AdminPage() {
     setActionLoading(false);
   };
 
+  const handleResetToBooked = async (booking) => {
+    setResetConfirmOpen(false);
+    setActionLoading(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await fetch('/api/admin/update-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentIntentId: booking.paymentIntentId, action: 'reset_to_booked', password }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setActionError(data.error);
+      } else {
+        setActionSuccess('↩ Booking reset — status reverted to Upcoming');
+        await refreshBookings();
+        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
+      }
+    } catch {
+      setActionError('Connection error');
+    }
+    setActionLoading(false);
+  };
+
   if (!authed) {
     return (
       <div style={{ minHeight: '100vh', background: '#0B1120', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }}>
@@ -533,7 +561,7 @@ export default function AdminPage() {
           return (
             <div
               key={b.sessionId}
-              onClick={() => { setSelectedBooking(b); setActionError(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); }}
+              onClick={() => { setSelectedBooking(b); setActionError(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); setResetConfirmOpen(false); }}
               style={{
                 background: '#fff',
                 borderRadius: 14,
@@ -574,7 +602,7 @@ export default function AdminPage() {
       {/* Booking Detail Modal */}
       {selectedBooking && (
         <div
-          onClick={() => !actionLoading && setSelectedBooking(null)}
+          onClick={() => !actionLoading && (setSelectedBooking(null), setResetConfirmOpen(false))}
           style={{ position: 'fixed', inset: 0, background: 'rgba(11,17,32,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50, padding: 0 }}
         >
           <div
@@ -584,7 +612,7 @@ export default function AdminPage() {
             <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, background: '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                 <div style={{ fontSize: 19, fontWeight: 700 }}>{selectedBooking.renterName}</div>
-                <button onClick={() => setSelectedBooking(null)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
+                <button onClick={() => { setSelectedBooking(null); setResetConfirmOpen(false); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
               </div>
               <div style={{ fontSize: 13, color: '#64748B' }}>{selectedBooking.packageName} · {selectedBooking.location}</div>
             </div>
@@ -735,6 +763,43 @@ export default function AdminPage() {
                   {selectedBooking.returnTimestamp && (
                     <div style={{ fontSize: 11, fontWeight: 400, marginTop: 4 }}>
                       Returned {new Date(selectedBooking.returnTimestamp).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* DANGER ZONE — reset to booked (shown for picked_up or returned) */}
+              {selectedBooking.rentalStatus !== 'booked' && !actionSuccess && (
+                <div style={{ marginTop: 24, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Admin — Correct a Mistake</div>
+                  {!resetConfirmOpen ? (
+                    <button
+                      onClick={() => setResetConfirmOpen(true)}
+                      disabled={actionLoading}
+                      style={{ width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #FCA5A5', background: '#FFF1F2', color: '#991B1B', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
+                    >
+                      ↩ Reset to Booked (undo deposit / return)
+                    </button>
+                  ) : (
+                    <div style={{ background: '#FFF1F2', border: '1.5px solid #FCA5A5', borderRadius: 10, padding: 14 }}>
+                      <div style={{ fontSize: 13, color: '#991B1B', fontWeight: 600, marginBottom: 10 }}>
+                        This clears all deposit and return data from Stripe. Use only to correct a mistake — it cannot be undone automatically.
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => handleResetToBooked(selectedBooking)}
+                          disabled={actionLoading}
+                          style={{ flex: 1, padding: 10, borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
+                        >
+                          {actionLoading ? 'Resetting...' : 'Yes, Reset'}
+                        </button>
+                        <button
+                          onClick={() => setResetConfirmOpen(false)}
+                          style={{ flex: 1, padding: 10, borderRadius: 8, border: '1.5px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -1,41 +1,18 @@
 // app/api/admin/update-booking/route.js
-// Version: 2026-06-16 — Add reset_to_booked action
-// Last edited: June 16 2026
+// Version: 2026-06-18 — Use lib/reset-booking for reset_to_booked
+// Last edited: June 18 2026
 //
-// New action: reset_to_booked
-//   Resets a booking's PaymentIntent metadata to a clean pre-pickup state.
-//   Clears all deposit/pickup/return fields while leaving core booking data
-//   (renter info, dates, package, location, pricing, waiver) untouched.
-//   Returns before/after metadata snapshot for auditability.
-//   Use case: mis-applied deposit (wrong customer), accidental state advance,
-//   or any scenario where a booking needs to re-enter the pickup flow.
+// Change: reset_to_booked now delegates to buildResetMetadata / diffResetMetadata
+// from lib/reset-booking.js. Behavior is identical — refactor only.
 //
-// Builds on: 2026-06-02 auto-fire review request email after return
+// Builds on: 2026-06-16 (Add reset_to_booked action)
 
 import Stripe from 'stripe';
 import { sendReviewRequest } from '../../../../lib/review-email';
 import { getDepositAmount } from '../../../../lib/deposit';
+import { buildResetMetadata, diffResetMetadata } from '../../../../lib/reset-booking.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-// Fields that reset_to_booked clears. These are exclusively deposit/pickup/return
-// lifecycle fields — none of the core booking fields (renter name, dates, package, etc.)
-const RESET_FIELDS = [
-  'rentalStatus',
-  'securityDepositStatus',
-  'securityDepositHoldId',
-  'securityDepositMethod',
-  'securityDepositCard',
-  'pickupTimestamp',
-  'returnTimestamp',
-  'capturedAmount',
-  'damageReason',
-  'captureTimestamp',
-  'returnNotes',
-  'cashDepositAmount',
-  'externalStripeAction',
-  'externalStripeActionAt',
-];
 
 // Fire-and-forget review email
 function fireReviewRequestForBooking(piId) {
@@ -86,14 +63,8 @@ export async function POST(request) {
       updates.returnTimestamp = new Date().toISOString();
       if (notes) updates.returnNotes = notes;
     } else if (action === 'reset_to_booked') {
-      // Reset lifecycle fields to clean pre-pickup state.
-      // Stripe treats '' as deleting the key from metadata.
-      for (const field of RESET_FIELDS) {
-        updates[field] = '';
-      }
-      // Set the two status fields to their canonical initial values.
-      updates.rentalStatus = 'booked';
-      updates.securityDepositStatus = 'pending';
+      const resetMeta = buildResetMetadata(before);
+      Object.assign(updates, resetMeta);
     }
 
     await stripe.paymentIntents.update(paymentIntentId, { metadata: updates });
@@ -105,16 +76,7 @@ export async function POST(request) {
 
     // ── For reset_to_booked: return before/after for auditability ────────
     if (action === 'reset_to_booked') {
-      const changed = {};
-      for (const field of RESET_FIELDS) {
-        if (before[field] !== undefined && before[field] !== '') {
-          changed[field] = { before: before[field], after: updates[field] };
-        }
-      }
-      // Always show the two status fields regardless
-      changed.rentalStatus        = { before: before.rentalStatus        || '(unset)', after: updates.rentalStatus };
-      changed.securityDepositStatus = { before: before.securityDepositStatus || '(unset)', after: updates.securityDepositStatus };
-
+      const changed = diffResetMetadata(before, updates);
       return Response.json({ success: true, action, changed });
     }
 
