@@ -64,6 +64,9 @@ export default function AdminPage() {
   // Booking reset confirmation state
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
+  // Return deep-link state — set when Inspect redirects back after a return inspection
+  const [pendingReturnToast, setPendingReturnToast] = useState(null); // { sessionId, renterName }
+
   // Check for saved password on mount
   useEffect(() => {
     const saved = sessionStorage.getItem('ftu_admin_pass');
@@ -81,9 +84,10 @@ export default function AdminPage() {
     const focus = params.get('focus');
     if (!focus) return;
     const checkedOut = params.get('checkedOut');
+    const returned = params.get('returned');
     const inspId = params.get('inspectionId');
     if (inspId) setInspectionId(inspId);
-    setDeepLinkParams({ focus, checkedOut, inspectionId: inspId });
+    setDeepLinkParams({ focus, checkedOut, returned, inspectionId: inspId });
     history.replaceState(null, '', window.location.pathname);
   }, []);
 
@@ -92,7 +96,7 @@ export default function AdminPage() {
   // this only fires once even if bookings are refreshed later.
   useEffect(() => {
     if (!deepLinkParams || !bookings.length) return;
-    const { focus, checkedOut } = deepLinkParams;
+    const { focus, checkedOut, returned } = deepLinkParams;
     const booking = bookings.find(b => b.sessionId === focus);
     if (!booking) return;
     setSelectedBooking(booking);
@@ -103,6 +107,9 @@ export default function AdminPage() {
     setReturnNotes('');
     if (checkedOut === '1') {
       setPendingInspectionToast({ sessionId: focus, renterName: booking.renterName });
+    }
+    if (returned === '1') {
+      setPendingReturnToast({ sessionId: focus, renterName: booking.renterName });
     }
     setDeepLinkParams(null);
   }, [bookings, deepLinkParams]);
@@ -273,6 +280,7 @@ export default function AdminPage() {
 
       // Normal success path
       await markReturnedInBackend(booking, returnNotes || 'Clean return');
+      setPendingReturnToast(null);
       setActionSuccess('✅ Hold released — customer charged $0');
       await refreshBookings();
       setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
@@ -338,6 +346,7 @@ export default function AdminPage() {
 
       // Normal success path
       await markReturnedInBackend(booking, `Damage: ${damageReason} ($${amount})`);
+      setPendingReturnToast(null);
       setActionSuccess(`✅ Captured $${amount} · $${dep - amount} released`);
       await refreshBookings();
       setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); }, 3000);
@@ -366,6 +375,7 @@ export default function AdminPage() {
       if (data.error) {
         setActionError(data.error);
       } else {
+        setPendingReturnToast(null);
         setActionSuccess('💵 Cash deposit returned, rental closed');
         await refreshBookings();
         setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
@@ -452,18 +462,23 @@ export default function AdminPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'system-ui, sans-serif', paddingBottom: 40 }}>
-      {/* Keyframe for card-hold pulse — only injected when a deep-link return is active */}
-      {pendingInspectionToast && (
+      {/* Keyframes — only inject when the relevant deep-link is active */}
+      {(pendingInspectionToast || pendingReturnToast) && (
         <style>{`
           @keyframes ftu-hold-pulse {
             0%, 100% { box-shadow: 0 0 0 0 rgba(14,165,233,0.6); }
             50%       { box-shadow: 0 0 0 8px rgba(14,165,233,0); }
           }
           .ftu-hold-pulse { animation: ftu-hold-pulse 1.4s ease-in-out 4; }
+          @keyframes ftu-return-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.6); }
+            50%       { box-shadow: 0 0 0 8px rgba(22,163,74,0); }
+          }
+          .ftu-return-pulse { animation: ftu-return-pulse 1.4s ease-in-out 4; }
         `}</style>
       )}
 
-      {/* Inspection-complete toast — fixed banner, zIndex above the panel (50) */}
+      {/* Checkout-inspection toast */}
       {pendingInspectionToast && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 60,
@@ -482,7 +497,26 @@ export default function AdminPage() {
         </div>
       )}
 
-      <div style={{ background: '#0B1120', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: pendingInspectionToast ? 52 : 0 }}>
+      {/* Return-inspection toast — stacks below checkout toast if both are active */}
+      {pendingReturnToast && (
+        <div style={{
+          position: 'fixed', top: pendingInspectionToast ? 52 : 0, left: 0, right: 0, zIndex: 59,
+          background: '#166534', color: '#fff',
+          padding: '14px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>
+            ✅ Return inspection complete for {pendingReturnToast.renterName} — settle the security deposit below.
+          </span>
+          <button
+            onClick={() => setPendingReturnToast(null)}
+            style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}
+          >×</button>
+        </div>
+      )}
+
+      <div style={{ background: '#0B1120', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: (pendingInspectionToast ? 52 : 0) + (pendingReturnToast ? 52 : 0) }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Full Throttle Admin</div>
           <div style={{ fontSize: 11, color: '#94A3B8' }}>{bookings.length} bookings · {bookings.filter(b => b.rentalStatus !== 'returned').length} active</div>
@@ -700,6 +734,7 @@ export default function AdminPage() {
                   {selectedBooking.securityDepositMethod === 'card' && selectedBooking.securityDepositHoldId && (
                     <>
                       <button
+                        className={pendingReturnToast?.sessionId === selectedBooking.sessionId ? 'ftu-return-pulse' : undefined}
                         onClick={() => handleReleaseHold(selectedBooking)}
                         disabled={actionLoading}
                         style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', background: '#16A34A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10, opacity: actionLoading ? 0.5 : 1 }}
@@ -752,6 +787,14 @@ export default function AdminPage() {
                       </button>
                     </>
                   )}
+
+                  {/* Deep-link: Return Inspection button — opens Inspect with booking context */}
+                  <a
+                    href={`/inspect?sid=${selectedBooking.sessionId}&mode=return&returnUrl=${encodeURIComponent('/admin?focus=' + selectedBooking.sessionId + '&returned=1')}`}
+                    style={{ display: 'block', width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#F8FAFC', color: '#166534', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 14, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}
+                  >
+                    Return Inspection →
+                  </a>
                 </div>
                 );
               })()}
