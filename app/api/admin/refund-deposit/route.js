@@ -31,6 +31,41 @@ function classifyStripeStateError(err) {
   return null;
 }
 
+// Write "rental returned" status onto the ORIGINAL BOOKING PaymentIntent.
+// This is the PI that list-bookings reads — the hold PI (written by writeReturnMetadata)
+// is never surfaced in the admin dashboard.
+// Non-fatal: the hold operation already succeeded. Log loudly so manual reconciliation
+// is possible if this call fails (booking will show "OUT · CARD HOLD" until corrected).
+async function writeReturnedToBookingPI(origPiId, { action, capturedAmount, damageReason }) {
+  if (!origPiId) {
+    console.error(
+      '[refund-deposit] writeReturnedToBookingPI: origPiId is null — ' +
+        'booking PI rentalStatus NOT updated. Requires manual correction.'
+    );
+    return;
+  }
+  try {
+    const pi = await stripe.paymentIntents.retrieve(origPiId);
+    const updates = { ...pi.metadata };
+    updates.rentalStatus = 'returned';
+    updates.returnTimestamp = new Date().toISOString();
+    if (action === 'release') {
+      updates.securityDepositStatus = 'released';
+    } else if (action === 'capture') {
+      updates.securityDepositStatus = 'captured';
+      if (capturedAmount != null) updates.capturedAmount = String(capturedAmount);
+      if (damageReason) updates.damageReason = damageReason;
+    }
+    await stripe.paymentIntents.update(origPiId, { metadata: updates });
+    console.log('[refund-deposit] Booking PI rentalStatus → returned:', origPiId);
+  } catch (err) {
+    console.error(
+      `[refund-deposit] FAILED to update booking PI ${origPiId}: ${err.message}. ` +
+        'Booking shows OUT·CARD HOLD until manually corrected via update-booking.'
+    );
+  }
+}
+
 // Write the full set of "rental returned" metadata onto a PaymentIntent in one call.
 async function writeReturnMetadata(piId, { action, damageReason, capturedAmount, externalAction }) {
   const pi = await stripe.paymentIntents.retrieve(piId);
@@ -130,6 +165,10 @@ export async function POST(request) {
           });
           // Fire review email + return notification for the original booking
           const origPiId = await findOriginalBookingPI(result);
+          await writeReturnedToBookingPI(origPiId, {
+            action: 'capture',
+            capturedAmount: result.amount_received / 100,
+          });
           fireReviewRequestForBooking(origPiId);
           fireReturnNotification(result, origPiId, {
             action: 'capture',
@@ -157,6 +196,7 @@ export async function POST(request) {
 
       // Fire review email + return notification for the original booking
       const origPiId = await findOriginalBookingPI(result);
+      await writeReturnedToBookingPI(origPiId, { action: 'release' });
       fireReviewRequestForBooking(origPiId);
       fireReturnNotification(result, origPiId, {
         action: 'release',
@@ -229,11 +269,16 @@ export async function POST(request) {
 
     // Fire review email + return notification for the original booking
     const origPiId = await findOriginalBookingPI(result);
+    await writeReturnedToBookingPI(origPiId, {
+      action: 'capture',
+      capturedAmount: finalCapturedAmount,
+      damageReason: externalAction ? null : damageReason,
+    });
     fireReviewRequestForBooking(origPiId);
     fireReturnNotification(result, origPiId, {
       action: 'capture',
       capturedAmount: finalCapturedAmount,
-      releasedAmount: (result.amount / 100) - finalCapturedAmount,
+      releasedAmount: result.amount / 100 - finalCapturedAmount,
       damageReason: externalAction ? null : damageReason,
     });
 
