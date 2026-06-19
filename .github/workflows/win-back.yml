@@ -1,0 +1,22 @@
+name: Abandoned-checkout win-back
+
+on:
+  # Fires every 15 minutes. GitHub Actions scheduler can lag by a few minutes
+  # under load, but that's fine for a 45-minute nudge window.
+  schedule:
+    - cron: '*/15 * * * *'
+  # Manual trigger for testing — use "Run workflow" in the GitHub Actions UI
+  # or: gh workflow run win-back.yml
+  workflow_dispatch:
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Fire win-back cron
+        run: |
+          curl --fail \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://fullthrottleutah.com/api/cron/win-back

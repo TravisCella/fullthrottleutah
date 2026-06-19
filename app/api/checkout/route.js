@@ -15,6 +15,7 @@
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const FIREBASE_DB_URL = 'https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com';
 
 // ── Server-side source of truth for boat rider capacity (USCG-rated) ──
 // Must stay in sync with PACKAGES[].maxRiders in app/booking.js. Kept here
@@ -212,6 +213,51 @@ export async function POST(request) {
       success_url: `${request.headers.get('origin') || 'https://www.fullthrottleutah.com'}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.headers.get('origin') || 'https://www.fullthrottleutah.com'}/`,
     });
+
+    // Write a pending-checkout record to Firebase so the win-back cron can find
+    // customers who reached Stripe but didn't complete payment.
+    // Non-fatal: a Firebase failure here must NEVER block or alter the checkout
+    // response — the customer is already on their way to pay.
+    try {
+      const fbSecret = process.env.FIREBASE_DATABASE_SECRET;
+      if (fbSecret) {
+        const now = Date.now();
+        const pendingRecord = {
+          sessionId: session.id,
+          checkoutUrl: session.url,
+          renterName,
+          renterEmail,
+          renterPhone: renterPhone || '',
+          smsOptIn: smsOptIn ? 'true' : 'false',
+          packageName,
+          location,
+          startDate,
+          endDate: endDate || startDate,
+          days: days?.toString() || '1',
+          totalPrice: totalPrice?.toString() || '0',
+          createdAt: now,
+          expiresAt: now + 24 * 60 * 60 * 1000, // Stripe session default: 24 h
+          status: 'pending',
+          nudged: false,
+        };
+        const fbRes = await fetch(
+          `${FIREBASE_DB_URL}/pending-checkouts/${session.id}.json?auth=${encodeURIComponent(fbSecret)}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pendingRecord),
+          }
+        );
+        if (!fbRes.ok) {
+          const errText = await fbRes.text();
+          console.error('[checkout] Firebase pending-checkout write failed:', fbRes.status, errText);
+        }
+      } else {
+        console.warn('[checkout] FIREBASE_DATABASE_SECRET not set — skipping pending-checkout write');
+      }
+    } catch (fbErr) {
+      console.error('[checkout] Pending-checkout write threw:', fbErr.message);
+    }
 
     return Response.json({ url: session.url, sessionId: session.id });
   } catch (err) {
