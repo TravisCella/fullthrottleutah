@@ -270,6 +270,27 @@ export async function POST(request) {
       }
 
       await sendConfirmationEmail(booking);
+
+      // Mark the pending-checkout record completed so the win-back cron
+      // never nudges a customer who has already paid.
+      // Fire-and-forget — a Firebase failure here must not affect the
+      // webhook response or any existing booking logic.
+      try {
+        const fbSecret = process.env.FIREBASE_DATABASE_SECRET;
+        if (fbSecret) {
+          await fetch(
+            `https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com/pending-checkouts/${session.id}.json?auth=${encodeURIComponent(fbSecret)}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'completed' }),
+            }
+          );
+          console.log('[webhook] Pending-checkout marked completed:', session.id);
+        }
+      } catch (fbErr) {
+        console.error('[webhook] Failed to mark pending-checkout completed:', fbErr.message);
+      }
     }
 
     return NextResponse.json({ received: true });
