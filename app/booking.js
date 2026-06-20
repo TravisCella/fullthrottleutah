@@ -26,6 +26,12 @@ import {
   AGREEMENT_SECTIONS,
   AGREEMENT_CHECKBOXES,
 } from "../lib/agreement-text";
+import {
+  PACKAGES, LOCATIONS, HOLIDAYS,
+  EXTRA_VEST_FEE, MAX_EXTRA_VESTS,
+  isWeekend, daysBetween,
+  calculateBasePrice, getHolidaySurcharge,
+} from "../lib/pricing";
 
 // ── Product images (served from /images/) ──
 const IMAGES = {
@@ -40,66 +46,6 @@ const IMAGES = {
   sparkProfile: "/images/spark-profile.png",
   gtxHero: "/images/gtx-hero.png",
 };
-
-const PACKAGES = [
-  {
-    id: "spark-duo",
-    name: "Spark Duo",
-    tagline: "2 × 2014 Sea-Doo Spark 900 ACE HO",
-    description: "Two nimble, lightweight Sparks on a single trailer. Quick, fun, and easy to ride — perfect for cruising any Utah reservoir.",
-    includes: ["2 Sea-Doo Spark 900 ACE HO", "Single trailer", "4 life preservers", "2 anchoring systems", "Safety flags"],
-    weekday: 269,
-    weekend: 299,
-    multiDay: { 2: 256, 3: 237, 4: 229, 5: 215 },
-    deposit: 1000,
-    maxRiders: 4, // 2 skis × 2 riders each
-    heroImg: "sparkHero",
-    galleryImgs: ["sparkFront", "sparkSide", "sparkAngle"],
-    accent: "#0EA5E9",
-    accentLight: "rgba(14,165,233,0.08)",
-  },
-  {
-    id: "gtx-duo",
-    name: "GTX Limited Duo",
-    tagline: "2 × 2026 Sea-Doo GTX Limited 325",
-    description: "The ultimate luxury ride. 325 HP, 10.25\" touchscreen, premium Bluetooth audio, massive swim platform. This is first class on the water.",
-    includes: ["2 Sea-Doo GTX Limited 325 HP", "Single trailer", "6 life preservers", "2 anchoring systems", "Safety flags", "Bluetooth audio"],
-    weekday: 549,
-    weekend: 649,
-    multiDay: { 2: 522, 3: 483, 4: 467, 5: 439 },
-    deposit: 2000,
-    maxRiders: 6, // 2 skis × 3 riders each (Sea-Doo GTX 325 is 3-up)
-    heroImg: "gtxHero",
-    galleryImgs: ["gtxStudio", "gtxWater", "gtxAction"],
-    accent: "#B8860B",
-    accentLight: "rgba(184,134,11,0.08)",
-  },
-];
-
-// ── Lakes we serve, with distance-tiered white-glove pricing ──
-const LOCATIONS = [
-  { id: "pineview", name: "Pineview Reservoir", region: "Ogden Valley", drive: "~1hr", emoji: "🏔️", aisStatus: "clean", whiteGloveFee: 175 },
-  { id: "willard-bay", name: "Willard Bay", region: "Northern Utah", drive: "~35min", emoji: "🦅", aisStatus: "clean", whiteGloveFee: 150 },
-  { id: "echo", name: "Echo Reservoir", region: "Summit County", drive: "~45min", emoji: "🌊", aisStatus: "clean", whiteGloveFee: 175 },
-  { id: "rockport", name: "Rockport Reservoir", region: "Summit County", drive: "~50min", emoji: "🪨", aisStatus: "clean", whiteGloveFee: 225 },
-  { id: "east-canyon", name: "East Canyon Reservoir", region: "Morgan County", drive: "~50min", emoji: "🏞️", aisStatus: "clean", whiteGloveFee: 200 },
-  { id: "jordanelle", name: "Jordanelle Reservoir", region: "Wasatch Back", drive: "~45min", emoji: "🌲", aisStatus: "clean", whiteGloveFee: 225 },
-  { id: "deer-creek", name: "Deer Creek Reservoir", region: "Heber Valley", drive: "~50min", emoji: "🦌", aisStatus: "clean", whiteGloveFee: 250 },
-  { id: "utah-lake", name: "Utah Lake", region: "Utah County", drive: "~1hr", emoji: "🐟", aisStatus: "clean", whiteGloveFee: 250 },
-  { id: "yuba", name: "Yuba Lake", region: "Central Utah", drive: "~2hr", emoji: "🏖️", aisStatus: "clean", whiteGloveFee: 400 },
-  { id: "bear-lake", name: "Bear Lake", region: "Utah/Idaho Border", drive: "~2.5hr", emoji: "💎", aisStatus: "clean", minDays: 2, whiteGloveFee: 450 },
-  { id: "flaming-gorge", name: "Flaming Gorge Reservoir", region: "Utah/Wyoming Border", drive: "~3.5hr", emoji: "🔥", aisStatus: "clean", minDays: 3, whiteGloveFee: 650 },
-  { id: "sand-hollow", name: "Sand Hollow Reservoir", region: "St. George / Hurricane", drive: "~4hr", emoji: "🌅", aisStatus: "clean", minDays: 3, whiteGloveFee: 750 },
-  { id: "lake-powell", name: "Lake Powell", region: "Southern Utah", drive: "~4.5hr", emoji: "🏜️", aisStatus: "infested", minDays: 3, deconFee: 200, whiteGloveFee: null },
-];
-
-// ── Holiday surcharges ──
-const HOLIDAYS = [
-  { start: "07-01", end: "07-05", name: "July 4th", premium: 75 },
-  { start: "07-20", end: "07-25", name: "Pioneer Day", premium: 75 },
-  { start: "08-29", end: "09-02", name: "Labor Day", premium: 75 },
-  { start: "05-23", end: "05-27", name: "Memorial Day", premium: 75 },
-];
 
 // ── Life vest sizes (matches inventory) ──
 // Order from largest to smallest for natural reading
@@ -139,12 +85,6 @@ const EMPTY_VESTS = {
 
 // Default selection if customer skips this section: 2 Adult Mediums (one per operator)
 const DEFAULT_VESTS = { ...EMPTY_VESTS, adult_medium: 2 };
-
-// ── Spare vest economics (2026-06-06) ──
-// Customers can exceed boat capacity by buying spare vests. Hard cap on extras
-// keeps the request reasonable and protects against client-side bypass abuse.
-const EXTRA_VEST_FEE = 15;     // $ per spare vest beyond rated boat capacity
-const MAX_EXTRA_VESTS = 2;     // hard cap on spares — server enforces this too
 
 // Build the readable summary string used in SMS, email, and Sheet.
 // e.g. "1 Adult XXL, 1 Adult M, 1 Youth (3 vests)"  — under capacity
@@ -199,37 +139,8 @@ function timeToMinutes(t24) {
   return h * 60 + m;
 }
 
-function getHolidaySurcharge(startDate, endDate) {
-  if (!startDate) return { total: 0, holidays: [] };
-  const end = endDate || startDate;
-  const matched = [];
-  let totalSurcharge = 0;
-
-  const current = new Date(startDate);
-  current.setHours(0,0,0,0);
-  const last = new Date(end);
-  last.setHours(0,0,0,0);
-
-  while (current <= last) {
-    const mmdd = `${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
-    for (const h of HOLIDAYS) {
-      if (mmdd >= h.start && mmdd <= h.end) {
-        if (!matched.find(m => m.name === h.name)) {
-          matched.push(h);
-        }
-        totalSurcharge += h.premium;
-        break;
-      }
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  return { total: totalSurcharge, holidays: matched };
-}
-
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDayOfMonth(y, m) { return new Date(y, m, 1).getDay(); }
-function isWeekend(d) { const day = new Date(d).getDay(); return day === 0 || day === 5 || day === 6; }
 function formatDate(d) { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
 function toISODate(d) {
   const y = d.getFullYear();
@@ -237,19 +148,6 @@ function toISODate(d) {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-function daysBetween(a, b) { return Math.round((b - a) / 864e5) + 1; }
-
-function calculatePrice(pkg, start, end) {
-  const days = daysBetween(start, end);
-  if (days === 1) return isWeekend(start) ? pkg.weekend : pkg.weekday;
-  let rate;
-  if (days >= 5) rate = pkg.multiDay[5];
-  else if (days >= 4) rate = pkg.multiDay[4];
-  else if (days >= 3) rate = pkg.multiDay[3];
-  else rate = pkg.multiDay[2];
-  return rate * days;
-}
-
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS_HDR = ["Su","Mo","Tu","We","Th","Fr","Sa"];
 
@@ -627,7 +525,7 @@ export default function JetSkiBooking() {
   };
 
   const days = dates.length === 2 ? daysBetween(dates[0], dates[1]) : dates.length === 1 ? 1 : 0;
-  const basePrice = pkg && days > 0 ? calculatePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0]) : 0;
+  const basePrice = pkg && days > 0 ? calculateBasePrice(pkg, dates[0], dates.length === 2 ? dates[1] : dates[0]) : 0;
   const holidayInfo = dates.length > 0 ? getHolidaySurcharge(dates[0], dates.length === 2 ? dates[1] : dates[0]) : { total: 0, holidays: [] };
   const whiteGloveFee = (whiteGlove && loc?.whiteGloveFee) ? loc.whiteGloveFee : 0;
   const isLakePowell = loc?.id === "lake-powell";
