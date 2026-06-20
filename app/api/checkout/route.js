@@ -10,23 +10,23 @@
 //      with snake_case as fallback, so existing bookings are unaffected.
 //      Brings active key count from 52 → 34.
 //
+// 2026-06-20: Server-authoritative pricing (price-tamper fix)
+//      computeTotal() from lib/pricing.js now computes the Stripe charge.
+//      The client-sent totalPrice is NEVER used for the charge amount.
+//      Repeat-customer status is determined server-side via isRepeatCustomer();
+//      on any error, no discount applies (fail closed — client flag not used).
+//      spareVestCount / extraVestFee come from priceBreakdown, not client.
+//      All pricing fields in bookingMeta are server-authoritative.
+//      35 metadata keys — still under the 50-key cap.
+//
 // Builds on: 2026-06-06 Phase 2 agreement metadata
 
 import Stripe from 'stripe';
+import { computeTotal, getPackage, MAX_EXTRA_VESTS } from '../../../lib/pricing';
+import { isRepeatCustomer } from '../../../lib/sheets';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const FIREBASE_DB_URL = 'https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com';
-
-// ── Server-side source of truth for boat rider capacity (USCG-rated) ──
-// Must stay in sync with PACKAGES[].maxRiders in app/booking.js. Kept here
-// so the server can independently validate vest counts regardless of what
-// the client sends.
-const MAX_RIDERS_BY_PACKAGE = {
-  'Spark Duo': 4,         // 2 riders × 2 Sparks
-  'GTX Limited Duo': 6,   // 3 riders × 2 GTX 325s
-};
-const SPARE_VEST_FEE = 15;       // $ per spare vest beyond capacity
-const MAX_SPARE_VESTS = 2;       // hard cap on spares
 
 export async function POST(request) {
   try {
@@ -35,31 +35,26 @@ export async function POST(request) {
     const {
       packageName,
       packageTagline,
-      totalPrice,
+      totalPrice,           // client-sent; used only for mismatch logging
       days,
       startDate,
       endDate,
-      location,
+      locationId,           // preferred id string ("pineview") — absent in old bundles
+      location,             // display name — kept for webhook/sheet/metadata + getLocation fallback
       renterName,
       renterEmail,
       renterPhone,
       experience,
       smsOptIn,
       whiteGlove,
-      whiteGloveFee,
-      holidaySurcharge,
-      deconFee,
       isLakePowell,
-      loyaltyDiscount,
-      vestSizes,        // JSON string of {size_key: count}
-      vestSummary,      // Human-readable string
-      vestUsedDefault,  // true if customer skipped and we defaulted
-      spareVestCount,   // # of vests beyond boat capacity (2026-06-06)
-      extraVestFee,     // $ fee for spares (2026-06-06)
-      pickupTime,        // 24-hr internal format "HH:MM" (e.g. "08:00")
-      returnTime,        // 24-hr internal format "HH:MM" (e.g. "20:00")
-      pickupTimeDisplay, // 12-hr display string (e.g. "8:00 AM")
-      returnTimeDisplay, // 12-hr display string (e.g. "8:00 PM")
+      vestSizes,            // JSON string of {size_key: count}
+      vestSummary,          // human-readable string
+      vestUsedDefault,      // true if customer skipped and we defaulted
+      pickupTime,           // 24-hr internal "HH:MM"
+      returnTime,           // 24-hr internal "HH:MM"
+      pickupTimeDisplay,    // 12-hr display string
+      returnTimeDisplay,    // 12-hr display string
       waiverSigned,
       waiverDate,
       // ── Rental Agreement (Phase 2) ──
@@ -69,21 +64,13 @@ export async function POST(request) {
       agreementChecksJson,
     } = data;
 
-    // ─── 2026-06-06: Server-side vest validation ─────────────────────────
-    // Independent check so client-side UI bugs (or tampered requests) can't
-    // bypass boat capacity rules. This was added after a customer somehow
-    // checked out with 6 vests on a Spark Duo (rated for 4 riders + 2 spares
-    // max = 6 vests). The math here is the source of truth.
-    const maxRiders = MAX_RIDERS_BY_PACKAGE[packageName];
-    if (!maxRiders) {
-      return Response.json(
-        { error: `Unknown package: ${packageName}` },
-        { status: 400 }
-      );
+    // ─── Vest hard-reject (unchanged logic) ──────────────────────────────
+    const pkg = getPackage(packageName);
+    if (!pkg) {
+      return Response.json({ error: `Unknown package: ${packageName}` }, { status: 400 });
     }
-    const maxTotalVests = maxRiders + MAX_SPARE_VESTS;
+    const maxTotalVests = pkg.maxRiders + MAX_EXTRA_VESTS;
 
-    // Parse and count the vest selection
     let parsedVests = {};
     try {
       parsedVests = typeof vestSizes === 'string' ? JSON.parse(vestSizes) : (vestSizes || {});
@@ -94,31 +81,64 @@ export async function POST(request) {
       (s, v) => s + (Number(v) || 0), 0
     );
 
-    // Hard cap check — reject anything beyond capacity + 2 spares
     if (serverTotalVests > maxTotalVests) {
       console.error(
         `[checkout] Rejecting booking: ${serverTotalVests} vests for ${packageName} (max ${maxTotalVests}). renter=${renterEmail}`
       );
       return Response.json(
         {
-          error: `Vest selection exceeds boat capacity. ${packageName} allows up to ${maxRiders} riders + ${MAX_SPARE_VESTS} spare vests (${maxTotalVests} total). You selected ${serverTotalVests}.`,
+          error: `Vest selection exceeds boat capacity. ${packageName} allows up to ${pkg.maxRiders} riders + ${MAX_EXTRA_VESTS} spare vests (${maxTotalVests} total). You selected ${serverTotalVests}.`,
         },
         { status: 400 }
       );
     }
+    // ──────────────────────────────────────────────────────────────────────
 
-    // Recompute the spare fee from scratch — the source of truth.
-    // If client-sent extraVestFee disagrees, we use the server value (no error).
-    const serverSpareCount = Math.max(0, serverTotalVests - maxRiders);
-    const serverExtraFee = serverSpareCount * SPARE_VEST_FEE;
-    if (Number(extraVestFee) !== serverExtraFee) {
+    // ─── Server-side repeat-customer check ───────────────────────────────
+    // isRepeatCustomer() already returns false on its own Sheets errors.
+    // When repeat status can't be confirmed, no loyalty discount applies.
+    // The client-sent repeatCustomer flag is intentionally NOT used for pricing.
+    let repeatCustomer = false;
+    try {
+      repeatCustomer = await isRepeatCustomer(renterEmail, renterPhone);
+    } catch (rcErr) {
       console.warn(
-        `[checkout] Vest fee mismatch — client sent ${extraVestFee}, server computed ${serverExtraFee}. Using server value.`
+        `[checkout] isRepeatCustomer threw for ${renterEmail} — no discount applied:`,
+        rcErr.message
       );
+      repeatCustomer = false;
     }
     // ──────────────────────────────────────────────────────────────────────
 
-    const fullAmount = Math.round(totalPrice * 100);
+    // ─── Authoritative server price ───────────────────────────────────────
+    // The Stripe charge is always Math.round(priceBreakdown.total * 100).
+    // The client-sent totalPrice is never used for the charge — only logged.
+    // An unresolvable package or location (tampered or stale client) fails
+    // closed with a 400 rather than an unhandled 500.
+    let priceBreakdown;
+    try {
+      priceBreakdown = computeTotal({
+        packageName,
+        startDate,
+        endDate,
+        locationId: locationId || location,
+        whiteGlove: !!whiteGlove,
+        vestSizes: parsedVests,
+        repeatCustomer,
+      });
+    } catch (pricingErr) {
+      console.error(`[checkout] computeTotal failed for ${renterEmail}:`, pricingErr.message);
+      return Response.json({ error: 'Invalid booking details' }, { status: 400 });
+    }
+
+    const fullAmount = Math.round(priceBreakdown.total * 100);
+
+    if (Math.abs((totalPrice || 0) - priceBreakdown.total) > 1) {
+      console.warn(
+        `[checkout] Price mismatch for ${renterEmail}: client sent $${totalPrice}, server computed $${priceBreakdown.total}. Charging server value.`
+      );
+    }
+    // ──────────────────────────────────────────────────────────────────────
 
     let customer;
     const existingCustomers = await stripe.customers.list({ email: renterEmail, limit: 1 });
@@ -137,8 +157,9 @@ export async function POST(request) {
 
     // Shared metadata attached to both the session and the payment intent.
     // Session-level metadata is readable even for abandoned/expired sessions
-    // where no payment intent was created. Both objects: 34 keys (under the 50-key cap).
+    // where no payment intent was created. Both objects: 35 keys (under the 50-key cap).
     // 2026-06-06 Phase 3 fix: removed snake_case duplicates to stay under cap.
+    // 2026-06-20: all pricing fields use server-computed values from priceBreakdown.
     // Webhook reads camelCase first with snake_case fallback for older bookings.
     const bookingMeta = {
       // Renter info
@@ -148,24 +169,25 @@ export async function POST(request) {
       experience: experience || '',
       // Booking details
       packageName,
+      locationId: locationId || '',
       location,
       startDate,
       endDate,
       days: days?.toString() || '1',
-      // Pricing detail flags
+      // Pricing — server-authoritative values from priceBreakdown
       whiteGlove: whiteGlove ? 'true' : 'false',
-      whiteGloveFee: whiteGloveFee?.toString() || '0',
-      holidaySurcharge: holidaySurcharge?.toString() || '0',
-      deconFee: deconFee?.toString() || '0',
+      whiteGloveFee: priceBreakdown.whiteGloveFee.toString(),
+      holidaySurcharge: priceBreakdown.holidaySurcharge.toString(),
+      deconFee: priceBreakdown.deconFee.toString(),
       isLakePowell: isLakePowell ? 'true' : 'false',
-      loyaltyDiscount: loyaltyDiscount?.toString() || '0',
+      loyaltyDiscount: priceBreakdown.loyaltyDiscount.toString(),
       // Life vest selection
       vestSizes: vestSizes || '',
       vestSummary: vestSummary || '',
       vestUsedDefault: vestUsedDefault ? 'true' : 'false',
-      // Spare vest fee — server-computed values, not client
-      spareVestCount: serverSpareCount.toString(),
-      extraVestFee: serverExtraFee.toString(),
+      // Spare vest fee — server-computed from priceBreakdown
+      spareVestCount: priceBreakdown.spareVestCount.toString(),
+      extraVestFee: priceBreakdown.extraVestFee.toString(),
       // Pickup & return times
       pickupTime: pickupTime || '08:00',
       returnTime: returnTime || '20:00',
@@ -202,7 +224,7 @@ export async function POST(request) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `${packageName}${whiteGlove && whiteGloveFee > 0 ? ` (White Glove $${whiteGloveFee})` : whiteGlove ? ' (White Glove)' : ''}`,
+              name: `${packageName}${whiteGlove && priceBreakdown.whiteGloveFee > 0 ? ` (White Glove $${priceBreakdown.whiteGloveFee})` : whiteGlove ? ' (White Glove)' : ''}`,
               description: `${packageTagline} · ${location} · ${days} day${days > 1 ? 's' : ''} (${startDate}${endDate !== startDate ? ` - ${endDate}` : ''})`,
             },
             unit_amount: fullAmount,
@@ -234,7 +256,7 @@ export async function POST(request) {
           startDate,
           endDate: endDate || startDate,
           days: days?.toString() || '1',
-          totalPrice: totalPrice?.toString() || '0',
+          totalPrice: priceBreakdown.total.toString(),
           createdAt: now,
           expiresAt: now + 24 * 60 * 60 * 1000, // Stripe session default: 24 h
           status: 'pending',
