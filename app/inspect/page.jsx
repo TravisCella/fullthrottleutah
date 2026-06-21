@@ -95,7 +95,7 @@ function upload(record, cb) {
 }
 
 // Notify backend so it can email/SMS the owner AND log to Google Sheets
-function notifyBackend(record, inspectionId) {
+function notifyBackend(record, inspectionId, password) {
   const damageNotes = (record.zones || [])
     .filter(z => z.damage && z.damage !== "None" && z.damage.trim() !== "")
     .map(z => `${z.zone}: ${z.damage}`);
@@ -116,6 +116,7 @@ function notifyBackend(record, inspectionId) {
       fuelOk: record.fuelOk,
       hourMeter: record.hourMeter,
       globalNote: record.globalNote,
+      password,
     }),
   }).catch(err => {
     console.error('Notify backend failed (non-fatal):', err);
@@ -127,11 +128,11 @@ function notifyBackend(record, inspectionId) {
 // uses Claude Sonnet 4.6 vision to analyze actual differences between check-out
 // and check-in. Returns null on error. Result shape matches the previous text-
 // based version so the UI doesn't change.
-function aiCompare(checkoutId, checkinId, cb) {
+function aiCompare(checkoutId, checkinId, password, cb) {
   fetch('/api/ai-compare', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ checkoutId, checkinId }),
+    body: JSON.stringify({ checkoutId, checkinId, password }),
   })
     .then(r => r.json())
     .then(data => {
@@ -217,6 +218,12 @@ export default function InspectionV2() {
   const [loadingRecent, setLoadingRecent] = useState(false);
   const [recentSearch, setRecentSearch] = useState("");
 
+  // Auth gate — reads the same sessionStorage key as /admin so a deep-linked
+  // operator arriving from the admin dashboard is not prompted again.
+  const [authed, setAuthed] = useState(null); // null = checking storage, true/false = determined
+  const [authPass, setAuthPass] = useState('');
+  const [authError, setAuthError] = useState('');
+
   // Deep-link params from admin check-out flow.
   // Read on mount via useEffect (not useSearchParams — avoids Suspense requirement).
   // NOT stripped from the URL so a mobile refresh mid-inspection preserves context.
@@ -229,6 +236,16 @@ export default function InspectionV2() {
     const returnUrl = params.get('returnUrl');
     if (sid || dlMode || returnUrl) {
       setDeepLink({ sid, mode: dlMode, returnUrl });
+    }
+  }, []);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem('ftu_admin_pass');
+    if (saved) {
+      setAuthPass(saved);
+      setAuthed(true);
+    } else {
+      setAuthed(false);
     }
   }, []);
 
@@ -249,8 +266,19 @@ export default function InspectionV2() {
 
   function loadRecentInspections() {
     setLoadingRecent(true);
-    fetch('/api/recent-inspections?days=30')
-      .then(r => r.json())
+    fetch('/api/recent-inspections?days=30', {
+      headers: { 'Authorization': `Bearer ${authPass}` },
+    })
+      .then(r => {
+        if (r.status === 401) {
+          sessionStorage.removeItem('ftu_admin_pass');
+          setAuthed(false);
+          setAuthPass('');
+          setAuthError('Incorrect password. Try again.');
+          return { inspections: [] };
+        }
+        return r.json();
+      })
       .then(data => {
         setRecentInspections(data.inspections || []);
       })
@@ -288,7 +316,7 @@ export default function InspectionV2() {
     };
     upload(record, (ok, id) => {
       if (ok) {
-        notifyBackend(record, id);
+        notifyBackend(record, id, authPass);
 
         setSubmitted(prev => [...prev, { ...record, id, timestamp: ts() }]);
         setPhotos(p => { const n = { ...p }; delete n[mk]; return n; });
@@ -320,7 +348,7 @@ export default function InspectionV2() {
     setAiLoading(true);
     setAiError("");
     setAiResult(null);
-    aiCompare(compareOut.trim(), compareIn.trim(), result => {
+    aiCompare(compareOut.trim(), compareIn.trim(), authPass, result => {
       if (!result) {
         setAiError("AI analysis failed. Check the inspection IDs and try again, or check Vercel logs.");
       } else {
@@ -331,6 +359,13 @@ export default function InspectionV2() {
   };
 
   const reset = () => { setRole(null); setMode(null); setStep("machine"); setMachine(null); setZone(0); setFuelOk(null); setGlobalNote(""); setCompareMode(false); setAiResult(null); setAiError(""); setCompareOut(""); setCompareIn(""); setHourMeter(""); };
+
+  const handleAuthSubmit = () => {
+    if (!authPass.trim()) return;
+    sessionStorage.setItem('ftu_admin_pass', authPass);
+    setAuthError('');
+    setAuthed(true);
+  };
 
   const accent = "#D85A30";
   const dark = "#111";
@@ -343,6 +378,36 @@ export default function InspectionV2() {
 
   const btn = (bgColor, color) => ({ padding: "13px 24px", border: "none", borderRadius: 12, background: bgColor, color, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", width: "100%", transition: "opacity 0.15s" });
   const outline = { padding: "11px 18px", border: `1.5px solid ${bdr}`, borderRadius: 12, background: "transparent", color: dark, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.2s" };
+
+  // Hold off rendering until we've checked sessionStorage (avoids flash of gate for authed operators).
+  if (authed === null) return null;
+
+  if (!authed) {
+    return (
+      <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: bg, minHeight: "100vh", color: dark, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "100%", maxWidth: 360, padding: "32px 24px" }}>
+          <div style={{ marginBottom: 24 }}>
+            <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.5px" }}>FULL THROTTLE</span>
+            {" "}<span style={{ fontSize: 10, background: accent, color: "#fff", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>INSPECT</span>
+            <div style={{ fontSize: 13, color: muted, marginTop: 6 }}>Staff access only. Enter admin password.</div>
+          </div>
+          <input
+            type="password"
+            value={authPass}
+            onChange={e => { setAuthPass(e.target.value); setAuthError(''); }}
+            onKeyDown={e => e.key === 'Enter' && handleAuthSubmit()}
+            placeholder="Admin password"
+            autoFocus
+            style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${authError ? red : bdr}`, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 12 }}
+          />
+          {authError && (
+            <div style={{ fontSize: 12, color: red, marginBottom: 12 }}>{authError}</div>
+          )}
+          <button onClick={handleAuthSubmit} style={btn(accent, "#fff")}>Continue →</button>
+        </div>
+      </div>
+    );
+  }
 
   function RecentCard({ insp, onTap, showSelectButtons, onUseAsCheckout, onUseAsCheckin }) {
     const isCustomer = insp.type === 'customer';

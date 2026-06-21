@@ -136,6 +136,12 @@ Verdict guide:
 
 export async function POST(request) {
   try {
+    const { checkoutId, checkinId, password } = await request.json();
+
+    if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
         { error: 'ANTHROPIC_API_KEY is not configured on the server' },
@@ -154,7 +160,6 @@ export async function POST(request) {
     }
     const authParam = `?auth=${encodeURIComponent(dbSecret)}`;
 
-    const { checkoutId, checkinId } = await request.json();
     if (!checkoutId || !checkinId) {
       return NextResponse.json({ error: 'Missing checkoutId or checkinId' }, { status: 400 });
     }

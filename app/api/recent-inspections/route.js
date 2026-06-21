@@ -3,6 +3,11 @@ import { getRecentInspections } from '../../../lib/sheets';
 
 export async function GET(request) {
   try {
+    const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    if (!process.env.ADMIN_PASSWORD || token !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '30', 10);
     const search = (searchParams.get('search') || '').toLowerCase().trim();

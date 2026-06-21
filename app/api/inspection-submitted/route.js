@@ -140,7 +140,11 @@ async function sendInspectionSMS(data) {
 export async function POST(request) {
   try {
     const data = await request.json();
-    
+
+    if (!process.env.ADMIN_PASSWORD || data.password !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Required fields
     if (!data.inspectionId || !data.type || !data.customerName) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
