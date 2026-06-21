@@ -145,7 +145,17 @@ export async function GET(request) {
           ? `${record.startDate} → ${record.endDate}`
           : record.startDate;
 
-      // ── 2. Resend email (always, when email is present) ───────────────────
+      // ── 2. Claim the record before sending — belt-and-suspenders against
+      //       overlapping cron runs both seeing nudged:false simultaneously.
+      //       Tradeoff: if email/SMS fail after this PATCH, nudged stays true
+      //       and the customer misses that one nudge. Acceptable — a missed
+      //       nudge beats a double-text.
+      await patchPendingRecord(record.sessionId, fbSecret, {
+        nudged: true,
+        nudgedAt: new Date().toISOString(),
+      });
+
+      // ── 3. Resend email (always, when email is present) ───────────────────
       if (record.renterEmail) {
         try {
           await sendWinBackEmail({
@@ -162,7 +172,7 @@ export async function GET(request) {
         }
       }
 
-      // ── 3. Renter SMS (ONLY if opted in) ─────────────────────────────────
+      // ── 4. Renter SMS (ONLY if opted in) ─────────────────────────────────
       if (record.smsOptIn === 'true' && record.renterPhone) {
         try {
           await sendSMS(record.renterPhone, buildRenterSMS(record, dates));
@@ -171,7 +181,7 @@ export async function GET(request) {
         }
       }
 
-      // ── 4. Owner hot-lead SMS ─────────────────────────────────────────────
+      // ── 5. Owner hot-lead SMS ─────────────────────────────────────────────
       try {
         const ownerPhones = (process.env.OWNER_PHONE_NUMBER || '')
           .split(',')
@@ -187,11 +197,6 @@ export async function GET(request) {
         console.error('[win-back] Owner SMS failed:', ownerErr.message);
       }
 
-      // ── 5. Mark nudged ────────────────────────────────────────────────────
-      await patchPendingRecord(record.sessionId, fbSecret, {
-        nudged: true,
-        nudgedAt: new Date().toISOString(),
-      });
       console.log('[win-back] Nudged:', record.sessionId, record.renterEmail);
       nudgedCount++;
     } catch (recordErr) {
