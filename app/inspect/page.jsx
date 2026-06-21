@@ -259,10 +259,10 @@ export default function InspectionV2() {
   const done = Object.keys(zp).filter(k => (zp[k] || []).length > 0).length;
 
   useEffect(() => {
-    if (role === null || compareMode) {
+    if (authed === true && (role === null || compareMode)) {
       loadRecentInspections();
     }
-  }, [role, compareMode]);
+  }, [role, compareMode, authed]);
 
   function loadRecentInspections() {
     setLoadingRecent(true);
