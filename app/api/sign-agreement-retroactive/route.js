@@ -119,7 +119,7 @@ export async function POST(request) {
       );
     }
 
-    const fbPath = `${FIREBASE_DB_URL}/retroactive-signatures/${encodeURIComponent(bookingId)}.json?auth=${firebaseSecret}`;
+    const fbPath = `${FIREBASE_DB_URL}/retroactive-signatures/${encodeURIComponent(bookingId)}.json?auth=${encodeURIComponent(firebaseSecret)}`;
     const fbPayload = {
       bookingId,
       agreementVersion,
