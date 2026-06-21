@@ -194,6 +194,23 @@ export async function POST(request) {
         console.log('Booking added to sheet:', booking.booking_id);
       } catch (sheetErr) {
         console.error('Sheet error (non-fatal):', sheetErr.message);
+        // Alert the owner team immediately — booking is PAID but not in the Sheet.
+        // Inner try/catch: this fires on an error path and must never throw.
+        // NOT gated on smsOptIn — this is an internal owner alert.
+        try {
+          const alertPhones = (process.env.OWNER_PHONE_NUMBER || '').split(',').map(p => p.trim()).filter(Boolean);
+          const dateLine = booking.end_date && booking.end_date !== booking.start_date
+            ? `${booking.start_date} → ${booking.end_date}`
+            : booking.start_date;
+          const alertMsg =
+            `⚠️ Sheet write FAILED for ${booking.renter_name} — ${booking.package}, ` +
+            `${dateLine}. Booking is PAID but not in the Sheet. Add it manually + check Vercel logs.`;
+          for (const phone of alertPhones) {
+            await sendSMS(phone, alertMsg);
+          }
+        } catch (alertErr) {
+          console.error('[webhook] Sheet-failure alert SMS also failed:', alertErr.message);
+        }
       }
 
       // Create Google Calendar event
