@@ -145,7 +145,7 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/list-bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, bust: true }),
       });
       const data = await res.json();
       if (data.bookings) setBookings(data.bookings);

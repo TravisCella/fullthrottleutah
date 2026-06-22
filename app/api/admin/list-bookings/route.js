@@ -42,6 +42,11 @@ import { google } from 'googleapis';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Module-level response cache. Per-instance (best-effort on serverless), 60s TTL.
+// Busted by post-mutation refreshes that send bust:true in the POST body.
+let listCache = null; // { data: [...bookings], expiresAt: number }
+const CACHE_TTL_MS = 60_000;
+
 async function getAllBookingsFromSheet() {
   try {
     let credentials;
@@ -105,17 +110,24 @@ async function getAllBookingsFromSheet() {
 
 export async function POST(request) {
   try {
-    const { password } = await request.json();
+    const { password, bust } = await request.json();
 
     if (password !== process.env.ADMIN_PASSWORD) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const ninetyDaysAgo = Math.floor(Date.now() / 1000) - (90 * 24 * 60 * 60);
+    // Return cached result for rapid reloads. Skip cache when bust:true (post-mutation).
+    if (!bust && listCache && Date.now() < listCache.expiresAt) {
+      return Response.json({ bookings: listCache.data });
+    }
 
-    const [sessionsResponse, sheetBookings] = await Promise.all([
+    const oneYearAgo = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60);
+    const MAX_SESSIONS = 1000;
+
+    // First page + Sheet in parallel, then paginate through remaining pages
+    const [firstPage, sheetBookings] = await Promise.all([
       stripe.checkout.sessions.list({
-        created: { gte: ninetyDaysAgo },
+        created: { gte: oneYearAgo },
         limit: 100,
         expand: [
           'data.payment_intent',
@@ -126,9 +138,28 @@ export async function POST(request) {
       getAllBookingsFromSheet(),
     ]);
 
+    const allSessions = [...firstPage.data];
+    let page = firstPage;
+    while (page.has_more && allSessions.length < MAX_SESSIONS) {
+      page = await stripe.checkout.sessions.list({
+        created: { gte: oneYearAgo },
+        limit: 100,
+        starting_after: page.data[page.data.length - 1].id,
+        expand: [
+          'data.payment_intent',
+          'data.payment_intent.latest_charge',
+          'data.customer',
+        ],
+      });
+      allSessions.push(...page.data);
+    }
+    if (allSessions.length >= MAX_SESSIONS) {
+      console.warn(`[list-bookings] Hit ${MAX_SESSIONS}-session ceiling — some sessions may be omitted.`);
+    }
+
     // ── STEP 1: Filter ─────────────────────────────────────────────────────
     // Keep a session only if it represents a live, uncharged-back booking.
-    const filtered = sessionsResponse.data.filter(s => {
+    const filtered = allSessions.filter(s => {
       if (s.payment_status !== 'paid') return false;
 
       const pi = s.payment_intent;
@@ -276,6 +307,7 @@ export async function POST(request) {
       return parseDate(a.startDate) - parseDate(b.startDate);
     });
 
+    listCache = { data: deduped, expiresAt: Date.now() + CACHE_TTL_MS };
     return Response.json({ bookings: deduped });
   } catch (err) {
     console.error('List bookings error:', err);
