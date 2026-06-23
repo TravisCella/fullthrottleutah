@@ -206,5 +206,36 @@ export async function GET(request) {
   }
 
   console.log(`[win-back] Done — nudged: ${nudgedCount}, skipped: ${skippedCount}`);
+
+  // ── Cleanup: delete records stale by > 7 days past expiry ────────────────
+  // expiresAt is set to createdAt + 24h in checkout. 7-day grace means only
+  // records 8+ days old are touched — nothing within the nudgeable window.
+  const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
+  try {
+    const staleIds = Object.entries(allRecords)
+      .filter(([, r]) => r.expiresAt < now - STALE_THRESHOLD_MS)
+      .map(([id]) => id);
+
+    if (staleIds.length > 0) {
+      console.log(`[win-back] Deleting ${staleIds.length} stale record(s)`);
+      for (const sessionId of staleIds) {
+        try {
+          const delRes = await fetch(
+            `${FIREBASE_DB_URL}/pending-checkouts/${sessionId}.json?auth=${encodeURIComponent(fbSecret)}`,
+            { method: 'DELETE' }
+          );
+          if (!delRes.ok) {
+            console.warn(`[win-back] Stale delete failed for ${sessionId}: ${delRes.status}`);
+          }
+        } catch (delErr) {
+          console.warn(`[win-back] Stale delete threw for ${sessionId}:`, delErr.message);
+        }
+      }
+    }
+  } catch (cleanupErr) {
+    // Best-effort — cleanup failure never affects nudge results or the response
+    console.error('[win-back] Cleanup pass failed:', cleanupErr.message);
+  }
+
   return NextResponse.json({ nudged: nudgedCount, skipped: skippedCount });
 }
