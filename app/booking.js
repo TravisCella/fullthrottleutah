@@ -481,6 +481,7 @@ export default function JetSkiBooking() {
           days: days,
           startDate: toISODate(dates[0]),
           endDate: dates.length === 2 ? toISODate(dates[1]) : toISODate(dates[0]),
+          locationId: loc.id,
           location: loc.name,
           renterName: info.name,
           renterEmail: info.email,
