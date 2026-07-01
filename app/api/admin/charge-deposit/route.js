@@ -158,7 +158,7 @@ async function getCardLast4(paymentMethod) {
 
 export async function POST(request) {
   try {
-    const { sessionId, password, inspectionId } = await request.json();
+    const { sessionId, password, inspectionId, paymentMethodId } = await request.json();
 
     if (password !== process.env.ADMIN_PASSWORD) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -251,13 +251,40 @@ export async function POST(request) {
 
     // existing?.state === 'stale' OR null → create a fresh hold
 
-    // ─── 2. SMART CARD SELECTION ───────────────────────────────────────────
-    const card = await selectBestCard(customerId, expandedPI);
-    if (!card) {
-      return Response.json(
-        { error: 'No saved payment method found for this customer. Switch to cash deposit.' },
-        { status: 400 }
-      );
+    // ─── 2. CARD SELECTION ─────────────────────────────────────────────────
+    // Explicit paymentMethodId (backup-card flow): verify PM belongs to this
+    // customer, then use it directly. Bypasses selectBestCard — which would
+    // otherwise re-select the declined card via fingerprint match.
+    // Implicit path (normal flow): selectBestCard unchanged.
+    let card;
+    if (paymentMethodId) {
+      let pm;
+      try {
+        pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+      } catch (pmErr) {
+        return Response.json(
+          { error: `Could not retrieve payment method: ${pmErr.message}` },
+          { status: 400 }
+        );
+      }
+      // Guard: pm.customer is the cus_ string on an attached PM.
+      // Reject immediately if it doesn't match — never place a hold on
+      // a card that isn't attached to this booking's customer.
+      if (pm.customer !== customerId) {
+        return Response.json(
+          { error: "Payment method does not belong to this booking's customer. Hold rejected." },
+          { status: 400 }
+        );
+      }
+      card = pm;
+    } else {
+      card = await selectBestCard(customerId, expandedPI);
+      if (!card) {
+        return Response.json(
+          { error: 'No saved payment method found for this customer. Switch to cash deposit.' },
+          { status: 400 }
+        );
+      }
     }
 
     // ─── 3. CREATE THE HOLD ────────────────────────────────────────────────

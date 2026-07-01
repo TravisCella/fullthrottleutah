@@ -25,6 +25,13 @@
 // Prior: 2026-06-17 (inSheet NO SHEET badge)
 
 import { useState, useEffect } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+// Initialized once at module level — avoids recreating the Stripe object on every render.
+// NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY must be live-mode if STRIPE_SECRET_KEY is live-mode
+// (and test-mode if test-mode) — a mismatched pair is the classic Elements failure mode.
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 // Helper — detect Stripe state-mismatch errors so we can recover gracefully
 function classifyStripeError(errorMsg) {
@@ -37,6 +44,100 @@ function classifyStripeError(errorMsg) {
     return 'already_captured';
   }
   return null;
+}
+
+// ── Backup Card Modal ──────────────────────────────────────────────────────────
+// Must be a child of <Elements> (rendered in AdminPage's return) to use
+// useStripe / useElements. Card number is collected inside a Stripe-hosted iframe
+// — raw PAN never reaches this component or our servers.
+function BackupCardModal({ booking, password, onSuccess, onClose }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [clientSecret, setClientSecret] = useState(null);
+  const [initError, setInitError] = useState('');
+  const [cardError, setCardError] = useState('');
+  const [processing, setProcessing] = useState(false);
+
+  // Create the SetupIntent on mount and get the client_secret.
+  useEffect(() => {
+    fetch('/api/admin/create-setup-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: booking.sessionId, password }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) setInitError(data.error);
+        else setClientSecret(data.clientSecret);
+      })
+      .catch(() => setInitError('Network error — could not initialize card entry.'));
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements || !clientSecret || processing) return;
+    setProcessing(true);
+    setCardError('');
+
+    const { error, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
+      payment_method: { card: elements.getElement(CardElement) },
+    });
+
+    if (error) {
+      // Card declined, network error, etc. — show inline and let operator retry.
+      setCardError(error.message || 'Card declined. Try a different card.');
+      setProcessing(false);
+      return;
+    }
+
+    // SetupIntent confirmed — pm_ is now attached to the customer.
+    // Hand it back to AdminPage which will call charge-deposit with it.
+    onSuccess(setupIntent.payment_method);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(11,17,32,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Add Backup Card</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94A3B8', padding: 0, lineHeight: 1 }}>×</button>
+        </div>
+
+        <p style={{ fontSize: 13, color: '#64748B', lineHeight: 1.5, margin: '0 0 20px' }}>
+          Enter the customer's alternate card. The number goes directly to Stripe — it never touches this app.
+        </p>
+
+        {initError && (
+          <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{initError}</div>
+        )}
+
+        {!initError && !clientSecret && (
+          <div style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>Initializing…</div>
+        )}
+
+        {clientSecret && (
+          <>
+            <div style={{ border: '2px solid #E2E8F0', borderRadius: 10, padding: '14px 12px', marginBottom: 12, background: '#F8FAFC' }}>
+              <CardElement options={{ style: { base: { fontSize: '15px', color: '#0F172A', '::placeholder': { color: '#94A3B8' } } } }} />
+            </div>
+
+            {cardError && (
+              <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+                {cardError}
+              </div>
+            )}
+
+            <button
+              onClick={handleSubmit}
+              disabled={processing || !stripe}
+              style={{ width: '100%', padding: 14, borderRadius: 10, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 15, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer', opacity: processing || !stripe ? 0.6 : 1 }}
+            >
+              {processing ? 'Processing…' : 'Save Card & Place Hold'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function AdminPage() {
@@ -66,6 +167,10 @@ export default function AdminPage() {
 
   // Return deep-link state — set when Inspect redirects back after a return inspection
   const [pendingReturnToast, setPendingReturnToast] = useState(null); // { sessionId, renterName }
+
+  // Backup card flow — code tracks which decline type triggered the button
+  const [actionErrorCode, setActionErrorCode] = useState(null);
+  const [showBackupCardModal, setShowBackupCardModal] = useState(false);
 
   // Check for saved password on mount
   useEffect(() => {
@@ -153,13 +258,15 @@ export default function AdminPage() {
     setLoading(false);
   };
 
-  const handleChargeDeposit = async (booking) => {
+  const handleChargeDeposit = async (booking, paymentMethodId = null) => {
     setActionLoading(true);
     setActionError(null);
+    setActionErrorCode(null);
     setActionSuccess(null);
     try {
       const body = { sessionId: booking.sessionId, password };
       if (inspectionId) body.inspectionId = inspectionId;
+      if (paymentMethodId) body.paymentMethodId = paymentMethodId;
       const res = await fetch('/api/admin/charge-deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,6 +275,7 @@ export default function AdminPage() {
       const data = await res.json();
       if (data.error) {
         setActionError(data.error);
+        setActionErrorCode(data.code || null);
       } else {
         setActionSuccess(`✅ $${(data.depositAmount || 1000).toLocaleString()} held on card ending in ${data.cardLast4}`);
         setPendingInspectionToast(null);
@@ -179,6 +287,11 @@ export default function AdminPage() {
       setActionError('Connection error');
     }
     setActionLoading(false);
+  };
+
+  const handleBackupCardSuccess = async (pmId) => {
+    setShowBackupCardModal(false);
+    await handleChargeDeposit(selectedBooking, pmId);
   };
 
   const handleCashDeposit = async (booking) => {
@@ -595,7 +708,7 @@ export default function AdminPage() {
           return (
             <div
               key={b.sessionId}
-              onClick={() => { setSelectedBooking(b); setActionError(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); setResetConfirmOpen(false); }}
+              onClick={() => { setSelectedBooking(b); setActionError(null); setActionErrorCode(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); setResetConfirmOpen(false); setShowBackupCardModal(false); }}
               style={{
                 background: '#fff',
                 borderRadius: 14,
@@ -636,7 +749,7 @@ export default function AdminPage() {
       {/* Booking Detail Modal */}
       {selectedBooking && (
         <div
-          onClick={() => !actionLoading && (setSelectedBooking(null), setResetConfirmOpen(false))}
+          onClick={() => !actionLoading && (setSelectedBooking(null), setResetConfirmOpen(false), setShowBackupCardModal(false), setActionErrorCode(null))}
           style={{ position: 'fixed', inset: 0, background: 'rgba(11,17,32,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50, padding: 0 }}
         >
           <div
@@ -646,7 +759,7 @@ export default function AdminPage() {
             <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, background: '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                 <div style={{ fontSize: 19, fontWeight: 700 }}>{selectedBooking.renterName}</div>
-                <button onClick={() => { setSelectedBooking(null); setResetConfirmOpen(false); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
+                <button onClick={() => { setSelectedBooking(null); setResetConfirmOpen(false); setShowBackupCardModal(false); setActionErrorCode(null); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
               </div>
               <div style={{ fontSize: 13, color: '#64748B' }}>{selectedBooking.packageName} · {selectedBooking.location}</div>
             </div>
@@ -711,6 +824,19 @@ export default function AdminPage() {
                   >
                     💵 Cash Deposit Received ({depLabel})
                   </button>
+
+                  {/* Backup card — shown ONLY after a card-decline error on this booking.
+                      Never visible on a normal pickup; operator reaches for it only when
+                      a hold actually failed. */}
+                  {actionError && ['card_declined', 'insufficient_funds', 'expired_card', 'processing_error'].includes(actionErrorCode) && (
+                    <button
+                      onClick={() => setShowBackupCardModal(true)}
+                      disabled={actionLoading}
+                      style={{ width: '100%', padding: 14, borderRadius: 10, border: '2px solid #0C4A6E', background: '#fff', color: '#0C4A6E', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 10, opacity: actionLoading ? 0.5 : 1 }}
+                    >
+                      💳 Add backup card
+                    </button>
+                  )}
 
                   {/* Deep-link: Check Out button — opens Inspect with booking context */}
                   <a
@@ -850,6 +976,20 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Backup card modal — rendered outside the booking detail sheet so it
+          sits above everything (z-index 70 > sheet's 50). Elements provider
+          wraps it so BackupCardModal can use useStripe / useElements. */}
+      {showBackupCardModal && selectedBooking && (
+        <Elements stripe={stripePromise}>
+          <BackupCardModal
+            booking={selectedBooking}
+            password={password}
+            onSuccess={handleBackupCardSuccess}
+            onClose={() => setShowBackupCardModal(false)}
+          />
+        </Elements>
       )}
     </div>
   );
