@@ -165,6 +165,9 @@ export default function AdminPage() {
   // Booking reset confirmation state
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
+  // Cancellation confirmation state
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+
   // Return deep-link state — set when Inspect redirects back after a return inspection
   const [pendingReturnToast, setPendingReturnToast] = useState(null); // { sessionId, renterName }
 
@@ -499,6 +502,32 @@ export default function AdminPage() {
     setActionLoading(false);
   };
 
+  const handleCancelBooking = async (booking) => {
+    setCancelConfirmOpen(false);
+    setActionLoading(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await fetch('/api/admin/cancel-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: booking.sessionId, password }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setActionError(data.error);
+      } else {
+        const sheetNote = data.sheetUpdated ? '' : ' (Sheets row not found — mark manually)';
+        setActionSuccess(`✅ Refunded $${data.amountRefunded?.toLocaleString()} · Booking cancelled${sheetNote}`);
+        await refreshBookings();
+        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 3500);
+      }
+    } catch {
+      setActionError('Connection error');
+    }
+    setActionLoading(false);
+  };
+
   const handleResetToBooked = async (booking) => {
     setResetConfirmOpen(false);
     setActionLoading(true);
@@ -558,6 +587,9 @@ export default function AdminPage() {
     const status = booking.rentalStatus;
     const depStatus = booking.securityDepositStatus;
 
+    if (status === 'cancelled') {
+      return { label: 'CANCELLED', color: '#6B7280', bg: 'rgba(107,114,128,0.1)' };
+    }
     if (status === 'returned') {
       return { label: 'COMPLETED', color: '#16A34A', bg: 'rgba(22,163,74,0.1)' };
     }
@@ -708,7 +740,7 @@ export default function AdminPage() {
           return (
             <div
               key={b.sessionId}
-              onClick={() => { setSelectedBooking(b); setActionError(null); setActionErrorCode(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); setResetConfirmOpen(false); setShowBackupCardModal(false); }}
+              onClick={() => { setSelectedBooking(b); setActionError(null); setActionErrorCode(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); setResetConfirmOpen(false); setCancelConfirmOpen(false); setShowBackupCardModal(false); }}
               style={{
                 background: '#fff',
                 borderRadius: 14,
@@ -749,7 +781,7 @@ export default function AdminPage() {
       {/* Booking Detail Modal */}
       {selectedBooking && (
         <div
-          onClick={() => !actionLoading && (setSelectedBooking(null), setResetConfirmOpen(false), setShowBackupCardModal(false), setActionErrorCode(null))}
+          onClick={() => !actionLoading && (setSelectedBooking(null), setResetConfirmOpen(false), setCancelConfirmOpen(false), setShowBackupCardModal(false), setActionErrorCode(null))}
           style={{ position: 'fixed', inset: 0, background: 'rgba(11,17,32,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50, padding: 0 }}
         >
           <div
@@ -759,7 +791,7 @@ export default function AdminPage() {
             <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, background: '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                 <div style={{ fontSize: 19, fontWeight: 700 }}>{selectedBooking.renterName}</div>
-                <button onClick={() => { setSelectedBooking(null); setResetConfirmOpen(false); setShowBackupCardModal(false); setActionErrorCode(null); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
+                <button onClick={() => { setSelectedBooking(null); setResetConfirmOpen(false); setCancelConfirmOpen(false); setShowBackupCardModal(false); setActionErrorCode(null); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
               </div>
               <div style={{ fontSize: 13, color: '#64748B' }}>{selectedBooking.packageName} · {selectedBooking.location}</div>
             </div>
@@ -845,6 +877,44 @@ export default function AdminPage() {
                   >
                     Check Out — Open Inspection →
                   </a>
+
+                  {/* Cancel booking — two-step confirm, destructive */}
+                  <div style={{ marginTop: 20, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Cancel Booking</div>
+                    {!cancelConfirmOpen ? (
+                      <button
+                        onClick={() => setCancelConfirmOpen(true)}
+                        disabled={actionLoading}
+                        style={{ width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #FCA5A5', background: '#FFF1F2', color: '#991B1B', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
+                      >
+                        Cancel & Refund Customer
+                      </button>
+                    ) : (
+                      <div style={{ background: '#FFF1F2', border: '1.5px solid #FCA5A5', borderRadius: 10, padding: 14 }}>
+                        <div style={{ fontSize: 13, color: '#991B1B', fontWeight: 600, marginBottom: 6 }}>
+                          Full refund of ${selectedBooking.totalPaid?.toLocaleString()} to customer's card.
+                        </div>
+                        <div style={{ fontSize: 12, color: '#7F1D1D', marginBottom: 12 }}>
+                          Booking will be removed from the date picker. Google Calendar event must be deleted manually.
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => handleCancelBooking(selectedBooking)}
+                            disabled={actionLoading}
+                            style={{ flex: 1, padding: 10, borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
+                          >
+                            {actionLoading ? 'Cancelling...' : 'Yes, Cancel & Refund'}
+                          </button>
+                          <button
+                            onClick={() => setCancelConfirmOpen(false)}
+                            style={{ flex: 1, padding: 10, borderRadius: 8, border: '1.5px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Keep Booking
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 );
               })()}
