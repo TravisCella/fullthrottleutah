@@ -1083,6 +1083,10 @@ export default function JetSkiBooking() {
                   </div>
                 )}
 
+                <div style={{ fontSize: 12, color: "#92400E", marginTop: 12, padding: "10px 12px", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 8, lineHeight: 1.5 }}>
+                  ⏱ Arriving more than 1 hour past your scheduled pickup time may result in a <strong>$50 late pickup fee</strong> charged to your card on file.
+                </div>
+
                 <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 10, textAlign: "center", lineHeight: 1.5 }}>
                   {whiteGlove
                     ? `We'll confirm exact delivery & retrieval times by phone after you book.`
