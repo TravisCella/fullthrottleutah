@@ -357,6 +357,17 @@ export default function JetSkiBooking() {
   const [vestSizes, setVestSizes] = useState(EMPTY_VESTS);
   const [pickupTime, setPickupTime] = useState("08:00");
   const [returnTime, setReturnTime] = useState("20:00");
+  const [overrideMinDays, setOverrideMinDays] = useState(false);
+
+  // Read ?oc= param on mount. If it matches the operator override code, lift
+  // the minimum-days restriction for all lakes for this session only.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('oc');
+    if (code && code === process.env.NEXT_PUBLIC_BOOKING_OVERRIDE_CODE) {
+      setOverrideMinDays(true);
+    }
+  }, []);
 
   useEffect(() => { setFadeIn(false); const t = setTimeout(() => setFadeIn(true), 20); return () => clearTimeout(t); }, [step]);
 
@@ -536,7 +547,7 @@ export default function JetSkiBooking() {
   // when totalVests/maxVests/spareVestCount are derived.
   const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee + extraVestFee - loyaltyDiscount;
   const minDaysRequired = loc?.minDays || 1;
-  const meetsMinimum = days >= minDaysRequired;
+  const meetsMinimum = overrideMinDays || days >= minDaysRequired;
   // For same-day rentals, pickup must come before return. Multi-day has no
   // constraint (pickup Day 1 AM, return Day N PM regardless of clock time).
   const timesValid = days <= 1
@@ -854,7 +865,7 @@ export default function JetSkiBooking() {
               </div>
             )}
 
-            {loc?.minDays && loc?.aisStatus !== "infested" && (
+            {loc?.minDays && loc?.aisStatus !== "infested" && !overrideMinDays && (
               <div style={{ marginTop: 12, padding: 14, background: "#DBEAFE", borderRadius: 14, border: "2px solid #2563EB" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                   <span style={{ fontSize: 18 }}>📍</span>
@@ -955,7 +966,7 @@ export default function JetSkiBooking() {
               <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} />
             </div>
 
-            {loc?.minDays && days > 0 && days < loc.minDays && (
+            {loc?.minDays && days > 0 && days < loc.minDays && !overrideMinDays && (
               <div style={{ marginTop: 14, padding: 14, background: "#FEE2E2", borderRadius: 12, border: "2px solid #DC2626" }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B", marginBottom: 4 }}>
                   ⚠️ {loc.name} requires {loc.minDays}+ day rental
