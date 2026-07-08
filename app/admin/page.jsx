@@ -175,6 +175,12 @@ export default function AdminPage() {
   const [actionErrorCode, setActionErrorCode] = useState(null);
   const [showBackupCardModal, setShowBackupCardModal] = useState(false);
 
+  // Review SMS blast
+  const [blastLoading, setBlastLoading] = useState(false);
+  const [blastPreview, setBlastPreview] = useState(null); // { count, recipients }
+  const [blastResult, setBlastResult] = useState(null);  // { sent, failed, total }
+  const [blastError, setBlastError] = useState(null);
+
   // Check for saved password on mount
   useEffect(() => {
     const saved = sessionStorage.getItem('ftu_admin_pass');
@@ -221,6 +227,40 @@ export default function AdminPage() {
     }
     setDeepLinkParams(null);
   }, [bookings, deepLinkParams]);
+
+  const handleBlastDryRun = async () => {
+    setBlastLoading(true);
+    setBlastError(null);
+    setBlastPreview(null);
+    setBlastResult(null);
+    try {
+      const res = await fetch('/api/admin/send-review-sms-blast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, dryRun: true }),
+      });
+      const data = await res.json();
+      if (data.error) setBlastError(data.error);
+      else setBlastPreview(data);
+    } catch { setBlastError('Connection error'); }
+    setBlastLoading(false);
+  };
+
+  const handleBlastSend = async () => {
+    setBlastLoading(true);
+    setBlastError(null);
+    try {
+      const res = await fetch('/api/admin/send-review-sms-blast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (data.error) setBlastError(data.error);
+      else { setBlastResult(data); setBlastPreview(null); }
+    } catch { setBlastError('Connection error'); }
+    setBlastLoading(false);
+  };
 
   const handleLogin = async (pwd) => {
     const pwdToUse = pwd || password;
@@ -708,6 +748,53 @@ export default function AdminPage() {
               whiteSpace: 'nowrap', marginLeft: 'auto',
             }}
           >{hideTests ? '🧪 Show tests' : '🧪 Hide tests'}</button>
+        </div>
+      </div>
+
+      {/* ── Review SMS Blast ───────────────────────────────────────────────── */}
+      <div style={{ padding: '12px 16px 0' }}>
+        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: 16, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Review Request — SMS Blast</div>
+
+          {blastResult ? (
+            <div style={{ background: '#DCFCE7', color: '#166534', padding: 12, borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+              ✅ Sent {blastResult.sent} texts{blastResult.failed > 0 ? ` · ${blastResult.failed} failed` : ''} (of {blastResult.total} eligible)
+              <button onClick={() => setBlastResult(null)} style={{ float: 'right', background: 'none', border: 'none', color: '#166534', cursor: 'pointer', fontSize: 13 }}>Dismiss</button>
+            </div>
+          ) : blastPreview ? (
+            <div>
+              <div style={{ fontSize: 13, color: '#0F172A', marginBottom: 10 }}>
+                Ready to send to <strong>{blastPreview.count} customer{blastPreview.count !== 1 ? 's' : ''}</strong> who opted in and haven't reviewed yet.
+              </div>
+              {blastError && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 10 }}>{blastError}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handleBlastSend}
+                  disabled={blastLoading || blastPreview.count === 0}
+                  style={{ flex: 1, padding: 11, borderRadius: 8, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: blastLoading || blastPreview.count === 0 ? 0.5 : 1 }}
+                >
+                  {blastLoading ? 'Sending...' : `Send ${blastPreview.count} Text${blastPreview.count !== 1 ? 's' : ''}`}
+                </button>
+                <button
+                  onClick={() => { setBlastPreview(null); setBlastError(null); }}
+                  style={{ padding: '11px 16px', borderRadius: 8, border: '1.5px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {blastError && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 10 }}>{blastError}</div>}
+              <button
+                onClick={handleBlastDryRun}
+                disabled={blastLoading}
+                style={{ width: '100%', padding: 11, borderRadius: 8, border: '1.5px solid #0C4A6E', background: '#fff', color: '#0C4A6E', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: blastLoading ? 0.5 : 1 }}
+              >
+                {blastLoading ? 'Checking...' : '📨 Preview & Send Review Request Texts'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
