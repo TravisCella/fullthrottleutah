@@ -364,7 +364,7 @@ export default function JetSkiBooking() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('oc');
-    if (code && code === process.env.NEXT_PUBLIC_BOOKING_OVERRIDE_CODE) {
+    if (code && code === 'lakeday1') {
       setOverrideMinDays(true);
     }
   }, []);
