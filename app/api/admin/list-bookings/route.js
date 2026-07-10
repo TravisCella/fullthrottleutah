@@ -243,6 +243,8 @@ export async function POST(request) {
         waiverSigned: meta.waiverSigned === 'true' || sheetData.status === 'CONFIRMED',
         waiverDate:   meta.waiverDate || '',
 
+        smsOptIn: meta.smsOptIn === 'true',
+
         isTestBooking,
         inSheet,
         isPartiallyRefunded,
