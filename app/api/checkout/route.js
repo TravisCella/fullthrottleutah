@@ -281,6 +281,25 @@ export async function POST(request) {
       console.error('[checkout] Pending-checkout write threw:', fbErr.message);
     }
 
+    // Write phone-index entry so inbound texts can be resolved O(1) to this session.
+    // Non-fatal — must never block the checkout response.
+    try {
+      const fbSecret = process.env.FIREBASE_DATABASE_SECRET;
+      if (fbSecret && renterPhone) {
+        const rawDigits = renterPhone.replace(/\D/g, '');
+        const phoneKey = rawDigits.length === 10 ? `1${rawDigits}` :
+          (rawDigits.length === 11 && rawDigits.startsWith('1') ? rawDigits : null);
+        if (phoneKey) {
+          await fetch(
+            `${FIREBASE_DB_URL}/phone-index/${phoneKey}/${session.id}.json?auth=${encodeURIComponent(fbSecret)}`,
+            { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' }
+          );
+        }
+      }
+    } catch (piErr) {
+      console.error('[checkout] Phone-index write threw:', piErr.message);
+    }
+
     return Response.json({ url: session.url, sessionId: session.id });
   } catch (err) {
     console.error('Checkout error:', err);

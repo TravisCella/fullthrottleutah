@@ -24,7 +24,7 @@
 // Builds on: 2026-06-01 (graceful Stripe state-mismatch handling)
 // Prior: 2026-06-17 (inSheet NO SHEET badge)
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
@@ -180,6 +180,14 @@ export default function AdminPage() {
   const [blastPreview, setBlastPreview] = useState(null); // { count, recipients }
   const [blastResult, setBlastResult] = useState(null);  // { sent, failed, total }
   const [blastError, setBlastError] = useState(null);
+
+  // Chat / SMS thread state
+  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'chat'
+  const [conversation, setConversation] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [unmatchedCount, setUnmatchedCount] = useState(0);
+  const chatBottomRef = useRef(null);
 
   // Check for saved password on mount
   useEffect(() => {
@@ -593,6 +601,59 @@ export default function AdminPage() {
     setActionLoading(false);
   };
 
+  const fetchConversation = async (sessionId) => {
+    try {
+      const res = await fetch('/api/admin/get-conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, password }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setConversation(data.messages || []);
+        if (typeof data.unmatchedCount === 'number') setUnmatchedCount(data.unmatchedCount);
+      }
+    } catch {}
+  };
+
+  const handleSendMessage = async () => {
+    const body = chatInput.trim();
+    if (!body || chatSending || !selectedBooking) return;
+    setChatSending(true);
+    setChatInput('');
+    try {
+      const res = await fetch('/api/admin/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: selectedBooking.sessionId, password, body }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setActionError(data.error);
+        setChatInput(body);
+      } else {
+        await fetchConversation(selectedBooking.sessionId);
+      }
+    } catch {
+      setActionError('Connection error');
+      setChatInput(body);
+    }
+    setChatSending(false);
+  };
+
+  // Poll conversation every 5s while the chat tab is open
+  useEffect(() => {
+    if (!selectedBooking || activeTab !== 'chat') return;
+    fetchConversation(selectedBooking.sessionId);
+    const interval = setInterval(() => fetchConversation(selectedBooking.sessionId), 5000);
+    return () => clearInterval(interval);
+  }, [selectedBooking?.sessionId, activeTab]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversation]);
+
   if (!authed) {
     return (
       <div style={{ minHeight: '100vh', background: '#0B1120', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }}>
@@ -704,7 +765,14 @@ export default function AdminPage() {
       <div style={{ background: '#0B1120', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: (pendingInspectionToast ? 52 : 0) + (pendingReturnToast ? 52 : 0) }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Full Throttle Admin</div>
-          <div style={{ fontSize: 11, color: '#94A3B8' }}>{bookings.length} bookings · {bookings.filter(b => b.rentalStatus !== 'returned').length} active</div>
+          <div style={{ fontSize: 11, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {bookings.length} bookings · {bookings.filter(b => b.rentalStatus !== 'returned').length} active
+            {unmatchedCount > 0 && (
+              <span style={{ background: '#EF4444', color: '#fff', padding: '1px 7px', borderRadius: 20, fontWeight: 700, fontSize: 10 }}>
+                {unmatchedCount} unmatched SMS
+              </span>
+            )}
+          </div>
         </div>
         <button onClick={refreshBookings} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
           {loading ? '...' : '↻ Refresh'}
@@ -827,7 +895,7 @@ export default function AdminPage() {
           return (
             <div
               key={b.sessionId}
-              onClick={() => { setSelectedBooking(b); setActionError(null); setActionErrorCode(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); setResetConfirmOpen(false); setCancelConfirmOpen(false); setShowBackupCardModal(false); }}
+              onClick={() => { setSelectedBooking(b); setActionError(null); setActionErrorCode(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); setResetConfirmOpen(false); setCancelConfirmOpen(false); setShowBackupCardModal(false); setActiveTab('details'); setConversation([]); setChatInput(''); }}
               style={{
                 background: '#fff',
                 borderRadius: 14,
@@ -868,7 +936,7 @@ export default function AdminPage() {
       {/* Booking Detail Modal */}
       {selectedBooking && (
         <div
-          onClick={() => !actionLoading && (setSelectedBooking(null), setResetConfirmOpen(false), setCancelConfirmOpen(false), setShowBackupCardModal(false), setActionErrorCode(null))}
+          onClick={() => !actionLoading && (setSelectedBooking(null), setResetConfirmOpen(false), setCancelConfirmOpen(false), setShowBackupCardModal(false), setActionErrorCode(null), setActiveTab('details'), setConversation([]), setChatInput(''))}
           style={{ position: 'fixed', inset: 0, background: 'rgba(11,17,32,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50, padding: 0 }}
         >
           <div
@@ -878,12 +946,29 @@ export default function AdminPage() {
             <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, background: '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                 <div style={{ fontSize: 19, fontWeight: 700 }}>{selectedBooking.renterName}</div>
-                <button onClick={() => { setSelectedBooking(null); setResetConfirmOpen(false); setCancelConfirmOpen(false); setShowBackupCardModal(false); setActionErrorCode(null); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
+                <button onClick={() => { setSelectedBooking(null); setResetConfirmOpen(false); setCancelConfirmOpen(false); setShowBackupCardModal(false); setActionErrorCode(null); setActiveTab('details'); setConversation([]); setChatInput(''); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
               </div>
               <div style={{ fontSize: 13, color: '#64748B' }}>{selectedBooking.packageName} · {selectedBooking.location}</div>
+              <div style={{ display: 'flex', marginTop: 12, borderRadius: 10, overflow: 'hidden', border: '1.5px solid #E2E8F0' }}>
+                <button
+                  onClick={() => setActiveTab('details')}
+                  style={{ flex: 1, padding: '8px 0', border: 'none', borderRight: '1px solid #E2E8F0', background: activeTab === 'details' ? '#0C4A6E' : '#fff', color: activeTab === 'details' ? '#fff' : '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Details
+                </button>
+                <button
+                  onClick={() => selectedBooking.smsOptIn && setActiveTab('chat')}
+                  disabled={!selectedBooking.smsOptIn}
+                  title={!selectedBooking.smsOptIn ? 'Renter did not opt in to SMS' : ''}
+                  style={{ flex: 1, padding: '8px 0', border: 'none', background: activeTab === 'chat' ? '#0C4A6E' : (selectedBooking.smsOptIn ? '#fff' : '#F8FAFC'), color: activeTab === 'chat' ? '#fff' : (selectedBooking.smsOptIn ? '#475569' : '#CBD5E1'), fontSize: 13, fontWeight: 600, cursor: selectedBooking.smsOptIn ? 'pointer' : 'not-allowed' }}
+                >
+                  💬 Chat{!selectedBooking.smsOptIn ? ' (no opt-in)' : ''}
+                </button>
+              </div>
             </div>
 
             <div style={{ padding: 20 }}>
+              {activeTab === 'details' && <>
               {/* Booking Details */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Booking Details</div>
@@ -1128,6 +1213,55 @@ export default function AdminPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+              </>}
+
+              {activeTab === 'chat' && (
+                <div style={{ display: 'flex', flexDirection: 'column', height: 420 }}>
+                  {actionError && (
+                    <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 10 }}>{actionError}</div>
+                  )}
+                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingBottom: 4 }}>
+                    {conversation.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: 13, paddingTop: 40 }}>No messages yet — send one below</div>
+                    ) : (
+                      conversation.map(msg => (
+                        <div key={msg.twilioSid} style={{ display: 'flex', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', padding: '3px 0' }}>
+                          <div style={{
+                            maxWidth: '78%', padding: '9px 13px',
+                            borderRadius: msg.direction === 'outbound' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                            background: msg.direction === 'outbound' ? '#0C4A6E' : '#F1F5F9',
+                            color: msg.direction === 'outbound' ? '#fff' : '#0F172A',
+                            fontSize: 14, lineHeight: 1.45,
+                          }}>
+                            <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.body}</div>
+                            <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3, textAlign: 'right' }}>
+                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <div ref={chatBottomRef} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, paddingTop: 10, borderTop: '1px solid #E2E8F0' }}>
+                    <input
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                      placeholder="Type a message…"
+                      disabled={chatSending}
+                      style={{ flex: 1, padding: '10px 13px', borderRadius: 10, border: '1.5px solid #E2E8F0', fontSize: 14, outline: 'none', fontFamily: 'inherit', background: chatSending ? '#F8FAFC' : '#fff' }}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!chatInput.trim() || chatSending}
+                      style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 13, fontWeight: 700, cursor: !chatInput.trim() || chatSending ? 'not-allowed' : 'pointer', opacity: !chatInput.trim() || chatSending ? 0.4 : 1, whiteSpace: 'nowrap' }}
+                    >
+                      {chatSending ? '…' : 'Send'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
