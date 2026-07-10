@@ -184,7 +184,7 @@ function ImageGallery({ images: imgKeys }) {
   );
 }
 
-function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates, pkg }) {
+function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, bookedDates, pkg, premiumDates = [] }) {
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
   const today = new Date(); today.setHours(0,0,0,0);
@@ -251,7 +251,21 @@ function Calendar({ selectedDates, onSelectDate, month, year, onChangeMonth, boo
             const baseRate = wknd ? pkg.weekend : pkg.weekday;
             const mmdd = `${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const holidayMatch = HOLIDAYS.find(h => mmdd >= h.start && mmdd <= h.end);
-            dayPrice = baseRate + (holidayMatch ? holidayMatch.premium : 0);
+            let premiumAdj = 0;
+            if (premiumDates.length > 0) {
+              const thisDay = new Date(year, month, day);
+              for (const p of premiumDates) {
+                const [py, pm, pd] = p.start.split('-').map(Number);
+                const pStart = new Date(py, pm - 1, pd);
+                const [ey, em, ed] = (p.end || p.start).split('-').map(Number);
+                const pEnd = new Date(ey, em - 1, ed);
+                if (thisDay >= pStart && thisDay <= pEnd) {
+                  if (p.flatAdd !== 0) premiumAdj += p.flatAdd;
+                  else if (p.multiplier !== 1) premiumAdj += Math.round(baseRate * (p.multiplier - 1));
+                }
+              }
+            }
+            dayPrice = Math.max(0, baseRate + (holidayMatch ? holidayMatch.premium : 0) + premiumAdj);
           }
 
           const priceColor = !day ? "transparent"
@@ -965,7 +979,7 @@ export default function JetSkiBooking() {
           <div>
             <h2 style={secTitle}>Select Your Dates</h2>
             <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
-              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} />
+              <Calendar selectedDates={dates} onSelectDate={handleDate} month={mo} year={yr} onChangeMonth={changeMo} bookedDates={bookedDates} pkg={pkg} premiumDates={premiumDates} />
             </div>
 
             {loc?.minDays && days > 0 && days < loc.minDays && !overrideMinDays && (
