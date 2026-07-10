@@ -23,7 +23,7 @@
 
 import Stripe from 'stripe';
 import { computeTotal, getPackage, MAX_EXTRA_VESTS } from '../../../lib/pricing';
-import { isRepeatCustomer } from '../../../lib/sheets';
+import { isRepeatCustomer, getPremiumDates } from '../../../lib/sheets';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const FIREBASE_DB_URL = 'https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com';
@@ -115,6 +115,15 @@ export async function POST(request) {
     // The client-sent totalPrice is never used for the charge — only logged.
     // An unresolvable package or location (tampered or stale client) fails
     // closed with a 400 rather than an unhandled 500.
+
+    // Fetch Premiums tab overrides (non-fatal — if Sheets call fails, no promo applied).
+    let premiums = [];
+    try {
+      premiums = await getPremiumDates(packageName);
+    } catch (premiumsErr) {
+      console.warn('[checkout] getPremiumDates failed — no promo applied:', premiumsErr.message);
+    }
+
     let priceBreakdown;
     try {
       priceBreakdown = computeTotal({
@@ -125,6 +134,7 @@ export async function POST(request) {
         whiteGlove: !!whiteGlove,
         vestSizes: parsedVests,
         repeatCustomer,
+        premiums,
       });
     } catch (pricingErr) {
       console.error(`[checkout] computeTotal failed for ${renterEmail}:`, pricingErr.message);
@@ -205,6 +215,9 @@ export async function POST(request) {
       agreementSignedAt: agreementSignedAt || '',
       // Note: agreementChecksJson can be 200+ chars; trim to Stripe's 500-char metadata limit
       agreementChecksJson: (agreementChecksJson || '').slice(0, 490),
+      // Promo — only set when a Premiums-tab discount/surcharge was applied
+      promoDiscount: priceBreakdown.premiumAdjustment !== 0 ? priceBreakdown.premiumAdjustment.toString() : '',
+      promoReason:   priceBreakdown.promoReason || '',
       // Status flags for admin dashboard
       securityDepositStatus: 'pending',
       rentalStatus: 'booked',
