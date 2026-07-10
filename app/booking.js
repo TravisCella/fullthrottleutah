@@ -30,7 +30,7 @@ import {
   PACKAGES, LOCATIONS, HOLIDAYS,
   EXTRA_VEST_FEE, MAX_EXTRA_VESTS,
   isWeekend, daysBetween,
-  calculateBasePrice, getHolidaySurcharge,
+  calculateBasePrice, getHolidaySurcharge, computePremiumAdjustment,
 } from "../lib/pricing";
 
 // ── Product images (served from /images/) ──
@@ -351,6 +351,7 @@ export default function JetSkiBooking() {
   const sigCanvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [bookedDates, setBookedDates] = useState([]);
+  const [premiumDates, setPremiumDates] = useState([]);
   const [whiteGlove, setWhiteGlove] = useState(false);
   const [isRepeatCustomer, setIsRepeatCustomer] = useState(false);
   const [checkingCustomer, setCheckingCustomer] = useState(false);
@@ -375,8 +376,8 @@ export default function JetSkiBooking() {
     if (pkg) {
       fetch(`/api/bookings?package=${encodeURIComponent(pkg.name)}`)
         .then(r => r.json())
-        .then(data => setBookedDates(data.bookedDates || []))
-        .catch(() => setBookedDates([]));
+        .then(data => { setBookedDates(data.bookedDates || []); setPremiumDates(data.premiumDates || []); })
+        .catch(() => { setBookedDates([]); setPremiumDates([]); });
     }
   }, [pkg]);
 
@@ -543,9 +544,10 @@ export default function JetSkiBooking() {
   const isLakePowell = loc?.id === "lake-powell";
   const deconFee = isLakePowell ? 200 : 0;
   const loyaltyDiscount = isRepeatCustomer ? Math.round(basePrice * 0.10) : 0;
-  // 2026-06-06: extraVestFee is added to total. Note: this is computed above
-  // when totalVests/maxVests/spareVestCount are derived.
-  const totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee + extraVestFee - loyaltyDiscount;
+  const { adjustment: promoAdjustment, reason: promoReason } = dates.length > 0
+    ? computePremiumAdjustment(premiumDates, dates[0], dates.length === 2 ? dates[1] : dates[0], basePrice)
+    : { adjustment: 0, reason: '' };
+  const totalPrice = Math.max(0, basePrice + holidayInfo.total + whiteGloveFee + deconFee + extraVestFee - loyaltyDiscount + promoAdjustment);
   const minDaysRequired = loc?.minDays || 1;
   const meetsMinimum = overrideMinDays || days >= minDaysRequired;
   // For same-day rentals, pickup must come before return. Multi-day has no
@@ -996,7 +998,7 @@ export default function JetSkiBooking() {
                     {days > 1 && <div style={{ fontSize: 11, opacity: 0.6 }}>${Math.round(totalPrice/days)}/day avg</div>}
                   </div>
                 </div>
-                {(holidayInfo.total > 0 || whiteGlove || deconFee > 0 || loyaltyDiscount > 0 || extraVestFee > 0) && (
+                {(holidayInfo.total > 0 || whiteGlove || deconFee > 0 || loyaltyDiscount > 0 || extraVestFee > 0 || promoAdjustment !== 0) && (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.15)", fontSize: 11, opacity: 0.7 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                       <span>Base rental</span><span>${basePrice.toLocaleString()}</span>
@@ -1024,6 +1026,16 @@ export default function JetSkiBooking() {
                     {loyaltyDiscount > 0 && (
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#86EFAC" }}>
                         <span>✨ Returning customer</span><span>-${loyaltyDiscount}</span>
+                      </div>
+                    )}
+                    {promoAdjustment < 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#86EFAC" }}>
+                        <span>🏷️ {promoReason || "Promo"}</span><span>-${Math.abs(promoAdjustment)}</span>
+                      </div>
+                    )}
+                    {promoAdjustment > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, color: "#FCA5A5" }}>
+                        <span>📈 {promoReason || "Surcharge"}</span><span>+${promoAdjustment}</span>
                       </div>
                     )}
                   </div>
@@ -1750,6 +1762,8 @@ export default function JetSkiBooking() {
                   ...(deconFee > 0 ? [{ l: "🦠 Lake Powell decontamination", v: `+$${deconFee}`, color: "#D97706" }] : []),
                   ...(extraVestFee > 0 ? [{ l: `🪖 Spare vest${spareVestCount === 1 ? "" : "s"} (${spareVestCount} × $${EXTRA_VEST_FEE})`, v: `+$${extraVestFee}`, color: "#D97706" }] : []),
                   ...(loyaltyDiscount > 0 ? [{ l: "✨ Returning customer (10% off)", v: `-$${loyaltyDiscount}`, color: "#16A34A" }] : []),
+                  ...(promoAdjustment < 0 ? [{ l: `🏷️ ${promoReason || "Promo"}`, v: `-$${Math.abs(promoAdjustment)}`, color: "#16A34A" }] : []),
+                  ...(promoAdjustment > 0 ? [{ l: `📈 ${promoReason || "Surcharge"}`, v: `+$${promoAdjustment}`, color: "#DC2626" }] : []),
                   { l: "Total due now", v: `$${totalPrice.toLocaleString()}`, bold: true },
                 ].map((r, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: r.bold ? 14 : 13, fontWeight: r.bold ? 700 : 400, color: r.color || (r.bold ? "#0F172A" : "#64748B") }}>
