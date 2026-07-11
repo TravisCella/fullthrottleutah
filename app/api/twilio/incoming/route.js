@@ -125,20 +125,55 @@ async function resolveFromStripe(normalizedFrom) {
   return applyTieredPrecedence(candidates);
 }
 
-// All heavy async work lives here. Called fire-and-forget after TwiML is returned
-// so Twilio gets its 200 within milliseconds and never times out.
-async function processInbound(from, body, messageSid, timestamp) {
+export async function POST(request) {
+  // Read raw body — must happen before any framework body parsing
+  let rawBody = '';
+  let params = {};
+  try {
+    rawBody = await request.text();
+    params = Object.fromEntries(new URLSearchParams(rawBody));
+  } catch (err) {
+    console.error('[twilio/incoming] Failed to parse body:', err.message);
+    return new Response(TWIML_OK, { status: 200, headers: { 'Content-Type': 'text/xml' } });
+  }
+
+  // Reconstruct the public-facing URL from forwarded headers.
+  // request.url on Vercel can differ from the URL Twilio signed against,
+  // causing signature validation to fail. x-forwarded-* headers reflect
+  // the URL Twilio actually called.
+  const proto    = request.headers.get('x-forwarded-proto') || 'https';
+  const host     = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+  const pathname = new URL(request.url).pathname;
+  const webhookUrl = host ? `${proto}://${host}${pathname}` : request.url;
+
+  const authToken  = process.env.TWILIO_AUTH_TOKEN || '';
+  const signature  = request.headers.get('x-twilio-signature') || '';
+
+  console.log('[twilio/incoming] proto:', proto, '| host:', host, '| pathname:', pathname, '| webhookUrl:', webhookUrl);
+  console.log('[twilio/incoming] hasSig:', !!signature, '| sigLen:', signature.length, '| hasToken:', !!authToken, '| tokenLen:', authToken.length, '| params:', Object.keys(params).join(','));
+
+  if (!validateTwilioSignature(authToken, signature, webhookUrl, params)) {
+    console.warn('[twilio/incoming] Signature validation failed — returning 403');
+    return new Response('Forbidden', { status: 403 });
+  }
+
+  const from       = params.From       || '';
+  const body       = params.Body       || '';
+  const messageSid = params.MessageSid || `fallback-${Date.now()}`;
+  const timestamp  = new Date().toISOString();
+
   const normalizedFrom = normalizeToE164(from);
   if (!normalizedFrom) {
     console.warn('[twilio/incoming] Unparseable From number:', from);
-    return;
+    return new Response(TWIML_OK, { status: 200, headers: { 'Content-Type': 'text/xml' } });
   }
 
-  let resolved = await resolveFromPhoneIndex(normalizedFrom);
-  if (!resolved) {
-    console.log('[twilio/incoming] Not in index, scanning Stripe:', normalizedFrom);
-    resolved = await resolveFromStripe(normalizedFrom);
-  }
+  // Phone-index lookup is O(1) and fast (~100ms). Stripe scan is intentionally
+  // skipped here — it can take seconds and Vercel terminates the function after
+  // the response is sent (fire-and-forget does not work in serverless). Messages
+  // from phones not in the index go to unmatched; the admin badge will surface them.
+  // Index is populated at checkout and whenever admin sends a message.
+  const resolved = await resolveFromPhoneIndex(normalizedFrom);
 
   if (resolved) {
     await fbPut(`/conversations/${resolved.sessionId}/messages/${messageSid}`, {
@@ -164,50 +199,6 @@ async function processInbound(from, body, messageSid, timestamp) {
     });
     console.warn('[twilio/incoming] No booking matched for:', normalizedFrom, '— written to unmatched');
   }
-}
-
-export async function POST(request) {
-  // Read raw body — must happen before any framework body parsing
-  let rawBody = '';
-  let params = {};
-  try {
-    rawBody = await request.text();
-    params = Object.fromEntries(new URLSearchParams(rawBody));
-  } catch (err) {
-    console.error('[twilio/incoming] Failed to parse body:', err.message);
-    return new Response(TWIML_OK, { status: 200, headers: { 'Content-Type': 'text/xml' } });
-  }
-
-  // Reconstruct the public-facing URL from forwarded headers.
-  // request.url on Vercel can differ from the URL Twilio signed against,
-  // causing signature validation to fail. x-forwarded-* headers reflect
-  // the URL Twilio actually called.
-  const proto    = request.headers.get('x-forwarded-proto') || 'https';
-  const host     = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
-  const pathname = new URL(request.url).pathname;
-  const webhookUrl = host ? `${proto}://${host}${pathname}` : request.url;
-
-  const authToken  = process.env.TWILIO_AUTH_TOKEN || '';
-  const signature  = request.headers.get('x-twilio-signature') || '';
-
-  console.log('[twilio/incoming] webhookUrl:', webhookUrl, '| hasSig:', !!signature, '| hasToken:', !!authToken);
-
-  if (!validateTwilioSignature(authToken, signature, webhookUrl, params)) {
-    console.warn('[twilio/incoming] Signature validation failed — returning 403');
-    return new Response('Forbidden', { status: 403 });
-  }
-
-  const from       = params.From       || '';
-  const body       = params.Body       || '';
-  const messageSid = params.MessageSid || `fallback-${Date.now()}`;
-  const timestamp  = new Date().toISOString();
-
-  // Return TwiML immediately — Twilio has a 15s timeout and serverless functions
-  // can be slow under cold starts. Fire-and-forget lets Vercel's Node.js runtime
-  // continue executing processInbound after the response is sent.
-  processInbound(from, body, messageSid, timestamp).catch(err =>
-    console.error('[twilio/incoming] processInbound error:', err.message)
-  );
 
   return new Response(TWIML_OK, { status: 200, headers: { 'Content-Type': 'text/xml' } });
 }
