@@ -49,11 +49,6 @@ async function fbPut(path, value) {
   }
 }
 
-// Tiered precedence — explicit rule, not a pure start_date sort.
-// Tier 1: currently picked_up (on the water right now)
-// Tier 2: booked with future start_date (upcoming, soonest first within tier)
-// Tier 3: booked with past start_date (edge case — overdue/no-show)
-// Tier 4: returned (completed, most recent first within tier)
 function applyTieredPrecedence(candidates) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -71,43 +66,28 @@ function applyTieredPrecedence(candidates) {
   return [...candidates].sort((a, b) => {
     const ta = tier(a), tb = tier(b);
     if (ta !== tb) return ta - tb;
-    // Tier 2: soonest upcoming first (ASC)
     if (ta === 2) return new Date(a.startDate) - new Date(b.startDate);
-    // Tier 4: most recent completed first (DESC)
     if (ta === 4) return new Date(b.startDate) - new Date(a.startDate);
     return 0;
   })[0] || null;
 }
 
-// O(1) phone-index lookup. Single entry → return directly (no Stripe call).
-// Multiple entries → retrieve each session for current rentalStatus, then apply precedence.
 async function resolveFromPhoneIndex(normalizedFrom) {
   const indexEntry = await fbGet(`/phone-index/${phoneToKey(normalizedFrom)}`);
   if (!indexEntry || typeof indexEntry !== 'object') return null;
 
   const sessionIds = Object.keys(indexEntry).filter(k => k && k !== 'null');
   if (sessionIds.length === 0) return null;
+  if (sessionIds.length === 1) return { sessionId: sessionIds[0] };
 
-  // Single booking — O(1), no Stripe call needed
-  if (sessionIds.length === 1) {
-    return { sessionId: sessionIds[0] };
-  }
-
-  // Multiple bookings — retrieve each for current rentalStatus to apply precedence
   const candidates = [];
   for (const sid of sessionIds) {
     try {
-      const session = await stripe.checkout.sessions.retrieve(sid, {
-        expand: ['payment_intent'],
-      });
+      const session = await stripe.checkout.sessions.retrieve(sid, { expand: ['payment_intent'] });
       const pi = session.payment_intent;
       const meta = (pi && typeof pi === 'object') ? pi.metadata : {};
       if (meta.rentalStatus === 'cancelled') continue;
-      candidates.push({
-        sessionId: sid,
-        rentalStatus: meta.rentalStatus || 'booked',
-        startDate: meta.startDate || '',
-      });
+      candidates.push({ sessionId: sid, rentalStatus: meta.rentalStatus || 'booked', startDate: meta.startDate || '' });
     } catch (err) {
       console.warn(`[twilio/incoming] session retrieve failed for ${sid}:`, err.message);
     }
@@ -118,17 +98,11 @@ async function resolveFromPhoneIndex(normalizedFrom) {
   return applyTieredPrecedence(candidates);
 }
 
-// Stripe session scan fallback — used when phone not in index (renter texts before admin)
-// 180-day window, max 200 sessions (typically 1–2 Stripe pages for this business volume)
 async function resolveFromStripe(normalizedFrom) {
   const since = Math.floor(Date.now() / 1000) - (180 * 24 * 60 * 60);
   const candidates = [];
   let scanned = 0;
-  let page = await stripe.checkout.sessions.list({
-    created: { gte: since },
-    limit: 100,
-    expand: ['data.payment_intent'],
-  });
+  let page = await stripe.checkout.sessions.list({ created: { gte: since }, limit: 100, expand: ['data.payment_intent'] });
 
   while (true) {
     for (const session of page.data) {
@@ -139,20 +113,11 @@ async function resolveFromStripe(normalizedFrom) {
       if (meta.rentalStatus === 'cancelled') continue;
       const storedPhone = normalizeToE164(meta.renterPhone || '');
       if (storedPhone === normalizedFrom) {
-        candidates.push({
-          sessionId: session.id,
-          rentalStatus: meta.rentalStatus || 'booked',
-          startDate: meta.startDate || '',
-        });
+        candidates.push({ sessionId: session.id, rentalStatus: meta.rentalStatus || 'booked', startDate: meta.startDate || '' });
       }
     }
     if (!page.has_more || scanned >= 200) break;
-    page = await stripe.checkout.sessions.list({
-      created: { gte: since },
-      limit: 100,
-      starting_after: page.data[page.data.length - 1].id,
-      expand: ['data.payment_intent'],
-    });
+    page = await stripe.checkout.sessions.list({ created: { gte: since }, limit: 100, starting_after: page.data[page.data.length - 1].id, expand: ['data.payment_intent'] });
   }
 
   if (candidates.length === 0) return null;
@@ -160,84 +125,89 @@ async function resolveFromStripe(normalizedFrom) {
   return applyTieredPrecedence(candidates);
 }
 
+// All heavy async work lives here. Called fire-and-forget after TwiML is returned
+// so Twilio gets its 200 within milliseconds and never times out.
+async function processInbound(from, body, messageSid, timestamp) {
+  const normalizedFrom = normalizeToE164(from);
+  if (!normalizedFrom) {
+    console.warn('[twilio/incoming] Unparseable From number:', from);
+    return;
+  }
+
+  let resolved = await resolveFromPhoneIndex(normalizedFrom);
+  if (!resolved) {
+    console.log('[twilio/incoming] Not in index, scanning Stripe:', normalizedFrom);
+    resolved = await resolveFromStripe(normalizedFrom);
+  }
+
+  if (resolved) {
+    await fbPut(`/conversations/${resolved.sessionId}/messages/${messageSid}`, {
+      direction: 'inbound',
+      body,
+      from: normalizedFrom,
+      to: process.env.TWILIO_PHONE_NUMBER || '',
+      timestamp,
+      twilioSid: messageSid,
+    });
+
+    const existingMeta = await fbGet(`/conversations/${resolved.sessionId}/meta`);
+    await fbPut(`/conversations/${resolved.sessionId}/meta`, {
+      ...(existingMeta && typeof existingMeta === 'object' ? existingMeta : {}),
+      lastActivity: timestamp,
+    });
+
+    await fbPut(`/phone-index/${phoneToKey(normalizedFrom)}/${resolved.sessionId}`, true);
+    console.log(`[twilio/incoming] Written to conversation ${resolved.sessionId} (${messageSid})`);
+  } else {
+    await fbPut(`/conversations/unmatched/${messageSid}`, {
+      from: normalizedFrom, body, timestamp, twilioSid: messageSid,
+    });
+    console.warn('[twilio/incoming] No booking matched for:', normalizedFrom, '— written to unmatched');
+  }
+}
+
 export async function POST(request) {
-  // 1. Read raw body — required for Twilio signature validation
-  const rawBody = await request.text();
-  const params = Object.fromEntries(new URLSearchParams(rawBody));
+  // Read raw body — must happen before any framework body parsing
+  let rawBody = '';
+  let params = {};
+  try {
+    rawBody = await request.text();
+    params = Object.fromEntries(new URLSearchParams(rawBody));
+  } catch (err) {
+    console.error('[twilio/incoming] Failed to parse body:', err.message);
+    return new Response(TWIML_OK, { status: 200, headers: { 'Content-Type': 'text/xml' } });
+  }
 
-  // 2. Validate X-Twilio-Signature — ONLY non-2xx exit in this route
-  const authToken = process.env.TWILIO_AUTH_TOKEN || '';
-  const signature = request.headers.get('x-twilio-signature') || '';
-  const url = request.url;
+  // Reconstruct the public-facing URL from forwarded headers.
+  // request.url on Vercel can differ from the URL Twilio signed against,
+  // causing signature validation to fail. x-forwarded-* headers reflect
+  // the URL Twilio actually called.
+  const proto    = request.headers.get('x-forwarded-proto') || 'https';
+  const host     = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+  const pathname = new URL(request.url).pathname;
+  const webhookUrl = host ? `${proto}://${host}${pathname}` : request.url;
 
-  if (!validateTwilioSignature(authToken, signature, url, params)) {
-    console.warn('[twilio/incoming] Rejected — invalid Twilio signature');
+  const authToken  = process.env.TWILIO_AUTH_TOKEN || '';
+  const signature  = request.headers.get('x-twilio-signature') || '';
+
+  console.log('[twilio/incoming] webhookUrl:', webhookUrl, '| hasSig:', !!signature, '| hasToken:', !!authToken);
+
+  if (!validateTwilioSignature(authToken, signature, webhookUrl, params)) {
+    console.warn('[twilio/incoming] Signature validation failed — returning 403');
     return new Response('Forbidden', { status: 403 });
   }
 
-  // 3. Process — always return TwiML 200, never propagate throws
-  try {
-    const from        = params.From        || '';
-    const body        = params.Body        || '';
-    const messageSid  = params.MessageSid  || `fallback-${Date.now()}`;
-    const timestamp   = new Date().toISOString();
+  const from       = params.From       || '';
+  const body       = params.Body       || '';
+  const messageSid = params.MessageSid || `fallback-${Date.now()}`;
+  const timestamp  = new Date().toISOString();
 
-    const normalizedFrom = normalizeToE164(from);
-    if (!normalizedFrom) {
-      console.warn('[twilio/incoming] Unparseable From number:', from);
-      // fall through — return TwiML
-    } else {
-      // 4. Resolve booking: phone-index first (O(1)), Stripe scan as fallback
-      let resolved = await resolveFromPhoneIndex(normalizedFrom);
-      if (!resolved) {
-        console.log('[twilio/incoming] Not in index, scanning Stripe:', normalizedFrom);
-        resolved = await resolveFromStripe(normalizedFrom);
-      }
+  // Return TwiML immediately — Twilio has a 15s timeout and serverless functions
+  // can be slow under cold starts. Fire-and-forget lets Vercel's Node.js runtime
+  // continue executing processInbound after the response is sent.
+  processInbound(from, body, messageSid, timestamp).catch(err =>
+    console.error('[twilio/incoming] processInbound error:', err.message)
+  );
 
-      if (resolved) {
-        // 5a. Write inbound message — keyed by MessageSid (idempotent against retries)
-        await fbPut(
-          `/conversations/${resolved.sessionId}/messages/${messageSid}`,
-          {
-            direction: 'inbound',
-            body,
-            from: normalizedFrom,
-            to: process.env.TWILIO_PHONE_NUMBER || '',
-            timestamp,
-            twilioSid: messageSid,
-          }
-        );
-
-        // Update lastActivity on conversation meta, preserving existing fields
-        const existingMeta = await fbGet(`/conversations/${resolved.sessionId}/meta`);
-        await fbPut(`/conversations/${resolved.sessionId}/meta`, {
-          ...(existingMeta && typeof existingMeta === 'object' ? existingMeta : {}),
-          lastActivity: timestamp,
-        });
-
-        // Refresh phone index (idempotent — keeps index warm if Stripe scan found this)
-        await fbPut(`/phone-index/${phoneToKey(normalizedFrom)}/${resolved.sessionId}`, true);
-
-        console.log(`[twilio/incoming] Written to conversation ${resolved.sessionId} (${messageSid})`);
-      } else {
-        // 5b. No booking found — write to unmatched bucket, keyed by MessageSid
-        await fbPut(`/conversations/unmatched/${messageSid}`, {
-          from: normalizedFrom,
-          body,
-          timestamp,
-          twilioSid: messageSid,
-        });
-        console.warn('[twilio/incoming] No booking matched for:', normalizedFrom, '— written to unmatched');
-      }
-    }
-  } catch (err) {
-    // Log but never propagate — a 500 triggers Twilio retries which compound idempotency issues
-    console.error('[twilio/incoming] Processing error (non-fatal, returning TwiML):', err.message);
-  }
-
-  // 4. Always return valid TwiML — no auto-reply, just acknowledge
-  return new Response(TWIML_OK, {
-    status: 200,
-    headers: { 'Content-Type': 'text/xml' },
-  });
+  return new Response(TWIML_OK, { status: 200, headers: { 'Content-Type': 'text/xml' } });
 }
