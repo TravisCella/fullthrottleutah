@@ -149,13 +149,21 @@ export async function POST(request) {
   const authToken  = process.env.TWILIO_AUTH_TOKEN || '';
   const signature  = request.headers.get('x-twilio-signature') || '';
 
-  console.log('[twilio/incoming] proto:', proto, '| host:', host, '| pathname:', pathname, '| webhookUrl:', webhookUrl);
-  console.log('[twilio/incoming] hasSig:', !!signature, '| sigLen:', signature.length, '| hasToken:', !!authToken, '| tokenLen:', authToken.length, '| params:', Object.keys(params).join(','));
-
   if (!validateTwilioSignature(authToken, signature, webhookUrl, params)) {
-    console.warn('[twilio/incoming] Signature validation failed — returning 403');
+    console.error('[twilio/incoming] Signature validation failed', {
+      webhookUrl,
+      proto,
+      host,
+      pathname,
+      hasSig: !!signature,
+      sigLen: signature.length,
+      hasToken: !!authToken,
+      tokenLen: authToken.length,
+      params: Object.keys(params).join(','),
+    });
     return new Response('Forbidden', { status: 403 });
   }
+  console.log('[twilio/incoming] Signature OK | from:', params.From, '| sid:', params.MessageSid);
 
   const from       = params.From       || '';
   const body       = params.Body       || '';
