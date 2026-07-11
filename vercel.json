@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/return-reminder",
       "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/unanswered-chat",
-      "schedule": "* * * * *"
     }
   ]
 }

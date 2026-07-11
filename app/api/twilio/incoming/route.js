@@ -1,9 +1,11 @@
 import Stripe from 'stripe';
 import { validateTwilioSignature } from '../../../../lib/twilio-signature';
+import { sendSMS } from '../../../../lib/sms';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const FIREBASE_DB_URL = 'https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com';
 const TWIML_OK = '<Response/>';
+const ALERT_RATE_LIMIT_MS = 30 * 60 * 1000; // 30 minutes per conversation
 
 function normalizeToE164(phone) {
   if (!phone) return null;
@@ -46,6 +48,31 @@ async function fbPut(path, value) {
     });
   } catch (err) {
     console.warn('[twilio/incoming] Firebase write failed:', err.message);
+  }
+}
+
+// Returns true when the owners should receive an SMS alert for this inbound message.
+// Three gates: admin already replied, duplicate alert, 30-min rate limit (resets on reply).
+function shouldAlertOwners(meta, messageSid, timestamp) {
+  if (meta.lastOutboundAt && meta.lastOutboundAt >= timestamp) return false;
+  if (meta.lastNotifiedSid === messageSid) return false;
+  if (meta.lastNotifiedAt) {
+    const adminRepliedSinceLast = meta.lastOutboundAt && meta.lastOutboundAt > meta.lastNotifiedAt;
+    if (!adminRepliedSinceLast) {
+      if (Date.now() - new Date(meta.lastNotifiedAt).getTime() < ALERT_RATE_LIMIT_MS) return false;
+    }
+  }
+  return true;
+}
+
+async function sendOwnerAlert(smsBody) {
+  const phones = (process.env.OWNER_PHONE_NUMBER || '').split(',').map(p => p.trim()).filter(Boolean);
+  for (const phone of phones) {
+    try {
+      await sendSMS(phone, smsBody);
+    } catch (err) {
+      console.warn('[twilio/incoming] Owner alert failed for', phone, ':', err.message);
+    }
   }
 }
 
@@ -194,21 +221,31 @@ export async function POST(request) {
     });
 
     const existingMeta = await fbGet(`/conversations/${resolved.sessionId}/meta`);
+    const meta = (existingMeta && typeof existingMeta === 'object') ? existingMeta : {};
+    const alert = shouldAlertOwners(meta, messageSid, timestamp);
+
     await fbPut(`/conversations/${resolved.sessionId}/meta`, {
-      ...(existingMeta && typeof existingMeta === 'object' ? existingMeta : {}),
+      ...meta,
       lastActivity: timestamp,
       lastInboundAt: timestamp,
       lastInboundSid: messageSid,
       renterPhone: normalizedFrom,
+      ...(alert ? { lastNotifiedAt: timestamp, lastNotifiedSid: messageSid } : {}),
     });
 
     await fbPut(`/phone-index/${phoneToKey(normalizedFrom)}/${resolved.sessionId}`, true);
-    console.log(`[twilio/incoming] Written to conversation ${resolved.sessionId} (${messageSid})`);
+    console.log(`[twilio/incoming] Written to conversation ${resolved.sessionId} (${messageSid}) | alert:${alert}`);
+
+    if (alert) {
+      const name = meta.renterName || normalizedFrom;
+      await sendOwnerAlert(`FTU Chat: ${name} sent a message. fullthrottleutah.com/admin`);
+    }
   } else {
     await fbPut(`/conversations/unmatched/${messageSid}`, {
       from: normalizedFrom, body, timestamp, twilioSid: messageSid,
     });
     console.warn('[twilio/incoming] No booking matched for:', normalizedFrom, '— written to unmatched');
+    await sendOwnerAlert(`FTU Chat: Unknown # ${normalizedFrom} messaged. Check admin: fullthrottleutah.com/admin`);
   }
 
   return new Response(TWIML_OK, { status: 200, headers: { 'Content-Type': 'text/xml' } });
