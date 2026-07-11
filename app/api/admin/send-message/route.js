@@ -94,6 +94,7 @@ export async function POST(request) {
       renterName: meta.renterName || '',
       renterPhone: normalizedPhone,
       lastActivity: timestamp,
+      lastOutboundAt: timestamp,
     });
 
     // Write phone index — idempotent PUT, enables O(1) inbound resolution

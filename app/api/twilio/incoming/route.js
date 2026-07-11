@@ -197,6 +197,9 @@ export async function POST(request) {
     await fbPut(`/conversations/${resolved.sessionId}/meta`, {
       ...(existingMeta && typeof existingMeta === 'object' ? existingMeta : {}),
       lastActivity: timestamp,
+      lastInboundAt: timestamp,
+      lastInboundSid: messageSid,
+      renterPhone: normalizedFrom,
     });
 
     await fbPut(`/phone-index/${phoneToKey(normalizedFrom)}/${resolved.sessionId}`, true);
