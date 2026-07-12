@@ -40,10 +40,28 @@ const getCachedReviews = unstable_cache(
   { revalidate: 300, tags: ['reviews'] }
 );
 
+// Hard timeout on the reviews fetch. A slow or hung Google Sheets call must
+// never block this component — at BUILD time an unbounded await here times out
+// Next's 60s static-page-generation limit and fails the entire production
+// deploy (this happened 2026-07-12). On timeout we reject fast, the catch below
+// renders nothing (same as the "no reviews yet" empty state), the homepage
+// builds, and testimonials reappear on the next cache refresh once Sheets is
+// healthy. 8s is well under the 60s build limit and above a healthy 1–3s fetch.
+const REVIEWS_TIMEOUT_MS = 8000;
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`reviews fetch timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 export default async function TestimonialsSection() {
   let data;
   try {
-    data = await getCachedReviews();
+    data = await withTimeout(getCachedReviews(), REVIEWS_TIMEOUT_MS);
   } catch (err) {
     console.error('[TestimonialsSection] Failed to load reviews:', err.message);
     return null;
