@@ -45,6 +45,11 @@ const IMAGES = {
   sparkOverhead: "/images/spark-overhead.png",
   sparkProfile: "/images/spark-profile.png",
   gtxHero: "/images/gtx-hero.png",
+  // Sea-Doo Spark Trixx (3UP) — drop these files into /public/images/
+  trixxHero: "/images/trixx-hero.png",
+  trixxFront: "/images/trixx-front.png",
+  trixxSide: "/images/trixx-side.png",
+  trixxAction: "/images/trixx-action.png",
 };
 
 // ── Life vest sizes (matches inventory) ──
@@ -1368,7 +1373,7 @@ export default function JetSkiBooking() {
               </div>
 
               <div style={{ marginTop: 10, padding: "8px 10px", background: "#F8FAFC", borderRadius: 6, fontSize: 10, color: "#64748B", lineHeight: 1.5, textAlign: "center" }}>
-                <strong>Boat capacity: {maxVests} riders</strong> ({pkg?.id === "gtx-duo" ? "3 per GTX × 2 skis" : "2 per Spark × 2 skis"}). Spare vests $15 each (max +{MAX_EXTRA_VESTS}). Actual rider count cannot exceed boat capacity.
+                <strong>Boat capacity: {maxVests} riders</strong> ({pkg?.id === "gtx-duo" ? "3 per GTX × 2 skis" : pkg?.id === "trixx-single" ? "3 on one Trixx" : "2 per Spark × 2 skis"}). Spare vests $15 each (max +{MAX_EXTRA_VESTS}). Actual rider count cannot exceed boat capacity.
               </div>
             </div>
           </div>
