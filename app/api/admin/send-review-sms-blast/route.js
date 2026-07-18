@@ -16,12 +16,9 @@ function getSheets() {
       private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     };
   }
-  const auth = new google.auth.JWT(
-    credentials.client_email,
-    null,
-    credentials.private_key,
-    ['https://www.googleapis.com/auth/spreadsheets']
-  );
+  const auth = new google.auth.JWT(credentials.client_email, null, credentials.private_key, [
+    'https://www.googleapis.com/auth/spreadsheets',
+  ]);
   return google.sheets({ version: 'v4', auth });
 }
 
@@ -66,11 +63,11 @@ export async function POST(request) {
 
     for (let i = 1; i < bookingRows.length; i++) {
       const row = bookingRows[i];
-      const bookingId = (row[0]  || '').trim(); // A
-      const name      = (row[9]  || '').trim(); // J
-      const phone     = (row[11] || '').trim(); // L
-      const status    = (row[13] || '').trim(); // N
-      const smsOptIn  = (row[17] || '').trim().toUpperCase(); // R
+      const bookingId = (row[0] || '').trim(); // A
+      const name = (row[9] || '').trim(); // J
+      const phone = (row[11] || '').trim(); // L
+      const status = (row[13] || '').trim(); // N
+      const smsOptIn = (row[17] || '').trim().toUpperCase(); // R
 
       if (!bookingId || !phone) continue;
       if (status === 'CANCELLED') continue;
@@ -83,7 +80,11 @@ export async function POST(request) {
     }
 
     if (dryRun) {
-      return Response.json({ dryRun: true, count: recipients.length, recipients: recipients.map(r => ({ name: r.name, phone: r.phone.slice(-4) })) });
+      return Response.json({
+        dryRun: true,
+        count: recipients.length,
+        recipients: recipients.map((r) => ({ name: r.name, phone: r.phone.slice(-4) })),
+      });
     }
 
     // ── Send SMS to each recipient ────────────────────────────────────────────
@@ -104,8 +105,8 @@ export async function POST(request) {
       results.push({ name, phone: phone.slice(-4), ...result });
     }
 
-    const sent   = results.filter(r => r.success).length;
-    const failed = results.filter(r => !r.success && !r.skipped).length;
+    const sent = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success && !r.skipped).length;
 
     console.log(`[review-sms-blast] sent=${sent} failed=${failed} total=${recipients.length}`);
 

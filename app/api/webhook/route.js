@@ -48,7 +48,7 @@ async function sendConfirmationEmail(booking) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_KEY}`,
+        Authorization: `Bearer ${RESEND_KEY}`,
       },
       body: JSON.stringify({
         from: 'Full Throttle Utah <bookings@fullthrottleutah.com>',
@@ -183,7 +183,8 @@ export async function POST(request) {
         pickup_time_display: meta.pickup_time_display || meta.pickupTimeDisplay || '8:00 AM',
         return_time_display: meta.return_time_display || meta.returnTimeDisplay || '8:00 PM',
         // ── Rental Agreement (Phase 2) ──
-        rental_agreement_signed: meta.agreement_signed === 'true' || meta.agreementSigned === 'true',
+        rental_agreement_signed:
+          meta.agreement_signed === 'true' || meta.agreementSigned === 'true',
         rental_agreement_version: meta.agreement_version || meta.agreementVersion || '',
         rental_agreement_signed_at: meta.agreement_signed_at || meta.agreementSignedAt || '',
       };
@@ -198,10 +199,14 @@ export async function POST(request) {
         // Inner try/catch: this fires on an error path and must never throw.
         // NOT gated on smsOptIn — this is an internal owner alert.
         try {
-          const alertPhones = (process.env.OWNER_PHONE_NUMBER || '').split(',').map(p => p.trim()).filter(Boolean);
-          const dateLine = booking.end_date && booking.end_date !== booking.start_date
-            ? `${booking.start_date} → ${booking.end_date}`
-            : booking.start_date;
+          const alertPhones = (process.env.OWNER_PHONE_NUMBER || '')
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean);
+          const dateLine =
+            booking.end_date && booking.end_date !== booking.start_date
+              ? `${booking.start_date} → ${booking.end_date}`
+              : booking.start_date;
           const alertMsg =
             `⚠️ Sheet write FAILED for ${booking.renter_name} — ${booking.package}, ` +
             `${dateLine}. Booking is PAID but not in the Sheet. Add it manually + check Vercel logs.`;
@@ -236,7 +241,10 @@ export async function POST(request) {
 
       // Send SMS alert to owner team — includes white-glove fee + Lake Powell flags + vests
       try {
-        const ownerPhones = (process.env.OWNER_PHONE_NUMBER || '').split(',').map(p => p.trim()).filter(Boolean);
+        const ownerPhones = (process.env.OWNER_PHONE_NUMBER || '')
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean);
         if (ownerPhones.length > 0) {
           const flags = [];
           if (booking.white_glove) {
@@ -246,9 +254,10 @@ export async function POST(request) {
           if (booking.is_lake_powell) flags.push('🦠 LAKE POWELL');
           const flagPrefix = flags.length > 0 ? ` ${flags.join(' ')}` : '';
 
-          const dateLine = booking.end_date && booking.end_date !== booking.start_date
-            ? `${booking.start_date} → ${booking.end_date}`
-            : booking.start_date;
+          const dateLine =
+            booking.end_date && booking.end_date !== booking.start_date
+              ? `${booking.start_date} → ${booking.end_date}`
+              : booking.start_date;
 
           const ownerLines = [
             `🛎️ New booking!${flagPrefix}`,

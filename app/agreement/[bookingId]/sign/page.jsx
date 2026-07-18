@@ -50,42 +50,43 @@ export default async function SignAgreementPage({ params }) {
   }
 
   // Check if already signed. Phase 2 writes "YES" to column W when signed.
-  const alreadySigned = String(booking.rental_agreement_signed || '').toUpperCase().startsWith('YES');
+  const alreadySigned = String(booking.rental_agreement_signed || '')
+    .toUpperCase()
+    .startsWith('YES');
 
   if (alreadySigned) {
     return <AlreadySignedState booking={booking} />;
   }
 
-  return (
-    <SignAgreementClient
-      booking={booking}
-      agreementVersion={AGREEMENT_VERSION}
-    />
-  );
+  return <SignAgreementClient booking={booking} agreementVersion={AGREEMENT_VERSION} />;
 }
 
 // ─── State components ─────────────────────────────────────────────
 
 function PageShell({ children }) {
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0B1120',
-      fontFamily: "'Outfit', system-ui, sans-serif",
-      padding: '40px 20px',
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#0B1120',
+        fontFamily: "'Outfit', system-ui, sans-serif",
+        padding: '40px 20px',
+      }}
+    >
       <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
         rel="stylesheet"
       />
-      <div style={{
-        maxWidth: 720,
-        margin: '0 auto',
-        background: '#fff',
-        borderRadius: 16,
-        padding: 32,
-        boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
-      }}>
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          background: '#fff',
+          borderRadius: 16,
+          padding: 32,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
+        }}
+      >
         {children}
       </div>
     </div>
@@ -95,28 +96,40 @@ function PageShell({ children }) {
 function NotFoundState({ bookingId }) {
   return (
     <PageShell>
-      <h1 style={{
-        fontFamily: "'Playfair Display', Georgia, serif",
-        fontSize: 26,
-        color: '#0F172A',
-        margin: '0 0 12px',
-      }}>
+      <h1
+        style={{
+          fontFamily: "'Playfair Display', Georgia, serif",
+          fontSize: 26,
+          color: '#0F172A',
+          margin: '0 0 12px',
+        }}
+      >
         Booking not found
       </h1>
       <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.6, margin: '0 0 20px' }}>
-        We couldn't find a booking with the ID <code style={{
-          background: '#F1F5F9',
-          padding: '2px 6px',
-          borderRadius: 4,
-          fontSize: 12,
-        }}>{bookingId}</code>.
+        We couldn't find a booking with the ID{' '}
+        <code
+          style={{
+            background: '#F1F5F9',
+            padding: '2px 6px',
+            borderRadius: 4,
+            fontSize: 12,
+          }}
+        >
+          {bookingId}
+        </code>
+        .
       </p>
       <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.6 }}>
         If you believe this is an error, please contact us:
       </p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-        <a href="tel:+18015481273" style={btn('#EA580C')}>📞 (801) 548-1273</a>
-        <a href="mailto:bookings@fullthrottleutah.com" style={btn('#0C4A6E')}>✉️ bookings@fullthrottleutah.com</a>
+        <a href="tel:+18015481273" style={btn('#EA580C')}>
+          📞 (801) 548-1273
+        </a>
+        <a href="mailto:bookings@fullthrottleutah.com" style={btn('#0C4A6E')}>
+          ✉️ bookings@fullthrottleutah.com
+        </a>
       </div>
     </PageShell>
   );
@@ -125,30 +138,36 @@ function NotFoundState({ bookingId }) {
 function AlreadySignedState({ booking }) {
   return (
     <PageShell>
-      <div style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        background: '#DCFCE7',
-        color: '#166534',
-        padding: '6px 14px',
-        borderRadius: 999,
-        fontSize: 13,
-        fontWeight: 700,
-        marginBottom: 16,
-      }}>
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          background: '#DCFCE7',
+          color: '#166534',
+          padding: '6px 14px',
+          borderRadius: 999,
+          fontSize: 13,
+          fontWeight: 700,
+          marginBottom: 16,
+        }}
+      >
         ✓ Agreement signed
       </div>
-      <h1 style={{
-        fontFamily: "'Playfair Display', Georgia, serif",
-        fontSize: 26,
-        color: '#0F172A',
-        margin: '0 0 12px',
-      }}>
+      <h1
+        style={{
+          fontFamily: "'Playfair Display', Georgia, serif",
+          fontSize: 26,
+          color: '#0F172A',
+          margin: '0 0 12px',
+        }}
+      >
         You've already signed
       </h1>
       <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.6 }}>
-        Thanks, {booking.renter_name?.split(' ')[0] || 'rider'}. Your rental agreement for the {booking.package} at {booking.location} on {formatDate(booking.start_date)} is signed and on file. You don't need to do anything else.
+        Thanks, {booking.renter_name?.split(' ')[0] || 'rider'}. Your rental agreement for the{' '}
+        {booking.package} at {booking.location} on {formatDate(booking.start_date)} is signed and on
+        file. You don't need to do anything else.
       </p>
       <a
         href={`/agreement/${booking.booking_id}`}
@@ -166,17 +185,17 @@ function AlreadySignedState({ booking }) {
 function ErrorState({ message }) {
   return (
     <PageShell>
-      <h1 style={{
-        fontFamily: "'Playfair Display', Georgia, serif",
-        fontSize: 26,
-        color: '#0F172A',
-        margin: '0 0 12px',
-      }}>
+      <h1
+        style={{
+          fontFamily: "'Playfair Display', Georgia, serif",
+          fontSize: 26,
+          color: '#0F172A',
+          margin: '0 0 12px',
+        }}
+      >
         Something went wrong
       </h1>
-      <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.6 }}>
-        {message}
-      </p>
+      <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.6 }}>{message}</p>
     </PageShell>
   );
 }

@@ -39,8 +39,10 @@ function computeAgeAsOf(dobStr, refStr) {
   if (!by || !bm || !bd) return null;
   const born = new Date(by, bm - 1, bd);
   if (isNaN(born.getTime())) return null;
-  const [ry, rm, rd] = String(refStr || '').split('-').map(Number);
-  const ref = (ry && rm && rd) ? new Date(ry, rm - 1, rd) : new Date();
+  const [ry, rm, rd] = String(refStr || '')
+    .split('-')
+    .map(Number);
+  const ref = ry && rm && rd ? new Date(ry, rm - 1, rd) : new Date();
   let age = ref.getFullYear() - born.getFullYear();
   const mo = ref.getMonth() - born.getMonth();
   if (mo < 0 || (mo === 0 && ref.getDate() < born.getDate())) age--;
@@ -54,27 +56,27 @@ export async function POST(request) {
     const {
       packageName,
       packageTagline,
-      totalPrice,           // client-sent; used only for mismatch logging
+      totalPrice, // client-sent; used only for mismatch logging
       days,
       startDate,
       endDate,
-      locationId,           // preferred id string ("pineview") — absent in old bundles
-      location,             // display name — kept for webhook/sheet/metadata + getLocation fallback
+      locationId, // preferred id string ("pineview") — absent in old bundles
+      location, // display name — kept for webhook/sheet/metadata + getLocation fallback
       renterName,
       renterEmail,
       renterPhone,
-      renterDob,            // "YYYY-MM-DD" from the DOB field
+      renterDob, // "YYYY-MM-DD" from the DOB field
       experience,
       smsOptIn,
       whiteGlove,
       isLakePowell,
-      vestSizes,            // JSON string of {size_key: count}
-      vestSummary,          // human-readable string
-      vestUsedDefault,      // true if customer skipped and we defaulted
-      pickupTime,           // 24-hr internal "HH:MM"
-      returnTime,           // 24-hr internal "HH:MM"
-      pickupTimeDisplay,    // 12-hr display string
-      returnTimeDisplay,    // 12-hr display string
+      vestSizes, // JSON string of {size_key: count}
+      vestSummary, // human-readable string
+      vestUsedDefault, // true if customer skipped and we defaulted
+      pickupTime, // 24-hr internal "HH:MM"
+      returnTime, // 24-hr internal "HH:MM"
+      pickupTimeDisplay, // 12-hr display string
+      returnTimeDisplay, // 12-hr display string
       waiverSigned,
       waiverDate,
       // ── Rental Agreement (Phase 2) ──
@@ -107,13 +109,11 @@ export async function POST(request) {
 
     let parsedVests = {};
     try {
-      parsedVests = typeof vestSizes === 'string' ? JSON.parse(vestSizes) : (vestSizes || {});
+      parsedVests = typeof vestSizes === 'string' ? JSON.parse(vestSizes) : vestSizes || {};
     } catch (e) {
       return Response.json({ error: 'Invalid vestSizes payload' }, { status: 400 });
     }
-    const serverTotalVests = Object.values(parsedVests).reduce(
-      (s, v) => s + (Number(v) || 0), 0
-    );
+    const serverTotalVests = Object.values(parsedVests).reduce((s, v) => s + (Number(v) || 0), 0);
 
     if (serverTotalVests > maxTotalVests) {
       console.error(
@@ -251,8 +251,9 @@ export async function POST(request) {
       // Note: agreementChecksJson can be 200+ chars; trim to Stripe's 500-char metadata limit
       agreementChecksJson: (agreementChecksJson || '').slice(0, 490),
       // Promo — only set when a Premiums-tab discount/surcharge was applied
-      promoDiscount: priceBreakdown.premiumAdjustment !== 0 ? priceBreakdown.premiumAdjustment.toString() : '',
-      promoReason:   priceBreakdown.promoReason || '',
+      promoDiscount:
+        priceBreakdown.premiumAdjustment !== 0 ? priceBreakdown.premiumAdjustment.toString() : '',
+      promoReason: priceBreakdown.promoReason || '',
       // Status flags for admin dashboard
       securityDepositStatus: 'pending',
       rentalStatus: 'booked',
@@ -320,10 +321,16 @@ export async function POST(request) {
         );
         if (!fbRes.ok) {
           const errText = await fbRes.text();
-          console.error('[checkout] Firebase pending-checkout write failed:', fbRes.status, errText);
+          console.error(
+            '[checkout] Firebase pending-checkout write failed:',
+            fbRes.status,
+            errText
+          );
         }
       } else {
-        console.warn('[checkout] FIREBASE_DATABASE_SECRET not set — skipping pending-checkout write');
+        console.warn(
+          '[checkout] FIREBASE_DATABASE_SECRET not set — skipping pending-checkout write'
+        );
       }
     } catch (fbErr) {
       console.error('[checkout] Pending-checkout write threw:', fbErr.message);
@@ -335,8 +342,12 @@ export async function POST(request) {
       const fbSecret = process.env.FIREBASE_DATABASE_SECRET;
       if (fbSecret && renterPhone) {
         const rawDigits = renterPhone.replace(/\D/g, '');
-        const phoneKey = rawDigits.length === 10 ? `1${rawDigits}` :
-          (rawDigits.length === 11 && rawDigits.startsWith('1') ? rawDigits : null);
+        const phoneKey =
+          rawDigits.length === 10
+            ? `1${rawDigits}`
+            : rawDigits.length === 11 && rawDigits.startsWith('1')
+              ? rawDigits
+              : null;
         if (phoneKey) {
           await fetch(
             `${FIREBASE_DB_URL}/phone-index/${phoneKey}/${session.id}.json?auth=${encodeURIComponent(fbSecret)}`,

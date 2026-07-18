@@ -29,15 +29,15 @@ export async function POST(request) {
     // Pull the last 100 PaymentIntents (~30 days at FTU volume), filter to
     // our deposit-hold subset. Avoids needing Stripe Search API (which has
     // indexing latency). 30 days is a reasonable window for outstanding holds.
-    const cutoffTs = Math.floor(Date.now() / 1000) - (60 * 24 * 60 * 60);
+    const cutoffTs = Math.floor(Date.now() / 1000) - 60 * 24 * 60 * 60;
     const result = await stripe.paymentIntents.list({
       limit: 100,
       created: { gte: cutoffTs },
     });
 
     const holds = result.data
-      .filter(pi => pi.metadata?.type === 'manual_deposit_hold')
-      .map(pi => {
+      .filter((pi) => pi.metadata?.type === 'manual_deposit_hold')
+      .map((pi) => {
         // Compute capture deadline (7 days from creation for manual capture)
         const captureBefore = new Date((pi.created + 7 * 24 * 60 * 60) * 1000).toISOString();
 
@@ -70,9 +70,6 @@ export async function POST(request) {
     return Response.json({ ok: true, holds });
   } catch (err) {
     console.error('[list-deposit-holds] error:', err);
-    return Response.json(
-      { error: err.message || 'Internal error' },
-      { status: 500 }
-    );
+    return Response.json({ error: err.message || 'Internal error' }, { status: 500 });
   }
 }

@@ -4,9 +4,7 @@ async function fbGet(path) {
   const fbSecret = process.env.FIREBASE_DATABASE_SECRET;
   if (!fbSecret) return null;
   try {
-    const res = await fetch(
-      `${FIREBASE_DB_URL}${path}.json?auth=${encodeURIComponent(fbSecret)}`
-    );
+    const res = await fetch(`${FIREBASE_DB_URL}${path}.json?auth=${encodeURIComponent(fbSecret)}`);
     if (!res.ok) return null;
     return await res.json();
   } catch {

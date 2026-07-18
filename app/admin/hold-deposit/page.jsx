@@ -150,16 +150,26 @@ export default function HoldDepositPage() {
   // ── Render: login screen ────────────────────────────────────────────
   if (!authed) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#0B1120',
-        padding: 20,
-        fontFamily: 'system-ui, sans-serif',
-      }}>
-        <div style={{ background: '#fff', borderRadius: 16, padding: 32, width: '100%', maxWidth: 380 }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#0B1120',
+          padding: 20,
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 16,
+            padding: 32,
+            width: '100%',
+            maxWidth: 380,
+          }}
+        >
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#0F172A' }}>🔒 Hold Deposit</div>
             <div style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>Enter admin password</div>
@@ -167,8 +177,8 @@ export default function HoldDepositPage() {
           <input
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && tryLogin(password)}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && tryLogin(password)}
             placeholder="Password"
             style={{
               width: '100%',
@@ -182,7 +192,16 @@ export default function HoldDepositPage() {
             autoFocus
           />
           {loginError && (
-            <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+            <div
+              style={{
+                background: '#FEE2E2',
+                color: '#991B1B',
+                padding: 10,
+                borderRadius: 8,
+                fontSize: 13,
+                marginBottom: 12,
+              }}
+            >
               {loginError}
             </div>
           )}
@@ -211,21 +230,25 @@ export default function HoldDepositPage() {
 
   // ── Render: authed app ──────────────────────────────────────────────
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F8FAFC',
-      fontFamily: 'system-ui, sans-serif',
-      paddingBottom: 60,
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#F8FAFC',
+        fontFamily: 'system-ui, sans-serif',
+        paddingBottom: 60,
+      }}
+    >
       {/* Header */}
-      <div style={{
-        background: '#0B1120',
-        color: '#fff',
-        padding: '18px 24px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
+      <div
+        style={{
+          background: '#0B1120',
+          color: '#fff',
+          padding: '18px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
             🔒 Hold Deposit
@@ -235,7 +258,11 @@ export default function HoldDepositPage() {
           </div>
         </div>
         <button
-          onClick={() => { sessionStorage.removeItem('ftu_admin_pass'); setAuthed(false); setPassword(''); }}
+          onClick={() => {
+            sessionStorage.removeItem('ftu_admin_pass');
+            setAuthed(false);
+            setPassword('');
+          }}
           style={{
             background: 'rgba(255,255,255,0.1)',
             color: '#fff',
@@ -251,27 +278,30 @@ export default function HoldDepositPage() {
       </div>
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px' }}>
-
         {/* ─── FORM CARD ───────────────────────────────────────────── */}
-        <div style={{
-          background: '#fff',
-          borderRadius: 14,
-          padding: 20,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          marginBottom: 20,
-        }}>
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 14,
+            padding: 20,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            marginBottom: 20,
+          }}
+        >
           <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>
             New deposit hold
           </div>
           <div style={{ fontSize: 12, color: '#64748B', marginBottom: 16, lineHeight: 1.5 }}>
-            Generates a Stripe Checkout link. Share it with the customer — they enter their card on Stripe's secure page, and the funds are <strong>held but not charged</strong> until you capture or release in the Stripe Dashboard.
+            Generates a Stripe Checkout link. Share it with the customer — they enter their card on
+            Stripe's secure page, and the funds are <strong>held but not charged</strong> until you
+            capture or release in the Stripe Dashboard.
           </div>
 
           <Field label="Customer name *">
             <input
               type="text"
               value={customerName}
-              onChange={e => setCustomerName(e.target.value)}
+              onChange={(e) => setCustomerName(e.target.value)}
               placeholder="e.g. Israel Arvanitas"
               style={inputStyle}
             />
@@ -281,7 +311,7 @@ export default function HoldDepositPage() {
             <input
               type="email"
               value={customerEmail}
-              onChange={e => setCustomerEmail(e.target.value)}
+              onChange={(e) => setCustomerEmail(e.target.value)}
               placeholder="customer@example.com"
               style={inputStyle}
             />
@@ -291,7 +321,7 @@ export default function HoldDepositPage() {
             <input
               type="text"
               value={bookingId}
-              onChange={e => setBookingId(e.target.value)}
+              onChange={(e) => setBookingId(e.target.value)}
               placeholder="cs_live_a1cXc..."
               style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 13 }}
             />
@@ -305,7 +335,7 @@ export default function HoldDepositPage() {
               <input
                 type="number"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
+                onChange={(e) => setAmount(e.target.value)}
                 min="1"
                 max="10000"
                 step="any"
@@ -316,7 +346,7 @@ export default function HoldDepositPage() {
               <input
                 type="text"
                 value={notes}
-                onChange={e => setNotes(e.target.value)}
+                onChange={(e) => setNotes(e.target.value)}
                 placeholder="e.g. Friend paying deposit on behalf of John"
                 style={inputStyle}
               />
@@ -324,7 +354,16 @@ export default function HoldDepositPage() {
           </div>
 
           {formError && (
-            <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+            <div
+              style={{
+                background: '#FEE2E2',
+                color: '#991B1B',
+                padding: 10,
+                borderRadius: 8,
+                fontSize: 13,
+                marginBottom: 12,
+              }}
+            >
               ⚠ {formError}
             </div>
           )}
@@ -351,13 +390,15 @@ export default function HoldDepositPage() {
 
         {/* ─── RESULT PANEL ────────────────────────────────────────── */}
         {result && (
-          <div style={{
-            background: '#F0FDF4',
-            border: '2px solid #16A34A',
-            borderRadius: 14,
-            padding: 20,
-            marginBottom: 20,
-          }}>
+          <div
+            style={{
+              background: '#F0FDF4',
+              border: '2px solid #16A34A',
+              borderRadius: 14,
+              padding: 20,
+              marginBottom: 20,
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <div style={{ fontSize: 22 }}>✅</div>
               <div>
@@ -370,18 +411,20 @@ export default function HoldDepositPage() {
               </div>
             </div>
 
-            <div style={{
-              background: '#fff',
-              border: '1px solid #BBF7D0',
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 12,
-              fontFamily: 'monospace',
-              fontSize: 12,
-              color: '#0F172A',
-              wordBreak: 'break-all',
-              lineHeight: 1.5,
-            }}>
+            <div
+              style={{
+                background: '#fff',
+                border: '1px solid #BBF7D0',
+                borderRadius: 10,
+                padding: 12,
+                marginBottom: 12,
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: '#0F172A',
+                wordBreak: 'break-all',
+                lineHeight: 1.5,
+              }}
+            >
               {result.url}
             </div>
 
@@ -389,7 +432,12 @@ export default function HoldDepositPage() {
               <button onClick={() => copyToClipboard(result.url)} style={actionBtn}>
                 📋 Copy link
               </button>
-              <a href={result.url} target="_blank" rel="noopener" style={{ ...actionBtn, textDecoration: 'none', display: 'inline-block' }}>
+              <a
+                href={result.url}
+                target="_blank"
+                rel="noopener"
+                style={{ ...actionBtn, textDecoration: 'none', display: 'inline-block' }}
+              >
                 ↗ Open
               </a>
               <a
@@ -413,17 +461,24 @@ export default function HoldDepositPage() {
         )}
 
         {/* ─── RECENT HOLDS LIST ───────────────────────────────────── */}
-        <div style={{
-          background: '#fff',
-          borderRadius: 14,
-          padding: 20,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 14,
+            padding: 20,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 12,
+            }}
+          >
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>
-                Recent holds
-              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>Recent holds</div>
               <div style={{ fontSize: 11, color: '#94A3B8' }}>Last 60 days</div>
             </div>
             <button onClick={() => loadHolds()} style={{ ...actionBtn, padding: '6px 10px' }}>
@@ -443,26 +498,33 @@ export default function HoldDepositPage() {
             </div>
           )}
 
-          {holds.map(h => <HoldRow key={h.id} hold={h} />)}
+          {holds.map((h) => (
+            <HoldRow key={h.id} hold={h} />
+          ))}
         </div>
 
         {/* ─── HELP / DOCS ─────────────────────────────────────────── */}
-        <div style={{
-          background: '#F0F9FF',
-          border: '1px solid #BAE6FD',
-          borderRadius: 10,
-          padding: 14,
-          marginTop: 20,
-          fontSize: 12,
-          color: '#0C4A6E',
-          lineHeight: 1.6,
-        }}>
-          <strong>💡 How holds work:</strong><br/>
-          • Status <em>awaiting_card</em> = customer hasn't paid yet. Link is still valid for 24h.<br/>
-          • Status <em>hold_active</em> = funds reserved on customer's card. You have <strong>7 days</strong> to capture or release.<br/>
-          • Status <em>captured</em> = damaged released the deposit. Charge went through.<br/>
-          • Status <em>released</em> = funds returned to customer. No charge.<br/>
-          • Capture or release any active hold from its Stripe Dashboard page (click "Open in Stripe" on the row).
+        <div
+          style={{
+            background: '#F0F9FF',
+            border: '1px solid #BAE6FD',
+            borderRadius: 10,
+            padding: 14,
+            marginTop: 20,
+            fontSize: 12,
+            color: '#0C4A6E',
+            lineHeight: 1.6,
+          }}
+        >
+          <strong>💡 How holds work:</strong>
+          <br />• Status <em>awaiting_card</em> = customer hasn't paid yet. Link is still valid for
+          24h.
+          <br />• Status <em>hold_active</em> = funds reserved on customer's card. You have{' '}
+          <strong>7 days</strong> to capture or release.
+          <br />• Status <em>captured</em> = damaged released the deposit. Charge went through.
+          <br />• Status <em>released</em> = funds returned to customer. No charge.
+          <br />• Capture or release any active hold from its Stripe Dashboard page (click "Open in
+          Stripe" on the row).
         </div>
       </div>
     </div>
@@ -474,15 +536,17 @@ export default function HoldDepositPage() {
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={{
-        display: 'block',
-        fontSize: 11,
-        fontWeight: 700,
-        color: '#475569',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        marginBottom: 6,
-      }}>
+      <label
+        style={{
+          display: 'block',
+          fontSize: 11,
+          fontWeight: 700,
+          color: '#475569',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          marginBottom: 6,
+        }}
+      >
         {label}
       </label>
       {children}
@@ -492,32 +556,60 @@ function Field({ label, children }) {
 
 function HoldRow({ hold }) {
   const statusColors = {
-    awaiting_card:  { bg: '#FEF3C7', fg: '#92400E', label: '⏳ Awaiting card' },
-    hold_active:    { bg: '#DBEAFE', fg: '#1E40AF', label: '🔒 Hold active' },
-    captured:       { bg: '#FEE2E2', fg: '#991B1B', label: '💸 Captured' },
-    released:       { bg: '#DCFCE7', fg: '#166534', label: '✅ Released' },
+    awaiting_card: { bg: '#FEF3C7', fg: '#92400E', label: '⏳ Awaiting card' },
+    hold_active: { bg: '#DBEAFE', fg: '#1E40AF', label: '🔒 Hold active' },
+    captured: { bg: '#FEE2E2', fg: '#991B1B', label: '💸 Captured' },
+    released: { bg: '#DCFCE7', fg: '#166534', label: '✅ Released' },
   };
-  const status = statusColors[hold.friendlyStatus] || { bg: '#F1F5F9', fg: '#475569', label: hold.status };
+  const status = statusColors[hold.friendlyStatus] || {
+    bg: '#F1F5F9',
+    fg: '#475569',
+    label: hold.status,
+  };
   const created = new Date(hold.createdAt * 1000);
-  const createdStr = created.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const createdStr = created.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
   return (
-    <div style={{
-      padding: '14px 0',
-      borderBottom: '1px solid #F1F5F9',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+    <div
+      style={{
+        padding: '14px 0',
+        borderBottom: '1px solid #F1F5F9',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}
+      >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-            <span style={{
-              fontSize: 10,
-              fontWeight: 700,
-              padding: '3px 8px',
-              borderRadius: 5,
-              background: status.bg,
-              color: status.fg,
-              whiteSpace: 'nowrap',
-            }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 4,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: 5,
+                background: status.bg,
+                color: status.fg,
+                whiteSpace: 'nowrap',
+              }}
+            >
               {status.label}
             </span>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>

@@ -60,7 +60,7 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
     return () => observer.disconnect();
   }, []);
 
-  const allChecked = AGREEMENT_CHECKBOXES.every(c => checks[c.id]);
+  const allChecked = AGREEMENT_CHECKBOXES.every((c) => checks[c.id]);
   const canSubmit = scrolledToBottom && allChecked && signature && !isSubmitting;
 
   async function handleSubmit() {
@@ -102,50 +102,59 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
     <Shell>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{
-          display: 'inline-block',
-          background: '#FEF3C7',
-          color: '#92400E',
-          padding: '4px 12px',
-          borderRadius: 999,
-          fontSize: 12,
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          marginBottom: 12,
-        }}>
+        <div
+          style={{
+            display: 'inline-block',
+            background: '#FEF3C7',
+            color: '#92400E',
+            padding: '4px 12px',
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            marginBottom: 12,
+          }}
+        >
           Action needed before pickup
         </div>
-        <h1 style={{
-          fontFamily: "'Playfair Display', Georgia, serif",
-          fontSize: 28,
-          color: SLATE_DARK,
-          margin: '0 0 8px',
-          letterSpacing: '-0.01em',
-        }}>
+        <h1
+          style={{
+            fontFamily: "'Playfair Display', Georgia, serif",
+            fontSize: 28,
+            color: SLATE_DARK,
+            margin: '0 0 8px',
+            letterSpacing: '-0.01em',
+          }}
+        >
           Sign your rental agreement
         </h1>
         <p style={{ fontSize: 15, color: SLATE, lineHeight: 1.6, margin: 0 }}>
-          Hi {booking.renter_name?.split(' ')[0] || 'there'} — we've updated our rental agreement and need your signature before you pick up. Takes about 2 minutes.
+          Hi {booking.renter_name?.split(' ')[0] || 'there'} — we've updated our rental agreement
+          and need your signature before you pick up. Takes about 2 minutes.
         </p>
       </div>
 
       {/* Booking summary */}
-      <div style={{
-        background: '#F8FAFC',
-        border: '1px solid #E2E8F0',
-        borderRadius: 12,
-        padding: 18,
-        marginBottom: 24,
-      }}>
-        <div style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: SLATE_LIGHT,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          marginBottom: 10,
-        }}>
+      <div
+        style={{
+          background: '#F8FAFC',
+          border: '1px solid #E2E8F0',
+          borderRadius: 12,
+          padding: 18,
+          marginBottom: 24,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: SLATE_LIGHT,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: 10,
+          }}
+        >
           Your Booking
         </div>
         <Row label="Package" value={booking.package} />
@@ -162,26 +171,30 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
       />
 
       {/* Agreement text */}
-      <div style={{
-        background: '#fff',
-        border: '1px solid #E2E8F0',
-        borderRadius: 12,
-        padding: 20,
-        maxHeight: 420,
-        overflowY: 'auto',
-        marginBottom: 16,
-        fontSize: 13,
-        lineHeight: 1.6,
-        color: SLATE,
-      }}>
-        <div style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: NAVY,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          marginBottom: 12,
-        }}>
+      <div
+        style={{
+          background: '#fff',
+          border: '1px solid #E2E8F0',
+          borderRadius: 12,
+          padding: 20,
+          maxHeight: 420,
+          overflowY: 'auto',
+          marginBottom: 16,
+          fontSize: 13,
+          lineHeight: 1.6,
+          color: SLATE,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: NAVY,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: 12,
+          }}
+        >
           Rental Agreement {agreementVersion}
         </div>
 
@@ -189,24 +202,29 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
         {AGREEMENT_PREAMBLE && (
           <div style={{ marginBottom: 22 }}>
             {AGREEMENT_PREAMBLE.title && (
-              <h2 style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: SLATE_DARK,
-                margin: '0 0 10px',
-                letterSpacing: '0.01em',
-              }}>
+              <h2
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: SLATE_DARK,
+                  margin: '0 0 10px',
+                  letterSpacing: '0.01em',
+                }}
+              >
                 {AGREEMENT_PREAMBLE.title}
               </h2>
             )}
             {Array.isArray(AGREEMENT_PREAMBLE.about) &&
               AGREEMENT_PREAMBLE.about.map((paragraph, i) => (
-                <p key={i} style={{
-                  fontSize: 13,
-                  color: SLATE,
-                  lineHeight: 1.6,
-                  margin: '0 0 10px',
-                }}>
+                <p
+                  key={i}
+                  style={{
+                    fontSize: 13,
+                    color: SLATE,
+                    lineHeight: 1.6,
+                    margin: '0 0 10px',
+                  }}
+                >
                   {paragraph}
                 </p>
               ))}
@@ -216,110 +234,136 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
         {/* SECTIONS */}
         {AGREEMENT_SECTIONS.map((section) => (
           <div key={section.number} style={{ marginBottom: 18 }}>
-            <h3 style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: SLATE_DARK,
-              margin: '0 0 6px',
-            }}>
+            <h3
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: SLATE_DARK,
+                margin: '0 0 6px',
+              }}
+            >
               {section.number}. {section.title}
             </h3>
             {section.intro && (
-              <p style={{
-                fontSize: 13,
-                color: SLATE,
-                lineHeight: 1.6,
-                margin: '4px 0 8px',
-              }}>
-                {section.intro}
-              </p>
-            )}
-            {Array.isArray(section.clauses) && section.clauses.map((clause) => (
-              <div key={clause.id} style={{ marginBottom: 8 }}>
-                <p style={{
+              <p
+                style={{
                   fontSize: 13,
                   color: SLATE,
                   lineHeight: 1.6,
-                  margin: '0 0 4px',
-                }}>
-                  <strong style={{ color: SLATE_DARK, fontWeight: 600 }}>{clause.id}</strong> {clause.text}
-                </p>
-                {Array.isArray(clause.bullets) && clause.bullets.length > 0 && (
-                  <ul style={{
-                    margin: '4px 0 4px 20px',
-                    padding: 0,
-                    fontSize: 13,
-                    color: SLATE,
-                    lineHeight: 1.55,
-                  }}>
-                    {clause.bullets.map((b, i) => (
-                      <li key={i} style={{ marginBottom: 3 }}>{b}</li>
-                    ))}
-                  </ul>
-                )}
-                {clause.footer && (
-                  <p style={{
-                    fontSize: 12,
-                    color: SLATE_LIGHT,
-                    fontStyle: 'italic',
-                    margin: '4px 0 0',
-                  }}>
-                    {clause.footer}
+                  margin: '4px 0 8px',
+                }}
+              >
+                {section.intro}
+              </p>
+            )}
+            {Array.isArray(section.clauses) &&
+              section.clauses.map((clause) => (
+                <div key={clause.id} style={{ marginBottom: 8 }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: SLATE,
+                      lineHeight: 1.6,
+                      margin: '0 0 4px',
+                    }}
+                  >
+                    <strong style={{ color: SLATE_DARK, fontWeight: 600 }}>{clause.id}</strong>{' '}
+                    {clause.text}
                   </p>
-                )}
-              </div>
-            ))}
+                  {Array.isArray(clause.bullets) && clause.bullets.length > 0 && (
+                    <ul
+                      style={{
+                        margin: '4px 0 4px 20px',
+                        padding: 0,
+                        fontSize: 13,
+                        color: SLATE,
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {clause.bullets.map((b, i) => (
+                        <li key={i} style={{ marginBottom: 3 }}>
+                          {b}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {clause.footer && (
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: SLATE_LIGHT,
+                        fontStyle: 'italic',
+                        margin: '4px 0 0',
+                      }}
+                    >
+                      {clause.footer}
+                    </p>
+                  )}
+                </div>
+              ))}
           </div>
         ))}
 
         {/* APPENDIX */}
         {AGREEMENT_APPENDIX && (
-          <div style={{
-            marginTop: 18,
-            paddingTop: 14,
-            borderTop: '1px solid #E2E8F0',
-          }}>
+          <div
+            style={{
+              marginTop: 18,
+              paddingTop: 14,
+              borderTop: '1px solid #E2E8F0',
+            }}
+          >
             {AGREEMENT_APPENDIX.title && (
-              <h3 style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: SLATE_DARK,
-                margin: '0 0 6px',
-              }}>
+              <h3
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: SLATE_DARK,
+                  margin: '0 0 6px',
+                }}
+              >
                 {AGREEMENT_APPENDIX.title}
               </h3>
             )}
             {AGREEMENT_APPENDIX.intro && (
-              <p style={{
-                fontSize: 13,
-                color: SLATE,
-                lineHeight: 1.6,
-                margin: '0 0 8px',
-              }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: SLATE,
+                  lineHeight: 1.6,
+                  margin: '0 0 8px',
+                }}
+              >
                 {AGREEMENT_APPENDIX.intro}
               </p>
             )}
             {Array.isArray(AGREEMENT_APPENDIX.references) &&
               AGREEMENT_APPENDIX.references.length > 0 && (
-                <ul style={{
-                  margin: '4px 0 8px 20px',
-                  padding: 0,
-                  fontSize: 13,
-                  color: SLATE,
-                  lineHeight: 1.55,
-                }}>
+                <ul
+                  style={{
+                    margin: '4px 0 8px 20px',
+                    padding: 0,
+                    fontSize: 13,
+                    color: SLATE,
+                    lineHeight: 1.55,
+                  }}
+                >
                   {AGREEMENT_APPENDIX.references.map((ref, i) => (
-                    <li key={i} style={{ marginBottom: 3 }}>{ref}</li>
+                    <li key={i} style={{ marginBottom: 3 }}>
+                      {ref}
+                    </li>
                   ))}
                 </ul>
               )}
             {AGREEMENT_APPENDIX.conflict && (
-              <p style={{
-                fontSize: 12,
-                color: SLATE_LIGHT,
-                fontStyle: 'italic',
-                margin: '8px 0 0',
-              }}>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: SLATE_LIGHT,
+                  fontStyle: 'italic',
+                  margin: '8px 0 0',
+                }}
+              >
                 {AGREEMENT_APPENDIX.conflict}
               </p>
             )}
@@ -331,18 +375,18 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
       </div>
 
       {!scrolledToBottom && (
-        <div style={hintStyle()}>
-          ↑ Please scroll through the full agreement above to continue.
-        </div>
+        <div style={hintStyle()}>↑ Please scroll through the full agreement above to continue.</div>
       )}
 
       {/* Checkboxes */}
-      <div style={{
-        marginBottom: 24,
-        opacity: scrolledToBottom ? 1 : 0.4,
-        pointerEvents: scrolledToBottom ? 'auto' : 'none',
-        transition: 'opacity 0.3s',
-      }}>
+      <div
+        style={{
+          marginBottom: 24,
+          opacity: scrolledToBottom ? 1 : 0.4,
+          pointerEvents: scrolledToBottom ? 'auto' : 'none',
+          transition: 'opacity 0.3s',
+        }}
+      >
         <div style={sectionLabel()}>I acknowledge that</div>
         {AGREEMENT_CHECKBOXES.map((cb) => (
           <CheckboxCard
@@ -356,12 +400,14 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
       </div>
 
       {/* Signature canvas */}
-      <div style={{
-        marginBottom: 24,
-        opacity: allChecked ? 1 : 0.4,
-        pointerEvents: allChecked ? 'auto' : 'none',
-        transition: 'opacity 0.3s',
-      }}>
+      <div
+        style={{
+          marginBottom: 24,
+          opacity: allChecked ? 1 : 0.4,
+          pointerEvents: allChecked ? 'auto' : 'none',
+          transition: 'opacity 0.3s',
+        }}
+      >
         <div style={sectionLabel()}>Your signature</div>
         <p style={{ fontSize: 13, color: SLATE, margin: '0 0 10px', lineHeight: 1.5 }}>
           Sign with your finger (mobile) or mouse (desktop).
@@ -371,15 +417,17 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
 
       {/* Error */}
       {error && (
-        <div style={{
-          background: '#FEE2E2',
-          color: '#991B1B',
-          padding: 12,
-          borderRadius: 8,
-          fontSize: 13,
-          marginBottom: 16,
-          border: '1px solid #FCA5A5',
-        }}>
+        <div
+          style={{
+            background: '#FEE2E2',
+            color: '#991B1B',
+            padding: 12,
+            borderRadius: 8,
+            fontSize: 13,
+            marginBottom: 16,
+            border: '1px solid #FCA5A5',
+          }}
+        >
           {error}
         </div>
       )}
@@ -405,15 +453,17 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
         {isSubmitting ? 'Submitting…' : 'Submit signed agreement →'}
       </button>
 
-      <p style={{
-        fontSize: 11,
-        color: SLATE_LIGHT,
-        textAlign: 'center',
-        marginTop: 14,
-        lineHeight: 1.5,
-      }}>
-        By clicking Submit, you confirm you've read the agreement and electronically sign it.
-        Your signature is legally binding.
+      <p
+        style={{
+          fontSize: 11,
+          color: SLATE_LIGHT,
+          textAlign: 'center',
+          marginTop: 14,
+          lineHeight: 1.5,
+        }}
+      >
+        By clicking Submit, you confirm you've read the agreement and electronically sign it. Your
+        signature is legally binding.
       </p>
     </Shell>
   );
@@ -423,24 +473,28 @@ export default function SignAgreementClient({ booking, agreementVersion }) {
 
 function Shell({ children }) {
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0B1120',
-      fontFamily: "'Outfit', system-ui, sans-serif",
-      padding: '32px 16px',
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#0B1120',
+        fontFamily: "'Outfit', system-ui, sans-serif",
+        padding: '32px 16px',
+      }}
+    >
       <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
         rel="stylesheet"
       />
-      <div style={{
-        maxWidth: 720,
-        margin: '0 auto',
-        background: '#fff',
-        borderRadius: 16,
-        padding: 28,
-        boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
-      }}>
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          background: '#fff',
+          borderRadius: 16,
+          padding: 28,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
+        }}
+      >
         {children}
       </div>
     </div>
@@ -449,9 +503,18 @@ function Shell({ children }) {
 
 function Row({ label, value }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '4px 0' }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        padding: '4px 0',
+      }}
+    >
       <span style={{ fontSize: 13, color: SLATE_LIGHT }}>{label}</span>
-      <span style={{ fontSize: 14, color: SLATE_DARK, fontWeight: 600, textAlign: 'right' }}>{value}</span>
+      <span style={{ fontSize: 14, color: SLATE_DARK, fontWeight: 600, textAlign: 'right' }}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -463,11 +526,13 @@ function ProgressIndicator({ scrolledToBottom, allChecked, hasSignature }) {
     { label: 'Sign', done: hasSignature },
   ];
   return (
-    <div style={{
-      display: 'flex',
-      gap: 8,
-      marginBottom: 16,
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        marginBottom: 16,
+      }}
+    >
       {steps.map((s, i) => (
         <div
           key={i}
@@ -483,7 +548,8 @@ function ProgressIndicator({ scrolledToBottom, allChecked, hasSignature }) {
             border: `1px solid ${s.done ? '#86EFAC' : '#E2E8F0'}`,
           }}
         >
-          {s.done ? '✓ ' : `${i + 1}. `}{s.label}
+          {s.done ? '✓ ' : `${i + 1}. `}
+          {s.label}
         </div>
       ))}
     </div>
@@ -651,30 +717,35 @@ function SuccessState({ booking }) {
   return (
     <Shell>
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
-        <div style={{
-          width: 72,
-          height: 72,
-          borderRadius: '50%',
-          background: '#DCFCE7',
-          color: '#16A34A',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 36,
-          marginBottom: 20,
-        }}>
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: '50%',
+            background: '#DCFCE7',
+            color: '#16A34A',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 36,
+            marginBottom: 20,
+          }}
+        >
           ✓
         </div>
-        <h1 style={{
-          fontFamily: "'Playfair Display', Georgia, serif",
-          fontSize: 28,
-          color: SLATE_DARK,
-          margin: '0 0 12px',
-        }}>
+        <h1
+          style={{
+            fontFamily: "'Playfair Display', Georgia, serif",
+            fontSize: 28,
+            color: SLATE_DARK,
+            margin: '0 0 12px',
+          }}
+        >
           Agreement signed!
         </h1>
         <p style={{ fontSize: 15, color: SLATE, lineHeight: 1.6, marginBottom: 24 }}>
-          Thanks, {booking.renter_name?.split(' ')[0] || 'rider'}. Your signed agreement is on file. We'll see you at pickup on {formatDate(booking.start_date)}.
+          Thanks, {booking.renter_name?.split(' ')[0] || 'rider'}. Your signed agreement is on file.
+          We'll see you at pickup on {formatDate(booking.start_date)}.
         </p>
         <a
           href={`/agreement/${booking.booking_id}`}

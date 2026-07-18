@@ -23,7 +23,7 @@ import { logInspection } from '../../../lib/sheets';
 async function sendInspectionEmail(data) {
   const RESEND_KEY = process.env.RESEND_API_KEY;
   const OWNER_EMAIL = process.env.OWNER_EMAIL;
-  
+
   if (!RESEND_KEY || !OWNER_EMAIL) {
     console.log('Resend key or owner email missing, skipping inspection email');
     return;
@@ -31,13 +31,13 @@ async function sendInspectionEmail(data) {
 
   const typeLabel = data.type === 'customer' ? '📱 Customer Check-OUT' : '🔧 Owner Check-IN';
   const verdictColor = data.hasDamage ? '#c44' : '#1a8a5c';
-  
+
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_KEY}`,
+        Authorization: `Bearer ${RESEND_KEY}`,
       },
       body: JSON.stringify({
         from: 'Full Throttle Inspect <bookings@fullthrottleutah.com>',
@@ -65,21 +65,29 @@ async function sendInspectionEmail(data) {
                 ${data.fuelOk !== null && data.fuelOk !== undefined ? `<tr><td style="padding: 6px 0; color: #777; font-size: 12px;">Fuel</td><td style="padding: 6px 0; font-weight: 600; text-align: right; color: ${data.fuelOk ? '#1a8a5c' : '#c44'}">${data.fuelOk ? '✅ Full' : '⛽ Refuel fee needed'}</td></tr>` : ''}
               </table>
 
-              ${data.damageNotes && data.damageNotes.length > 0 ? `
+              ${
+                data.damageNotes && data.damageNotes.length > 0
+                  ? `
                 <div style="background: #fcebeb; border-left: 4px solid ${verdictColor}; border-radius: 6px; padding: 12px; margin-top: 14px;">
                   <div style="font-weight: 700; color: #991B1B; font-size: 13px; margin-bottom: 6px;">⚠️ Damage Notes Recorded:</div>
                   <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #991B1B;">
-                    ${data.damageNotes.map(n => `<li>${n}</li>`).join('')}
+                    ${data.damageNotes.map((n) => `<li>${n}</li>`).join('')}
                   </ul>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
 
-              ${data.globalNote ? `
+              ${
+                data.globalNote
+                  ? `
                 <div style="background: #fff; border-radius: 8px; padding: 12px; margin-top: 14px; font-size: 12px;">
                   <div style="font-weight: 600; margin-bottom: 4px;">Overall Notes:</div>
                   <div style="color: #444;">${data.globalNote}</div>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
 
               <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e0ddd5; font-size: 11px; color: #777; text-align: center;">
                 Submitted ${data.timestamp}<br/>
@@ -103,16 +111,16 @@ async function sendInspectionSMS(data) {
   // "To" field with commas in it would fail with "Invalid 'To' Phone Number".
   const ownerPhones = (process.env.OWNER_PHONE_NUMBER || '')
     .split(',')
-    .map(p => p.trim())
+    .map((p) => p.trim())
     .filter(Boolean);
 
   if (ownerPhones.length === 0) {
     console.log('[inspection-submitted] No owner phone configured, skipping SMS');
     return;
   }
-  
+
   const typeLabel = data.type === 'customer' ? 'CHECK-OUT' : 'CHECK-IN';
-  
+
   const msg = [
     `🔍 ${typeLabel} submitted`,
     ``,
@@ -124,7 +132,7 @@ async function sendInspectionSMS(data) {
     ``,
     `(Saved in inspection log)`,
   ].join('\n');
-  
+
   // Send to each owner phone individually (Travis, wife, son)
   for (const phone of ownerPhones) {
     try {
@@ -149,11 +157,12 @@ export async function POST(request) {
     if (!data.inspectionId || !data.type || !data.customerName) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-    
+
     // Log to Google Sheets (non-fatal if fails)
     try {
       await logInspection({
-        timestamp: data.timestamp || new Date().toLocaleString('en-US', { timeZone: 'America/Denver' }),
+        timestamp:
+          data.timestamp || new Date().toLocaleString('en-US', { timeZone: 'America/Denver' }),
         type: data.type, // 'customer' or 'owner'
         inspectionId: data.inspectionId,
         customerName: data.customerName,
@@ -168,13 +177,10 @@ export async function POST(request) {
     } catch (sheetErr) {
       console.error('Sheet log error (non-fatal):', sheetErr.message);
     }
-    
+
     // Send email + SMS notification to owner in parallel
-    await Promise.all([
-      sendInspectionEmail(data),
-      sendInspectionSMS(data),
-    ]);
-    
+    await Promise.all([sendInspectionEmail(data), sendInspectionSMS(data)]);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Inspection submission webhook error:', error);

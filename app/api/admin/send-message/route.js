@@ -53,7 +53,7 @@ export async function POST(request) {
       expand: ['payment_intent'],
     });
     const pi = session.payment_intent;
-    const meta = (pi && typeof pi === 'object') ? pi.metadata : {};
+    const meta = pi && typeof pi === 'object' ? pi.metadata : {};
 
     // Gate on smsOptIn === 'true' (exact stored value in Stripe metadata)
     if (meta.smsOptIn !== 'true') {
@@ -62,7 +62,10 @@ export async function POST(request) {
 
     const normalizedPhone = normalizeToE164(meta.renterPhone || '');
     if (!normalizedPhone) {
-      return Response.json({ error: 'Invalid or missing phone number on booking' }, { status: 400 });
+      return Response.json(
+        { error: 'Invalid or missing phone number on booking' },
+        { status: 400 }
+      );
     }
 
     // All outbound routed through lib/sms.js — STOP enforcement lives there
@@ -70,10 +73,19 @@ export async function POST(request) {
 
     if (smsResult.skipped) {
       // Twilio blocked due to STOP or missing credentials
-      return Response.json({ error: 'Message not delivered — recipient may have opted out via STOP or credentials are missing.' }, { status: 400 });
+      return Response.json(
+        {
+          error:
+            'Message not delivered — recipient may have opted out via STOP or credentials are missing.',
+        },
+        { status: 400 }
+      );
     }
     if (!smsResult.success) {
-      return Response.json({ error: 'SMS delivery failed', detail: smsResult.error }, { status: 400 });
+      return Response.json(
+        { error: 'SMS delivery failed', detail: smsResult.error },
+        { status: 400 }
+      );
     }
 
     const twilioSid = smsResult.sid || `admin-${Date.now()}`;

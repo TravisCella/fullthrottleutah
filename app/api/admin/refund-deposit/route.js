@@ -83,7 +83,8 @@ async function writeReturnMetadata(piId, { action, damageReason, capturedAmount,
     if (damageReason) updates.damageReason = damageReason;
     if (capturedAmount != null) updates.capturedAmount = String(capturedAmount);
     updates.captureTimestamp = new Date().toISOString();
-    updates.returnNotes = updates.returnNotes || `Damage: ${damageReason || 'Not specified'} ($${capturedAmount || 0})`;
+    updates.returnNotes =
+      updates.returnNotes || `Damage: ${damageReason || 'Not specified'} ($${capturedAmount || 0})`;
   }
 
   if (externalAction) {
@@ -102,7 +103,7 @@ function fireReviewRequestForBooking(originalBookingPiId) {
     return;
   }
   // Don't await — we don't want email latency or failure to affect the return action
-  sendReviewRequest(originalBookingPiId).catch(err => {
+  sendReviewRequest(originalBookingPiId).catch((err) => {
     console.error('[refund-deposit] Review email fire-and-forget failed:', err.message);
   });
 }
@@ -191,7 +192,9 @@ export async function POST(request) {
         amount: result.amount / 100,
         capturedAmount: 0,
         externalAction,
-        note: externalAction ? 'Hold was already released externally. Rental marked complete.' : undefined,
+        note: externalAction
+          ? 'Hold was already released externally. Rental marked complete.'
+          : undefined,
       });
     }
 
@@ -199,10 +202,13 @@ export async function POST(request) {
     const holdPI = await stripe.paymentIntents.retrieve(holdId);
     const maxCaptureAmount = holdPI.amount; // in cents — equals the deposit for this package
 
-    const amountToCapture = Math.round((captureAmount || (maxCaptureAmount / 100)) * 100);
+    const amountToCapture = Math.round((captureAmount || maxCaptureAmount / 100) * 100);
 
     if (amountToCapture > maxCaptureAmount) {
-      return Response.json({ error: `Cannot capture more than $${(maxCaptureAmount / 100).toLocaleString()}` }, { status: 400 });
+      return Response.json(
+        { error: `Cannot capture more than $${(maxCaptureAmount / 100).toLocaleString()}` },
+        { status: 400 }
+      );
     }
     if (amountToCapture < 100) {
       return Response.json({ error: 'Minimum capture is $1.00' }, { status: 400 });
@@ -269,7 +275,9 @@ export async function POST(request) {
       amount: result.amount / 100,
       capturedAmount: finalCapturedAmount,
       externalAction,
-      note: externalAction ? 'Hold was already captured externally. Rental marked complete.' : undefined,
+      note: externalAction
+        ? 'Hold was already captured externally. Rental marked complete.'
+        : undefined,
     });
   } catch (err) {
     console.error('Refund deposit error:', err);

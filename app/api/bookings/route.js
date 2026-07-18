@@ -12,6 +12,9 @@ export async function GET(request) {
     return NextResponse.json({ bookedDates, premiumDates });
   } catch (error) {
     console.error('Error fetching bookings:', error);
-    return NextResponse.json({ bookedDates: [], premiumDates: [], error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { bookedDates: [], premiumDates: [], error: error.message },
+      { status: 500 }
+    );
   }
 }

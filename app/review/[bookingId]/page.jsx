@@ -26,7 +26,7 @@ function StarPicker({ value, onChange }) {
   const display = hover || value;
   return (
     <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '8px 0 4px' }}>
-      {[1, 2, 3, 4, 5].map(n => (
+      {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n}
           type="button"
@@ -64,7 +64,15 @@ function RatingLabel({ rating }) {
   };
   const l = labels[rating];
   return (
-    <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: l.color, marginBottom: 8 }}>
+    <div
+      style={{
+        textAlign: 'center',
+        fontSize: 13,
+        fontWeight: 600,
+        color: l.color,
+        marginBottom: 8,
+      }}
+    >
       {l.text}
     </div>
   );
@@ -94,8 +102,8 @@ export default function ReviewPage() {
   useEffect(() => {
     if (!bookingId) return;
     fetch(`/api/submit-review?bookingId=${encodeURIComponent(bookingId)}`)
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (data.error) {
           setLoadError(data.error);
         } else {
@@ -121,7 +129,7 @@ export default function ReviewPage() {
       return;
     }
     if (!displayName.trim()) {
-      setSubmitError('Please tell us how you\'d like your name to appear.');
+      setSubmitError("Please tell us how you'd like your name to appear.");
       return;
     }
 
@@ -155,9 +163,7 @@ export default function ReviewPage() {
   if (loading) {
     return (
       <Shell>
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: MUTED }}>
-          Loading...
-        </div>
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: MUTED }}>Loading...</div>
       </Shell>
     );
   }
@@ -181,7 +187,9 @@ export default function ReviewPage() {
       <Shell>
         <div style={{ background: CARD, borderRadius: 16, padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>You've already reviewed this rental</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
+            You've already reviewed this rental
+          </div>
           <div style={{ fontSize: 14, color: MUTED, lineHeight: 1.6, marginBottom: 12 }}>
             We received your {existingReview.rating}-star review. Thanks for taking the time!
           </div>
@@ -216,7 +224,8 @@ export default function ReviewPage() {
                 💛 Help others find us
               </div>
               <div style={{ fontSize: 13, color: '#92400E', marginBottom: 14, lineHeight: 1.5 }}>
-                Would you also leave a quick review on Google? It helps other Utah riders find us. Takes 30 seconds.
+                Would you also leave a quick review on Google? It helps other Utah riders find us.
+                Takes 30 seconds.
               </div>
               <a
                 href="https://www.google.com/search?q=Full+Throttle+Utah+Farmington+jet+ski+rental"
@@ -263,7 +272,8 @@ export default function ReviewPage() {
           Hi {booking.renter_first_name || 'there'} 👋
         </div>
         <div style={{ fontSize: 14, color: MUTED, lineHeight: 1.5 }}>
-          Thanks for renting with us! Mind sharing how your trip went? Your review helps other Utah riders decide and helps us keep improving.
+          Thanks for renting with us! Mind sharing how your trip went? Your review helps other Utah
+          riders decide and helps us keep improving.
         </div>
         <div
           style={{
@@ -290,7 +300,7 @@ export default function ReviewPage() {
         <Label>Tell us about your trip</Label>
         <textarea
           value={reviewText}
-          onChange={e => setReviewText(e.target.value)}
+          onChange={(e) => setReviewText(e.target.value)}
           maxLength={2000}
           rows={5}
           placeholder="What stood out? Pickup experience? Equipment quality? Anything we should improve?"
@@ -315,7 +325,7 @@ export default function ReviewPage() {
         <Label>Name to display on our website</Label>
         <input
           value={displayName}
-          onChange={e => setDisplayName(e.target.value)}
+          onChange={(e) => setDisplayName(e.target.value)}
           maxLength={80}
           placeholder="e.g. Israel A."
           style={inputStyle}
@@ -340,7 +350,7 @@ export default function ReviewPage() {
           <input
             type="checkbox"
             checked={allowPublish}
-            onChange={e => setAllowPublish(e.target.checked)}
+            onChange={(e) => setAllowPublish(e.target.checked)}
             style={{ marginTop: 3, accentColor: NAVY, width: 18, height: 18 }}
           />
           <div>
@@ -375,7 +385,7 @@ export default function ReviewPage() {
             <Label>Private note (never published)</Label>
             <textarea
               value={privateNote}
-              onChange={e => setPrivateNote(e.target.value)}
+              onChange={(e) => setPrivateNote(e.target.value)}
               maxLength={2000}
               rows={3}
               placeholder="Anything for our eyes only — issues, suggestions, etc."
@@ -420,7 +430,15 @@ export default function ReviewPage() {
           {submitting ? 'Submitting...' : 'Submit Review'}
         </button>
 
-        <div style={{ fontSize: 11, color: MUTED, marginTop: 12, textAlign: 'center', lineHeight: 1.5 }}>
+        <div
+          style={{
+            fontSize: 11,
+            color: MUTED,
+            marginTop: 12,
+            textAlign: 'center',
+            lineHeight: 1.5,
+          }}
+        >
           Questions? Email{' '}
           <a href="mailto:bookings@fullthrottleutah.com" style={{ color: NAVY }}>
             bookings@fullthrottleutah.com

@@ -25,14 +25,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export async function POST(request) {
   try {
     const data = await request.json();
-    const {
-      password,
-      customerName,
-      customerEmail,
-      bookingId,
-      notes,
-      amount,
-    } = data;
+    const { password, customerName, customerEmail, bookingId, notes, amount } = data;
 
     // ─── Auth ────────────────────────────────────────────────────────────
     if (password !== process.env.ADMIN_PASSWORD) {
@@ -41,10 +34,7 @@ export async function POST(request) {
 
     // ─── Validate inputs ─────────────────────────────────────────────────
     if (!customerName || !customerName.trim()) {
-      return Response.json(
-        { error: 'Customer name is required' },
-        { status: 400 }
-      );
+      return Response.json({ error: 'Customer name is required' }, { status: 400 });
     }
 
     const parsedAmount = parseFloat(amount);
@@ -52,10 +42,7 @@ export async function POST(request) {
     const amountCents = Math.round(amountDollars * 100);
 
     if (amountCents < 50 || amountCents > 1000000) {
-      return Response.json(
-        { error: 'Amount must be between $0.50 and $10,000' },
-        { status: 400 }
-      );
+      return Response.json({ error: 'Amount must be between $0.50 and $10,000' }, { status: 400 });
     }
 
     // ─── Build metadata ──────────────────────────────────────────────────
@@ -81,7 +68,8 @@ export async function POST(request) {
             currency: 'usd',
             product_data: {
               name: 'Full Throttle Utah — Security Deposit Hold',
-              description: `Refundable authorization hold for ${meta.customer_name}. ` +
+              description:
+                `Refundable authorization hold for ${meta.customer_name}. ` +
                 `Your card will NOT be charged unless damage is documented after your rental. ` +
                 `The hold automatically releases within 7 days.`,
             },
@@ -93,7 +81,8 @@ export async function POST(request) {
       payment_intent_data: {
         capture_method: 'manual', // ← the critical flag — this makes it an auth-only hold
         metadata: meta,
-        description: `Deposit hold — ${meta.customer_name}` +
+        description:
+          `Deposit hold — ${meta.customer_name}` +
           (meta.linked_booking_id ? ` (booking ${meta.linked_booking_id.slice(-8)})` : ''),
         statement_descriptor_suffix: 'DEPOSIT', // shown on customer's card statement
       },
@@ -101,10 +90,12 @@ export async function POST(request) {
       customer_email: meta.customer_email || undefined,
       success_url: `https://www.fullthrottleutah.com/deposit-hold-confirmed?session={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://www.fullthrottleutah.com/admin/hold-deposit?cancelled=1`,
-      expires_at: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // session URL valid for 24h
+      expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // session URL valid for 24h
     });
 
-    console.log(`[create-deposit-hold] Created session ${session.id} for ${meta.customer_name} ($${amountDollars})`);
+    console.log(
+      `[create-deposit-hold] Created session ${session.id} for ${meta.customer_name} ($${amountDollars})`
+    );
 
     return Response.json({
       ok: true,
@@ -116,9 +107,6 @@ export async function POST(request) {
     });
   } catch (err) {
     console.error('[create-deposit-hold] error:', err);
-    return Response.json(
-      { error: err.message || 'Internal error' },
-      { status: 500 }
-    );
+    return Response.json({ error: err.message || 'Internal error' }, { status: 500 });
   }
 }

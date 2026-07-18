@@ -125,7 +125,15 @@ export default function AdminReviewsPage() {
           fontFamily: 'system-ui, sans-serif',
         }}
       >
-        <div style={{ background: '#fff', borderRadius: 16, padding: 32, width: '100%', maxWidth: 380 }}>
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 16,
+            padding: 32,
+            width: '100%',
+            maxWidth: 380,
+          }}
+        >
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>⭐</div>
             <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Review Moderation</div>
@@ -134,8 +142,8 @@ export default function AdminReviewsPage() {
           <input
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && tryLogin(password)}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && tryLogin(password)}
             placeholder="Password"
             style={{
               width: '100%',
@@ -149,7 +157,16 @@ export default function AdminReviewsPage() {
             }}
           />
           {loginError && (
-            <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+            <div
+              style={{
+                background: '#FEE2E2',
+                color: '#991B1B',
+                padding: 10,
+                borderRadius: 8,
+                fontSize: 13,
+                marginBottom: 12,
+              }}
+            >
               {loginError}
             </div>
           )}
@@ -178,7 +195,14 @@ export default function AdminReviewsPage() {
 
   // ── MAIN UI ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'system-ui, sans-serif', paddingBottom: 40 }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#F8FAFC',
+        fontFamily: 'system-ui, sans-serif',
+        paddingBottom: 40,
+      }}
+    >
       <div
         style={{
           background: '#0B1120',
@@ -217,7 +241,7 @@ export default function AdminReviewsPage() {
           { id: 'approved', label: `Approved (${counts.approved})` },
           { id: 'rejected', label: `Rejected (${counts.rejected})` },
           { id: 'all', label: `All (${counts.total})` },
-        ].map(f => (
+        ].map((f) => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
@@ -263,7 +287,7 @@ export default function AdminReviewsPage() {
           </div>
         )}
 
-        {reviews.map(r => (
+        {reviews.map((r) => (
           <ReviewCard
             key={r.review_id}
             review={r}
@@ -292,7 +316,7 @@ export default function AdminReviewsPage() {
           }}
         >
           <div
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             style={{
               background: '#fff',
               borderRadius: '20px 20px 0 0',
@@ -312,10 +336,18 @@ export default function AdminReviewsPage() {
                 zIndex: 1,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                }}
+              >
                 <div>
                   <Stars rating={selected.rating} size={20} />
-                  <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>{selected.display_name}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>
+                    {selected.display_name}
+                  </div>
                   <div style={{ fontSize: 12, color: '#64748B' }}>
                     {selected.location} · submitted {formatDate(selected.timestamp_submitted)}
                   </div>
@@ -341,17 +373,39 @@ export default function AdminReviewsPage() {
               <StatusBadge status={selected.status} />
 
               {/* Review text */}
-              <div style={{ background: '#F8FAFC', borderRadius: 10, padding: 14, margin: '14px 0', fontSize: 14, lineHeight: 1.6 }}>
+              <div
+                style={{
+                  background: '#F8FAFC',
+                  borderRadius: 10,
+                  padding: 14,
+                  margin: '14px 0',
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                }}
+              >
                 "{selected.review_text}"
               </div>
 
               {/* Private note */}
               {selected.private_note && (
-                <div style={{ background: '#FEF3C7', borderRadius: 10, padding: 14, marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                <div
+                  style={{ background: '#FEF3C7', borderRadius: 10, padding: 14, marginBottom: 14 }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#92400E',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: 4,
+                    }}
+                  >
                     🔒 Private note (never published)
                   </div>
-                  <div style={{ fontSize: 13, color: '#92400E', lineHeight: 1.5 }}>{selected.private_note}</div>
+                  <div style={{ fontSize: 13, color: '#92400E', lineHeight: 1.5 }}>
+                    {selected.private_note}
+                  </div>
                 </div>
               )}
 
@@ -360,7 +414,9 @@ export default function AdminReviewsPage() {
                 <Row k="Customer">{selected.customer_name}</Row>
                 <Row k="Package">{selected.package}</Row>
                 <Row k="Allow publish">{selected.allow_publish ? '✓ Yes' : '✗ No'}</Row>
-                <Row k="Booking ID" mono>{selected.booking_id}</Row>
+                <Row k="Booking ID" mono>
+                  {selected.booking_id}
+                </Row>
                 {selected.timestamp_moderated && (
                   <Row k="Moderated">{formatDate(selected.timestamp_moderated)}</Row>
                 )}
@@ -368,13 +424,22 @@ export default function AdminReviewsPage() {
 
               {/* Edit display name */}
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#94A3B8',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    marginBottom: 6,
+                  }}
+                >
                   Display name
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input
                     value={editingName}
-                    onChange={e => setEditingName(e.target.value)}
+                    onChange={(e) => setEditingName(e.target.value)}
                     maxLength={80}
                     style={{
                       flex: 1,
@@ -389,7 +454,9 @@ export default function AdminReviewsPage() {
                   />
                   <button
                     onClick={() => moderate('rename')}
-                    disabled={actionLoading || editingName === selected.display_name || !editingName.trim()}
+                    disabled={
+                      actionLoading || editingName === selected.display_name || !editingName.trim()
+                    }
                     style={{
                       padding: '10px 16px',
                       borderRadius: 8,
@@ -399,7 +466,12 @@ export default function AdminReviewsPage() {
                       fontSize: 13,
                       fontWeight: 600,
                       cursor: 'pointer',
-                      opacity: actionLoading || editingName === selected.display_name || !editingName.trim() ? 0.4 : 1,
+                      opacity:
+                        actionLoading ||
+                        editingName === selected.display_name ||
+                        !editingName.trim()
+                          ? 0.4
+                          : 1,
                     }}
                   >
                     Update
@@ -409,12 +481,31 @@ export default function AdminReviewsPage() {
 
               {/* Status messages */}
               {actionError && (
-                <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 12 }}>
+                <div
+                  style={{
+                    background: '#FEE2E2',
+                    color: '#991B1B',
+                    padding: 12,
+                    borderRadius: 10,
+                    fontSize: 13,
+                    marginBottom: 12,
+                  }}
+                >
                   {actionError}
                 </div>
               )}
               {actionSuccess && (
-                <div style={{ background: '#DCFCE7', color: '#166534', padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 12, fontWeight: 600 }}>
+                <div
+                  style={{
+                    background: '#DCFCE7',
+                    color: '#166534',
+                    padding: 12,
+                    borderRadius: 10,
+                    fontSize: 13,
+                    marginBottom: 12,
+                    fontWeight: 600,
+                  }}
+                >
                   {actionSuccess}
                 </div>
               )}
@@ -485,7 +576,14 @@ function ReviewCard({ review, onClick }) {
         border: '1px solid #E2E8F0',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: 8,
+        }}
+      >
         <div style={{ flex: 1, minWidth: 0 }}>
           <Stars rating={review.rating} size={16} />
           <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{review.display_name}</div>
@@ -533,7 +631,7 @@ function ReviewCard({ review, onClick }) {
 function Stars({ rating, size = 16 }) {
   return (
     <div style={{ display: 'flex', gap: 2 }}>
-      {[1, 2, 3, 4, 5].map(n => (
+      {[1, 2, 3, 4, 5].map((n) => (
         <span
           key={n}
           style={{
@@ -575,9 +673,26 @@ function StatusBadge({ status }) {
 
 function Row({ k, children, mono }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F1F5F9' }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        padding: '6px 0',
+        borderBottom: '1px solid #F1F5F9',
+      }}
+    >
       <span style={{ color: '#94A3B8' }}>{k}</span>
-      <span style={{ fontWeight: 600, color: '#0F172A', fontFamily: mono ? 'monospace' : 'inherit', fontSize: mono ? 11 : 12, wordBreak: 'break-all', textAlign: 'right', marginLeft: 16 }}>
+      <span
+        style={{
+          fontWeight: 600,
+          color: '#0F172A',
+          fontFamily: mono ? 'monospace' : 'inherit',
+          fontSize: mono ? 11 : 12,
+          wordBreak: 'break-all',
+          textAlign: 'right',
+          marginLeft: 16,
+        }}
+      >
         {children}
       </span>
     </div>

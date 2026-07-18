@@ -39,38 +39,23 @@ export async function POST(request) {
   try {
     // ─── 1. Parse + validate body ──────────────────────────────
     const body = await request.json();
-    const {
-      bookingId,
-      agreementVersion,
-      signatureDataUrl,
-      checksJson,
-      signedAt,
-    } = body || {};
+    const { bookingId, agreementVersion, signatureDataUrl, checksJson, signedAt } = body || {};
 
     if (!bookingId || !agreementVersion || !signatureDataUrl || !checksJson || !signedAt) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     if (!signatureDataUrl.startsWith('data:image/')) {
-      return NextResponse.json(
-        { error: 'Invalid signature format' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid signature format' }, { status: 400 });
     }
 
     // ─── 2. Auth to Google Sheets ──────────────────────────────
     const credentials = JSON.parse(
       Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString()
     );
-    const auth = new google.auth.JWT(
-      credentials.client_email,
-      null,
-      credentials.private_key,
-      ['https://www.googleapis.com/auth/spreadsheets']
-    );
+    const auth = new google.auth.JWT(credentials.client_email, null, credentials.private_key, [
+      'https://www.googleapis.com/auth/spreadsheets',
+    ]);
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 
@@ -95,28 +80,19 @@ export async function POST(request) {
     }
 
     if (rowIndex === -1) {
-      return NextResponse.json(
-        { error: 'Booking not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
     // Idempotency: don't allow re-signing
     if (existingSigned.toUpperCase().startsWith('YES')) {
-      return NextResponse.json(
-        { error: 'This booking has already been signed' },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: 'This booking has already been signed' }, { status: 409 });
     }
 
     // ─── 4. Save signature to Firebase ─────────────────────────
     const firebaseSecret = process.env.FIREBASE_DATABASE_SECRET;
     if (!firebaseSecret) {
       console.error('[sign-agreement-retroactive] Missing FIREBASE_DATABASE_SECRET env var');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
     const fbPath = `${FIREBASE_DB_URL}/retroactive-signatures/${encodeURIComponent(bookingId)}.json?auth=${encodeURIComponent(firebaseSecret)}`;
@@ -162,10 +138,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, rowIndex });
   } catch (err) {
     console.error('[sign-agreement-retroactive] error:', err);
-    return NextResponse.json(
-      { error: err.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 

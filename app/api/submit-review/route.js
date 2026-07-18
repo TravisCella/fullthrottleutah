@@ -14,11 +14,7 @@
 //                                              review needs moderation (low rating).
 
 import { NextResponse } from 'next/server';
-import {
-  getBookingById,
-  getReviewByBookingId,
-  addReview,
-} from '../../../lib/sheets';
+import { getBookingById, getReviewByBookingId, addReview } from '../../../lib/sheets';
 import { sendSMS } from '../../../lib/sms';
 
 // ─── GET: form context lookup ──────────────────────────────────────────────
@@ -33,7 +29,10 @@ export async function GET(request) {
     const booking = await getBookingById(bookingId);
     if (!booking) {
       return NextResponse.json(
-        { error: 'We couldn\'t find that booking. Double-check the link in your email — and if it still doesn\'t work, text us at (801) 548-1273.' },
+        {
+          error:
+            "We couldn't find that booking. Double-check the link in your email — and if it still doesn't work, text us at (801) 548-1273.",
+        },
         { status: 404 }
       );
     }
@@ -80,14 +79,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const {
-      bookingId,
-      rating,
-      reviewText,
-      displayName,
-      allowPublish,
-      privateNote,
-    } = body;
+    const { bookingId, rating, reviewText, displayName, allowPublish, privateNote } = body;
 
     // ── Validation ────────────────────────────────────────────────────────
     if (!bookingId) {
@@ -128,7 +120,7 @@ export async function POST(request) {
     if (existing) {
       return NextResponse.json(
         {
-          error: 'You\'ve already submitted a review for this rental. Thanks!',
+          error: "You've already submitted a review for this rental. Thanks!",
           existing_review: {
             review_id: existing.review_id,
             rating: existing.rating,
@@ -171,7 +163,7 @@ export async function POST(request) {
       reviewText: trimmedText,
       location: booking.location,
       privateNote: privateNote?.trim(),
-    }).catch(err => console.error('[submit-review] notify failed (non-fatal):', err));
+    }).catch((err) => console.error('[submit-review] notify failed (non-fatal):', err));
 
     // ── Send back enough info for the thank-you screen ────────────────────
     return NextResponse.json({
@@ -183,7 +175,7 @@ export async function POST(request) {
       message:
         status === 'approved'
           ? 'Your review is live! Thanks for sharing.'
-          : 'Got it! We\'ll review and publish it shortly.',
+          : "Got it! We'll review and publish it shortly.",
     });
   } catch (err) {
     console.error('[submit-review][POST] error:', err);
@@ -192,15 +184,25 @@ export async function POST(request) {
 }
 
 // Fire-and-forget owner notification. SMS goes to every number in OWNER_PHONE_NUMBER.
-async function notifyOwnerOfNewReview({ rating, status, displayName, reviewText, location, privateNote }) {
+async function notifyOwnerOfNewReview({
+  rating,
+  status,
+  displayName,
+  reviewText,
+  location,
+  privateNote,
+}) {
   const ownerPhones = (process.env.OWNER_PHONE_NUMBER || '')
-    .split(',').map(p => p.trim()).filter(Boolean);
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
   if (ownerPhones.length === 0) return;
 
   const stars = '⭐'.repeat(rating);
-  const flagLine = status === 'approved'
-    ? `✨ New ${rating}-star review (auto-published)`
-    : `⚠️ ${rating}-star review — needs your moderation`;
+  const flagLine =
+    status === 'approved'
+      ? `✨ New ${rating}-star review (auto-published)`
+      : `⚠️ ${rating}-star review — needs your moderation`;
 
   const lines = [
     flagLine,

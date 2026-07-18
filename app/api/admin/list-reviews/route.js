@@ -25,9 +25,9 @@ export async function POST(request) {
     const allReviews = statusFilter ? await getReviews() : reviews;
     const counts = {
       total: allReviews.length,
-      pending: allReviews.filter(r => r.status === 'pending').length,
-      approved: allReviews.filter(r => r.status === 'approved').length,
-      rejected: allReviews.filter(r => r.status === 'rejected').length,
+      pending: allReviews.filter((r) => r.status === 'pending').length,
+      approved: allReviews.filter((r) => r.status === 'approved').length,
+      rejected: allReviews.filter((r) => r.status === 'rejected').length,
     };
 
     return NextResponse.json({ ok: true, reviews, counts });

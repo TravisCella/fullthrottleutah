@@ -51,7 +51,9 @@ async function getAllBookingsFromSheet() {
   try {
     let credentials;
     if (process.env.GOOGLE_CREDENTIALS_BASE64) {
-      const decoded = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+      const decoded = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString(
+        'utf-8'
+      );
       credentials = JSON.parse(decoded);
     } else {
       credentials = {
@@ -60,12 +62,9 @@ async function getAllBookingsFromSheet() {
       };
     }
 
-    const auth = new google.auth.JWT(
-      credentials.client_email,
-      null,
-      credentials.private_key,
-      ['https://www.googleapis.com/auth/spreadsheets']
-    );
+    const auth = new google.auth.JWT(credentials.client_email, null, credentials.private_key, [
+      'https://www.googleapis.com/auth/spreadsheets',
+    ]);
 
     const sheets = google.sheets({ version: 'v4', auth });
     const res = await sheets.spreadsheets.values.get({
@@ -121,7 +120,7 @@ export async function POST(request) {
       return Response.json({ bookings: listCache.data });
     }
 
-    const oneYearAgo = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60);
+    const oneYearAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
     const MAX_SESSIONS = 1000;
 
     // First page + Sheet in parallel, then paginate through remaining pages
@@ -145,25 +144,23 @@ export async function POST(request) {
         created: { gte: oneYearAgo },
         limit: 100,
         starting_after: page.data[page.data.length - 1].id,
-        expand: [
-          'data.payment_intent',
-          'data.payment_intent.latest_charge',
-          'data.customer',
-        ],
+        expand: ['data.payment_intent', 'data.payment_intent.latest_charge', 'data.customer'],
       });
       allSessions.push(...page.data);
     }
     if (allSessions.length >= MAX_SESSIONS) {
-      console.warn(`[list-bookings] Hit ${MAX_SESSIONS}-session ceiling — some sessions may be omitted.`);
+      console.warn(
+        `[list-bookings] Hit ${MAX_SESSIONS}-session ceiling — some sessions may be omitted.`
+      );
     }
 
     // ── STEP 1: Filter ─────────────────────────────────────────────────────
     // Keep a session only if it represents a live, uncharged-back booking.
-    const filtered = allSessions.filter(s => {
+    const filtered = allSessions.filter((s) => {
       if (s.payment_status !== 'paid') return false;
 
       const pi = s.payment_intent;
-      const piObj = (pi && typeof pi === 'object') ? pi : null;
+      const piObj = pi && typeof pi === 'object' ? pi : null;
 
       // Exclude canceled payment intents
       if (piObj?.status === 'canceled') return false;
@@ -183,27 +180,37 @@ export async function POST(request) {
     });
 
     // ── STEP 2: Map to booking objects ─────────────────────────────────────
-    const mapped = filtered.map(s => {
+    const mapped = filtered.map((s) => {
       const pi = s.payment_intent;
-      const piObj = (pi && typeof pi === 'object') ? pi : null;
+      const piObj = pi && typeof pi === 'object' ? pi : null;
       const meta = piObj?.metadata || {};
       const customer = s.customer || {};
       const sheetData = sheetBookings[s.id] || {};
 
-      const renterName  = sheetData.renter_name  || meta.renterName  || (typeof customer === 'object' ? customer.name  : '') || '';
-      const renterEmail = sheetData.renter_email  || meta.renterEmail || (typeof customer === 'object' ? customer.email : '') || '';
-      const renterPhone = sheetData.renter_phone  || meta.renterPhone || '';
-      const packageName = sheetData.package       || meta.packageName || '';
-      const location    = sheetData.location      || meta.location    || '';
-      const startDate   = sheetData.start_date    || meta.startDate   || '';
-      const endDate     = sheetData.end_date      || meta.endDate     || startDate;
-      const days        = sheetData.days          || meta.days        || '1';
-      const experience  = sheetData.experience    || meta.experience  || '';
-      const totalPrice  = sheetData.total_price   || (s.amount_total / 100).toString();
+      const renterName =
+        sheetData.renter_name ||
+        meta.renterName ||
+        (typeof customer === 'object' ? customer.name : '') ||
+        '';
+      const renterEmail =
+        sheetData.renter_email ||
+        meta.renterEmail ||
+        (typeof customer === 'object' ? customer.email : '') ||
+        '';
+      const renterPhone = sheetData.renter_phone || meta.renterPhone || '';
+      const packageName = sheetData.package || meta.packageName || '';
+      const location = sheetData.location || meta.location || '';
+      const startDate = sheetData.start_date || meta.startDate || '';
+      const endDate = sheetData.end_date || meta.endDate || startDate;
+      const days = sheetData.days || meta.days || '1';
+      const experience = sheetData.experience || meta.experience || '';
+      const totalPrice = sheetData.total_price || (s.amount_total / 100).toString();
 
-      const ownerEmail    = process.env.OWNER_EMAIL || '';
-      const isTestBooking = !!(ownerEmail && renterEmail.toLowerCase() === ownerEmail.toLowerCase());
-      const inSheet       = !!sheetData.booking_id;
+      const ownerEmail = process.env.OWNER_EMAIL || '';
+      const isTestBooking = !!(
+        ownerEmail && renterEmail.toLowerCase() === ownerEmail.toLowerCase()
+      );
+      const inSheet = !!sheetData.booking_id;
 
       // Partial-refund flag: charge exists, has been partially refunded, not fully.
       // Kept visible (real trip) but useful context for the operator.
@@ -216,11 +223,11 @@ export async function POST(request) {
       );
 
       return {
-        sessionId:   s.id,
+        sessionId: s.id,
         paymentIntentId: piObj?.id || (typeof pi === 'string' ? pi : null),
-        customerId:  typeof customer === 'string' ? customer : customer.id,
+        customerId: typeof customer === 'string' ? customer : customer.id,
 
-        renterName:  renterName || 'Unknown Customer',
+        renterName: renterName || 'Unknown Customer',
         renterEmail,
         renterPhone,
 
@@ -231,17 +238,17 @@ export async function POST(request) {
         days: parseInt(days, 10) || 1,
         experience,
 
-        totalPaid:   s.amount_total / 100,
-        totalPrice:  parseFloat(totalPrice) || (s.amount_total / 100),
-        rentalStatus:           meta.rentalStatus           || 'booked',
-        securityDepositStatus:  meta.securityDepositStatus  || 'pending',
-        securityDepositMethod:  meta.securityDepositMethod  || '',
-        securityDepositHoldId:  meta.securityDepositHoldId  || null,
+        totalPaid: s.amount_total / 100,
+        totalPrice: parseFloat(totalPrice) || s.amount_total / 100,
+        rentalStatus: meta.rentalStatus || 'booked',
+        securityDepositStatus: meta.securityDepositStatus || 'pending',
+        securityDepositMethod: meta.securityDepositMethod || '',
+        securityDepositHoldId: meta.securityDepositHoldId || null,
 
-        whiteGlove:  meta.whiteGlove === 'true',
+        whiteGlove: meta.whiteGlove === 'true',
         isLakePowell: location?.toLowerCase().includes('powell') || meta.isLakePowell === 'true',
         waiverSigned: meta.waiverSigned === 'true' || sheetData.status === 'CONFIRMED',
-        waiverDate:   meta.waiverDate || '',
+        waiverDate: meta.waiverDate || '',
 
         smsOptIn: meta.smsOptIn === 'true',
 
@@ -249,9 +256,9 @@ export async function POST(request) {
         inSheet,
         isPartiallyRefunded,
 
-        createdAt:        new Date(s.created * 1000).toISOString(),
-        pickupTimestamp:  meta.pickupTimestamp  || null,
-        returnTimestamp:  meta.returnTimestamp  || null,
+        createdAt: new Date(s.created * 1000).toISOString(),
+        pickupTimestamp: meta.pickupTimestamp || null,
+        returnTimestamp: meta.returnTimestamp || null,
 
         // Customer-selected pickup/return times from checkout (distinct from the
         // *Timestamp fields above, which are set at actual check-out/return).
@@ -276,7 +283,11 @@ export async function POST(request) {
     const groups = new Map();
     for (const b of mapped) {
       const key = b.renterEmail
-        ? [b.renterEmail.toLowerCase(), b.startDate || '', (b.packageName || '').toLowerCase()].join('|')
+        ? [
+            b.renterEmail.toLowerCase(),
+            b.startDate || '',
+            (b.packageName || '').toLowerCase(),
+          ].join('|')
         : b.sessionId;
 
       if (!groups.has(key)) groups.set(key, []);
@@ -289,7 +300,7 @@ export async function POST(request) {
         deduped.push(group[0]);
         continue;
       }
-      const withSheet = group.filter(b => b.inSheet);
+      const withSheet = group.filter((b) => b.inSheet);
       if (withSheet.length > 0) {
         // Keep all Sheet-backed sessions; suppress ghosts (no Sheet row)
         deduped.push(...withSheet);

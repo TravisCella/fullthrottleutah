@@ -1,13 +1,15 @@
-import { Analytics } from '@vercel/analytics/react'
-import ChatWrapper from './chat-wrapper'
+import { Analytics } from '@vercel/analytics/react';
+import ChatWrapper from './chat-wrapper';
 
 export const metadata = {
   title: 'Full Throttle Utah | Premium Jet Ski & Powersport Rentals',
-  description: 'Premium Sea-Doo jet ski, UTV, and powersport rentals across every major Utah destination. Book online in 2 minutes. Pickup from Farmington, UT.',
+  description:
+    'Premium Sea-Doo jet ski, UTV, and powersport rentals across every major Utah destination. Book online in 2 minutes. Pickup from Farmington, UT.',
   metadataBase: new URL('https://www.fullthrottleutah.com'),
   openGraph: {
     title: 'Full Throttle Utah | Premium Jet Ski & Powersport Rentals',
-    description: 'Premium Sea-Doo jet ski rentals across Utah. Pineview, Jordanelle, Deer Creek, Bear Lake, Lake Powell. Book online in 2 minutes.',
+    description:
+      'Premium Sea-Doo jet ski rentals across Utah. Pineview, Jordanelle, Deer Creek, Bear Lake, Lake Powell. Book online in 2 minutes.',
     url: 'https://www.fullthrottleutah.com',
     siteName: 'Full Throttle Utah',
     images: [{ url: '/images/icon-512.png', width: 512, height: 512, alt: 'Full Throttle Utah' }],
@@ -20,9 +22,13 @@ export const metadata = {
     description: 'Premium Sea-Doo jet ski rentals across Utah. Pickup from Farmington.',
     images: ['/images/icon-512.png'],
   },
-  icons: { icon: '/images/favicon.ico', shortcut: '/images/favicon.ico', apple: '/images/apple-icon.png' },
+  icons: {
+    icon: '/images/favicon.ico',
+    shortcut: '/images/favicon.ico',
+    apple: '/images/apple-icon.png',
+  },
   manifest: '/images/manifest.json',
-}
+};
 
 export const viewport = {
   width: 'device-width',
@@ -30,7 +36,7 @@ export const viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: '#0C4A6E',
-}
+};
 
 export default function RootLayout({ children }) {
   return (
@@ -48,5 +54,5 @@ export default function RootLayout({ children }) {
         <Analytics />
       </body>
     </html>
-  )
+  );
 }

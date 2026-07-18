@@ -27,15 +27,15 @@ export async function POST(request) {
 
     if (meta.rentalStatus === 'picked_up') {
       return Response.json(
-        { error: 'Cannot cancel a rental that has already been picked up. Release the deposit hold instead.' },
+        {
+          error:
+            'Cannot cancel a rental that has already been picked up. Release the deposit hold instead.',
+        },
         { status: 400 }
       );
     }
     if (meta.rentalStatus === 'returned') {
-      return Response.json(
-        { error: 'Cannot cancel a completed rental.' },
-        { status: 400 }
-      );
+      return Response.json({ error: 'Cannot cancel a completed rental.' }, { status: 400 });
     }
     if (meta.rentalStatus === 'cancelled') {
       return Response.json({ error: 'Booking is already cancelled.' }, { status: 400 });
@@ -65,15 +65,15 @@ export async function POST(request) {
     // Mark the Sheets row as CANCELLED to free the dates in the booking wizard.
     // Best-effort — if the webhook hasn't written to Sheets yet, found=false is
     // logged but doesn't fail the cancellation (Stripe refund already succeeded).
-    const email     = meta.renterEmail || '';
-    const startDate = meta.startDate   || '';
+    const email = meta.renterEmail || '';
+    const startDate = meta.startDate || '';
     let sheetResult = { found: false };
     try {
       sheetResult = await cancelBookingInSheet(email, startDate);
       if (!sheetResult.found) {
         console.warn(
           `[cancel-booking] Sheets row not found for email=${email} startDate=${startDate}. ` +
-          'Booking may not have been written to Sheets yet — mark manually if needed.'
+            'Booking may not have been written to Sheets yet — mark manually if needed.'
         );
       }
     } catch (sheetErr) {

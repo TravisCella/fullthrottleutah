@@ -16,14 +16,19 @@ import { PACKAGES, LOCATIONS, computeTotal } from '../../lib/pricing.js';
 // ─── OLD: verbatim inline functions from booking.js ──────────────────────────
 
 const OLD_HOLIDAYS = [
-  { start: "07-01", end: "07-05", name: "July 4th", premium: 75 },
-  { start: "07-20", end: "07-25", name: "Pioneer Day", premium: 75 },
-  { start: "08-29", end: "09-02", name: "Labor Day", premium: 75 },
-  { start: "05-23", end: "05-27", name: "Memorial Day", premium: 75 },
+  { start: '07-01', end: '07-05', name: 'July 4th', premium: 75 },
+  { start: '07-20', end: '07-25', name: 'Pioneer Day', premium: 75 },
+  { start: '08-29', end: '09-02', name: 'Labor Day', premium: 75 },
+  { start: '05-23', end: '05-27', name: 'Memorial Day', premium: 75 },
 ];
 
-function OLD_isWeekend(d) { const day = new Date(d).getDay(); return day === 0 || day === 5 || day === 6; }
-function OLD_daysBetween(a, b) { return Math.round((b - a) / 864e5) + 1; }
+function OLD_isWeekend(d) {
+  const day = new Date(d).getDay();
+  return day === 0 || day === 5 || day === 6;
+}
+function OLD_daysBetween(a, b) {
+  return Math.round((b - a) / 864e5) + 1;
+}
 
 function OLD_calculatePrice(pkg, start, end) {
   const days = OLD_daysBetween(start, end);
@@ -43,15 +48,15 @@ function OLD_getHolidaySurcharge(startDate, endDate) {
   let totalSurcharge = 0;
 
   const current = new Date(startDate);
-  current.setHours(0,0,0,0);
+  current.setHours(0, 0, 0, 0);
   const last = new Date(end);
-  last.setHours(0,0,0,0);
+  last.setHours(0, 0, 0, 0);
 
   while (current <= last) {
-    const mmdd = `${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+    const mmdd = `${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
     for (const h of OLD_HOLIDAYS) {
       if (mmdd >= h.start && mmdd <= h.end) {
-        if (!matched.find(m => m.name === h.name)) {
+        if (!matched.find((m) => m.name === h.name)) {
           matched.push(h);
         }
         totalSurcharge += h.premium;
@@ -66,14 +71,19 @@ function OLD_getHolidaySurcharge(startDate, endDate) {
 
 // Replicates booking.js line 638 exactly:
 //   totalPrice = basePrice + holidayInfo.total + whiteGloveFee + deconFee + extraVestFee - loyaltyDiscount
-function oldTotal(pkg, startDate, endDate, { whiteGlove = false, repeatCustomer = false, loc = null, spareVestCount = 0 } = {}) {
+function oldTotal(
+  pkg,
+  startDate,
+  endDate,
+  { whiteGlove = false, repeatCustomer = false, loc = null, spareVestCount = 0 } = {}
+) {
   const location = loc || LOCATIONS[0]; // default: Pineview (no fees)
-  const basePrice        = OLD_calculatePrice(pkg, startDate, endDate);
+  const basePrice = OLD_calculatePrice(pkg, startDate, endDate);
   const holidaySurcharge = OLD_getHolidaySurcharge(startDate, endDate).total;
-  const whiteGloveFee    = (whiteGlove && location?.whiteGloveFee) ? location.whiteGloveFee : 0;
-  const deconFee         = location?.id === "lake-powell" ? 200 : 0;
-  const extraVestFee     = spareVestCount * 15;
-  const loyaltyDiscount  = repeatCustomer ? Math.round(basePrice * 0.10) : 0;
+  const whiteGloveFee = whiteGlove && location?.whiteGloveFee ? location.whiteGloveFee : 0;
+  const deconFee = location?.id === 'lake-powell' ? 200 : 0;
+  const extraVestFee = spareVestCount * 15;
+  const loyaltyDiscount = repeatCustomer ? Math.round(basePrice * 0.1) : 0;
   return basePrice + holidaySurcharge + whiteGloveFee + deconFee + extraVestFee - loyaltyDiscount;
 }
 
@@ -87,7 +97,12 @@ function toISODate(d) {
   return `${y}-${m}-${day}`;
 }
 
-function newTotal(pkg, startDate, endDate, { whiteGlove = false, repeatCustomer = false, loc = null, vestSizes = {} } = {}) {
+function newTotal(
+  pkg,
+  startDate,
+  endDate,
+  { whiteGlove = false, repeatCustomer = false, loc = null, vestSizes = {} } = {}
+) {
   const location = loc || LOCATIONS[0];
   return computeTotal({
     packageName: pkg.name,
@@ -102,13 +117,13 @@ function newTotal(pkg, startDate, endDate, { whiteGlove = false, repeatCustomer 
 
 // ─── Package & location shorthands ───────────────────────────────────────────
 
-const SPARK  = PACKAGES.find(p => p.id === 'spark-duo');
-const GTX    = PACKAGES.find(p => p.id === 'gtx-duo');
-const PINEVIEW     = LOCATIONS.find(l => l.id === 'pineview');
-const WILLARD      = LOCATIONS.find(l => l.id === 'willard-bay');
-const ECHO         = LOCATIONS.find(l => l.id === 'echo');
-const DEER_CREEK   = LOCATIONS.find(l => l.id === 'deer-creek');
-const POWELL       = LOCATIONS.find(l => l.id === 'lake-powell');
+const SPARK = PACKAGES.find((p) => p.id === 'spark-duo');
+const GTX = PACKAGES.find((p) => p.id === 'gtx-duo');
+const PINEVIEW = LOCATIONS.find((l) => l.id === 'pineview');
+const WILLARD = LOCATIONS.find((l) => l.id === 'willard-bay');
+const ECHO = LOCATIONS.find((l) => l.id === 'echo');
+const DEER_CREEK = LOCATIONS.find((l) => l.id === 'deer-creek');
+const POWELL = LOCATIONS.find((l) => l.id === 'lake-powell');
 
 // ─── 2026 calendar facts (for date construction) ─────────────────────────────
 // Jan 1, 2026 = Thursday. Derived from that:
@@ -125,7 +140,6 @@ const POWELL       = LOCATIONS.find(l => l.id === 'lake-powell');
 //   Jul 5  = Sunday                  — weekend + holiday (last in range 07-01→07-05)
 
 describe('pricing parity: old booking.js inline === new computeTotal', () => {
-
   test('1-day weekday (Tue Jun 9), Spark Duo — baseline', () => {
     const d = new Date(2026, 5, 9); // Jun 9 = Tuesday
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
@@ -190,8 +204,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
   });
 
   test('3-day weekday (Jun 9-11), Spark Duo — multi-day tier', () => {
-    const start = new Date(2026, 5, 9);  // Tue
-    const end   = new Date(2026, 5, 11); // Thu
+    const start = new Date(2026, 5, 9); // Tue
+    const end = new Date(2026, 5, 11); // Thu
     const old = oldTotal(SPARK, start, end, { loc: ECHO });
     const neu = newTotal(SPARK, start, end, { loc: ECHO });
     // expected: $267/day × 3 = $801 (multi-day ignores weekday/weekend)
@@ -201,7 +215,7 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
 
   test('2-day Jul 4-5 (Sat-Sun), Spark Duo — multi-day + holiday surcharge', () => {
     const start = new Date(2026, 6, 4); // Sat Jul 4
-    const end   = new Date(2026, 6, 5); // Sun Jul 5
+    const end = new Date(2026, 6, 5); // Sun Jul 5
     const old = oldTotal(SPARK, start, end, { loc: PINEVIEW });
     const neu = newTotal(SPARK, start, end, { loc: PINEVIEW });
     // expected: $286/day × 2 = $572 base + ($75 + $75) holiday = $722
@@ -220,7 +234,7 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
 
   test('3-day weekday, GTX, Lake Powell — decon fee, no white glove', () => {
     const start = new Date(2026, 5, 9);
-    const end   = new Date(2026, 5, 11);
+    const end = new Date(2026, 5, 11);
     const old = oldTotal(GTX, start, end, { loc: POWELL });
     const neu = newTotal(GTX, start, end, { loc: POWELL });
     // expected: $483/day × 3 = $1449 + $200 decon = $1649
@@ -250,8 +264,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
 
   test('5-day, GTX, Sand Hollow + white glove — max multi-day tier', () => {
     const start = new Date(2026, 5, 9);
-    const end   = new Date(2026, 5, 13); // 5 days
-    const OLD_SAND = LOCATIONS.find(l => l.id === 'sand-hollow');
+    const end = new Date(2026, 5, 13); // 5 days
+    const OLD_SAND = LOCATIONS.find((l) => l.id === 'sand-hollow');
     const old = oldTotal(GTX, start, end, { loc: OLD_SAND, whiteGlove: true });
     const neu = newTotal(GTX, start, end, { loc: OLD_SAND, whiteGlove: true });
     // expected: $439/day × 5 = $2195 + $750 white glove = $2945
@@ -262,9 +276,24 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
   test('location lookup by display name (deploy-window fallback)', () => {
     // Simulates a client bundle that sends location name, not locationId
     const d = new Date(2026, 5, 9);
-    const byId   = computeTotal({ packageName: 'Spark Duo', startDate: '2026-06-09', endDate: '2026-06-09', locationId: 'pineview',            whiteGlove: false, vestSizes: {}, repeatCustomer: false });
-    const byName = computeTotal({ packageName: 'Spark Duo', startDate: '2026-06-09', endDate: '2026-06-09', location: 'Pineview Reservoir',    whiteGlove: false, vestSizes: {}, repeatCustomer: false });
+    const byId = computeTotal({
+      packageName: 'Spark Duo',
+      startDate: '2026-06-09',
+      endDate: '2026-06-09',
+      locationId: 'pineview',
+      whiteGlove: false,
+      vestSizes: {},
+      repeatCustomer: false,
+    });
+    const byName = computeTotal({
+      packageName: 'Spark Duo',
+      startDate: '2026-06-09',
+      endDate: '2026-06-09',
+      location: 'Pineview Reservoir',
+      whiteGlove: false,
+      vestSizes: {},
+      repeatCustomer: false,
+    });
     expect(byId.total).toBe(byName.total);
   });
-
 });

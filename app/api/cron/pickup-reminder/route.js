@@ -19,9 +19,10 @@ import { getDepositAmount } from '../../../../lib/deposit';
 // Target: ~160 chars. Direct, actionable, no filler.
 function buildReminderSMS(booking) {
   const firstName = booking.renter_name.split(' ')[0];
-  const dateDisplay = booking.end_date && booking.end_date !== booking.start_date
-    ? `${booking.start_date} – ${booking.end_date}`
-    : booking.start_date;
+  const dateDisplay =
+    booking.end_date && booking.end_date !== booking.start_date
+      ? `${booking.start_date} – ${booking.end_date}`
+      : booking.start_date;
 
   const lines = [
     `Hi ${firstName}! Your Full Throttle Utah rental is TOMORROW.`,
@@ -35,7 +36,9 @@ function buildReminderSMS(booking) {
     lines.push(`🦺 Vests ready: ${booking.vest_summary}`);
   }
 
-  lines.push(`💵 Bring $${getDepositAmount(booking.package).toLocaleString()} security deposit (card or cash)`);
+  lines.push(
+    `💵 Bring $${getDepositAmount(booking.package).toLocaleString()} security deposit (card or cash)`
+  );
   lines.push(`⛽ Return with FULL tank of 91-octane or fuel charges apply`);
   lines.push(`❓ Questions? Text/call (801) 548-1273`);
 
@@ -50,9 +53,10 @@ function buildReminderSMS(booking) {
 // ─── Email HTML ───────────────────────────────────────────────────────────────
 function buildReminderEmailHTML(booking) {
   const firstName = booking.renter_name.split(' ')[0];
-  const dateDisplay = booking.end_date && booking.end_date !== booking.start_date
-    ? `${booking.start_date} → ${booking.end_date}`
-    : booking.start_date;
+  const dateDisplay =
+    booking.end_date && booking.end_date !== booking.start_date
+      ? `${booking.start_date} → ${booking.end_date}`
+      : booking.start_date;
 
   // NEW (2026-06-02): optional Life Vests row — appended only when data present
   const vestRow = booking.vest_summary
@@ -144,7 +148,7 @@ async function sendReminderEmail(booking) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${RESEND_KEY}`,
+      Authorization: `Bearer ${RESEND_KEY}`,
     },
     body: JSON.stringify({
       from: 'Full Throttle Utah <bookings@fullthrottleutah.com>',
@@ -206,7 +210,13 @@ export async function GET(request) {
 
     if (bookings.length === 0) {
       console.log('[pickup-reminder] No bookings tomorrow, nothing to do');
-      return NextResponse.json({ ok: true, processed: 0, smsSent: 0, emailsSent: 0, ownerSmsSent: 0 });
+      return NextResponse.json({
+        ok: true,
+        processed: 0,
+        smsSent: 0,
+        emailsSent: 0,
+        ownerSmsSent: 0,
+      });
     }
 
     for (const booking of bookings) {
@@ -214,7 +224,9 @@ export async function GET(request) {
         if (booking.sms_opt_in && booking.renter_phone) {
           const msg = buildReminderSMS(booking);
           await sendSMS(booking.renter_phone, msg);
-          console.log(`[pickup-reminder] SMS sent → ${booking.renter_name} (${booking.renter_phone})`);
+          console.log(
+            `[pickup-reminder] SMS sent → ${booking.renter_name} (${booking.renter_phone})`
+          );
           smsSent++;
         } else if (booking.renter_email) {
           const result = await sendReminderEmail(booking);
@@ -245,9 +257,10 @@ export async function GET(request) {
       }
     }
 
-    console.log(`[pickup-reminder] Done — ${smsSent} SMS, ${emailsSent} emails, ${ownerSmsSent} owner SMS, ${errors} errors`);
+    console.log(
+      `[pickup-reminder] Done — ${smsSent} SMS, ${emailsSent} emails, ${ownerSmsSent} owner SMS, ${errors} errors`
+    );
     return NextResponse.json({ ok: true, processed, smsSent, emailsSent, ownerSmsSent, errors });
-
   } catch (err) {
     console.error('[pickup-reminder] Fatal error:', err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

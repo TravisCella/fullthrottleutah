@@ -59,10 +59,7 @@ export async function POST(request) {
 
     const pi = session.payment_intent;
     if (!pi || typeof pi === 'string') {
-      return NextResponse.json(
-        { error: 'No PaymentIntent on this session' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No PaymentIntent on this session' }, { status: 400 });
     }
 
     const meta = pi.metadata || {};
@@ -149,7 +146,14 @@ export async function POST(request) {
 }
 
 // ─── Email HTML template — same as lib/review-email.js, with optional [TEST] banner
-function buildReviewRequestHTML({ firstName, packageName, location, reviewUrl, googleReviewUrl, isTest }) {
+function buildReviewRequestHTML({
+  firstName,
+  packageName,
+  location,
+  reviewUrl,
+  googleReviewUrl,
+  isTest,
+}) {
   const rentalLine =
     packageName && location
       ? `${packageName} at ${location}`

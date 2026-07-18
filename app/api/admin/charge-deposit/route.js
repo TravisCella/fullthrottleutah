@@ -73,7 +73,7 @@ async function selectBestCard(customerId, originalPI) {
   }
 
   if (originalFingerprint) {
-    const match = allMethods.data.find(pm => pm.card?.fingerprint === originalFingerprint);
+    const match = allMethods.data.find((pm) => pm.card?.fingerprint === originalFingerprint);
     if (match) return match;
   }
 
@@ -121,13 +121,18 @@ async function inspectExistingHold(originalPIId, customerId, sessionId) {
     try {
       const piList = await stripe.paymentIntents.list({ customer: customerId, limit: 20 });
       const orphanedHold = piList.data.find(
-        pi =>
+        (pi) =>
           pi.status === 'requires_capture' &&
           pi.metadata?.type === 'security_deposit_hold' &&
           pi.metadata?.originalCheckoutSession === sessionId
       );
       if (orphanedHold) {
-        console.log('[charge-deposit] Found orphaned hold via customer search:', orphanedHold.id, 'for session', sessionId);
+        console.log(
+          '[charge-deposit] Found orphaned hold via customer search:',
+          orphanedHold.id,
+          'for session',
+          sessionId
+        );
         return { state: 'active', hold: orphanedHold, orphaned: true };
       }
     } catch (e) {
@@ -180,8 +185,7 @@ export async function POST(request) {
     // string ID (when Stripe expand degrades). The old code used originalPI?.id
     // which is undefined on a string, silently skipping step 4.
     const originalPI = session.payment_intent;
-    const originalPIId =
-      typeof originalPI === 'string' ? originalPI : (originalPI?.id ?? null);
+    const originalPIId = typeof originalPI === 'string' ? originalPI : (originalPI?.id ?? null);
     // Keep the expanded object around for metadata spread and card fingerprint.
     const expandedPI = typeof originalPI === 'object' ? originalPI : null;
 
@@ -292,11 +296,12 @@ export async function POST(request) {
     // metadata as fallback for the known Stripe expand-degradation case where
     // expandedPI is null. Both objects are populated with identical bookingMeta
     // by checkout/route.js (lines 194–198). See CLAUDE.md pitfall #5.
-    const packageName = expandedPI?.metadata?.packageName
-                     || expandedPI?.metadata?.package
-                     || session.metadata?.packageName
-                     || session.metadata?.package
-                     || '';
+    const packageName =
+      expandedPI?.metadata?.packageName ||
+      expandedPI?.metadata?.package ||
+      session.metadata?.packageName ||
+      session.metadata?.package ||
+      '';
 
     // Fail loud: every checkout-originated booking has a package written. An
     // empty value here means a Stripe-expand anomaly or corrupted metadata —
@@ -344,8 +349,7 @@ export async function POST(request) {
             requiresAction: true,
             holdId: failedPI?.id,
             clientSecret: failedPI?.client_secret,
-            error:
-              `Customer's bank requires 3D Secure authentication for the $${depositAmount.toLocaleString()} hold. For now: switch to cash deposit, or try a different card. (Full 3DS pickup flow can be built later — the PaymentIntent is preserved.)`,
+            error: `Customer's bank requires 3D Secure authentication for the $${depositAmount.toLocaleString()} hold. For now: switch to cash deposit, or try a different card. (Full 3DS pickup flow can be built later — the PaymentIntent is preserved.)`,
             code: 'authentication_required',
             cardLast4: card.card?.last4 || '****',
             cardBrand: card.card?.brand,
@@ -400,7 +404,7 @@ export async function POST(request) {
     if (!originalPIId) {
       throw new Error(
         `[charge-deposit] No PaymentIntent ID on session ${sessionId}. ` +
-        `Hold ${depositHold.id} was created — manually set rentalStatus=picked_up on the booking PI.`
+          `Hold ${depositHold.id} was created — manually set rentalStatus=picked_up on the booking PI.`
       );
     }
 

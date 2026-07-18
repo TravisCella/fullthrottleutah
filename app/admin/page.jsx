@@ -41,7 +41,11 @@ function classifyStripeError(errorMsg) {
   if (m.includes('status of canceled') || m.includes('status of `canceled`')) {
     return 'already_canceled';
   }
-  if (m.includes('status of succeeded') || m.includes('status of `succeeded`') || m.includes('already been captured')) {
+  if (
+    m.includes('status of succeeded') ||
+    m.includes('status of `succeeded`') ||
+    m.includes('already been captured')
+  ) {
     return 'already_captured';
   }
   return null;
@@ -66,8 +70,8 @@ function BackupCardModal({ booking, password, onSuccess, onClose }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: booking.sessionId, password }),
     })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (data.error) setInitError(data.error);
         else setClientSecret(data.clientSecret);
       })
@@ -96,33 +100,114 @@ function BackupCardModal({ booking, password, onSuccess, onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(11,17,32,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 20 }}>
-      <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(11,17,32,0.75)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 70,
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 16,
+          padding: 24,
+          width: '100%',
+          maxWidth: 400,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
+        >
           <div style={{ fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Add Backup Card</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94A3B8', padding: 0, lineHeight: 1 }}>×</button>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: 22,
+              cursor: 'pointer',
+              color: '#94A3B8',
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
         </div>
 
         <p style={{ fontSize: 13, color: '#64748B', lineHeight: 1.5, margin: '0 0 20px' }}>
-          Enter the customer's alternate card. The number goes directly to Stripe — it never touches this app.
+          Enter the customer's alternate card. The number goes directly to Stripe — it never touches
+          this app.
         </p>
 
         {initError && (
-          <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{initError}</div>
+          <div
+            style={{
+              background: '#FEE2E2',
+              color: '#991B1B',
+              padding: 12,
+              borderRadius: 8,
+              fontSize: 13,
+              marginBottom: 12,
+            }}
+          >
+            {initError}
+          </div>
         )}
 
         {!initError && !clientSecret && (
-          <div style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>Initializing…</div>
+          <div style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
+            Initializing…
+          </div>
         )}
 
         {clientSecret && (
           <>
-            <div style={{ border: '2px solid #E2E8F0', borderRadius: 10, padding: '14px 12px', marginBottom: 12, background: '#F8FAFC' }}>
-              <CardElement options={{ style: { base: { fontSize: '15px', color: '#0F172A', '::placeholder': { color: '#94A3B8' } } } }} />
+            <div
+              style={{
+                border: '2px solid #E2E8F0',
+                borderRadius: 10,
+                padding: '14px 12px',
+                marginBottom: 12,
+                background: '#F8FAFC',
+              }}
+            >
+              <CardElement
+                options={{
+                  style: {
+                    base: {
+                      fontSize: '15px',
+                      color: '#0F172A',
+                      '::placeholder': { color: '#94A3B8' },
+                    },
+                  },
+                }}
+              />
             </div>
 
             {cardError && (
-              <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+              <div
+                style={{
+                  background: '#FEE2E2',
+                  color: '#991B1B',
+                  padding: 10,
+                  borderRadius: 8,
+                  fontSize: 13,
+                  marginBottom: 12,
+                }}
+              >
                 {cardError}
               </div>
             )}
@@ -130,7 +215,18 @@ function BackupCardModal({ booking, password, onSuccess, onClose }) {
             <button
               onClick={handleSubmit}
               disabled={processing || !stripe}
-              style={{ width: '100%', padding: 14, borderRadius: 10, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 15, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer', opacity: processing || !stripe ? 0.6 : 1 }}
+              style={{
+                width: '100%',
+                padding: 14,
+                borderRadius: 10,
+                border: 'none',
+                background: '#0C4A6E',
+                color: '#fff',
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: processing ? 'not-allowed' : 'pointer',
+                opacity: processing || !stripe ? 0.6 : 1,
+              }}
             >
               {processing ? 'Processing…' : 'Save Card & Place Hold'}
             </button>
@@ -179,7 +275,7 @@ export default function AdminPage() {
   // Review SMS blast
   const [blastLoading, setBlastLoading] = useState(false);
   const [blastPreview, setBlastPreview] = useState(null); // { count, recipients }
-  const [blastResult, setBlastResult] = useState(null);  // { sent, failed, total }
+  const [blastResult, setBlastResult] = useState(null); // { sent, failed, total }
   const [blastError, setBlastError] = useState(null);
 
   // Chat / SMS thread state
@@ -220,7 +316,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!deepLinkParams || !bookings.length) return;
     const { focus, checkedOut, returned } = deepLinkParams;
-    const booking = bookings.find(b => b.sessionId === focus);
+    const booking = bookings.find((b) => b.sessionId === focus);
     if (!booking) return;
     setSelectedBooking(booking);
     setActionError(null);
@@ -251,7 +347,9 @@ export default function AdminPage() {
       const data = await res.json();
       if (data.error) setBlastError(data.error);
       else setBlastPreview(data);
-    } catch { setBlastError('Connection error'); }
+    } catch {
+      setBlastError('Connection error');
+    }
     setBlastLoading(false);
   };
 
@@ -266,8 +364,13 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (data.error) setBlastError(data.error);
-      else { setBlastResult(data); setBlastPreview(null); }
-    } catch { setBlastError('Connection error'); }
+      else {
+        setBlastResult(data);
+        setBlastPreview(null);
+      }
+    } catch {
+      setBlastError('Connection error');
+    }
     setBlastLoading(false);
   };
 
@@ -329,11 +432,16 @@ export default function AdminPage() {
         setActionError(data.error);
         setActionErrorCode(data.code || null);
       } else {
-        setActionSuccess(`✅ $${(data.depositAmount || 1000).toLocaleString()} held on card ending in ${data.cardLast4}`);
+        setActionSuccess(
+          `✅ $${(data.depositAmount || 1000).toLocaleString()} held on card ending in ${data.cardLast4}`
+        );
         setPendingInspectionToast(null);
         setInspectionId(null);
         await refreshBookings();
-        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
+        setTimeout(() => {
+          setSelectedBooking(null);
+          setActionSuccess(null);
+        }, 2500);
       }
     } catch (err) {
       setActionError('Connection error');
@@ -357,7 +465,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           paymentIntentId: booking.paymentIntentId,
           action: 'cash_deposit_received',
-          password
+          password,
         }),
       });
       const data = await res.json();
@@ -366,7 +474,10 @@ export default function AdminPage() {
       } else {
         setActionSuccess('💵 Cash deposit recorded');
         await refreshBookings();
-        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2000);
+        setTimeout(() => {
+          setSelectedBooking(null);
+          setActionSuccess(null);
+        }, 2000);
       }
     } catch (err) {
       setActionError('Connection error');
@@ -395,7 +506,8 @@ export default function AdminPage() {
 
   const handleReleaseHold = async (booking) => {
     const dep = getDepositAmount(booking.packageName);
-    if (!confirm(`Release the $${dep.toLocaleString()} hold? This refunds the customer entirely.`)) return;
+    if (!confirm(`Release the $${dep.toLocaleString()} hold? This refunds the customer entirely.`))
+      return;
     setActionLoading(true);
     setActionError(null);
     try {
@@ -405,7 +517,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           holdId: booking.securityDepositHoldId,
           action: 'release',
-          password
+          password,
         }),
       });
       const data = await res.json();
@@ -421,7 +533,10 @@ export default function AdminPage() {
           await markReturnedInBackend(booking, returnNotes || 'Hold released in Stripe Dashboard');
           setActionSuccess('✅ Hold was already released in Stripe. Rental marked complete.');
           await refreshBookings();
-          setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 3000);
+          setTimeout(() => {
+            setSelectedBooking(null);
+            setActionSuccess(null);
+          }, 3000);
           setActionLoading(false);
           return;
         }
@@ -430,9 +545,14 @@ export default function AdminPage() {
           // Hold was already captured (charged) in Stripe. Mark rental returned
           // but flag it differently so Travis knows the deposit was kept.
           await markReturnedInBackend(booking, returnNotes || 'Hold captured in Stripe Dashboard');
-          setActionSuccess('⚠️ Hold was already captured in Stripe (deposit was charged). Rental marked complete.');
+          setActionSuccess(
+            '⚠️ Hold was already captured in Stripe (deposit was charged). Rental marked complete.'
+          );
           await refreshBookings();
-          setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 3500);
+          setTimeout(() => {
+            setSelectedBooking(null);
+            setActionSuccess(null);
+          }, 3500);
           setActionLoading(false);
           return;
         }
@@ -448,7 +568,10 @@ export default function AdminPage() {
       setPendingReturnToast(null);
       setActionSuccess('✅ Hold released — customer charged $0');
       await refreshBookings();
-      setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
+      setTimeout(() => {
+        setSelectedBooking(null);
+        setActionSuccess(null);
+      }, 2500);
     } catch (err) {
       setActionError('Connection error');
     }
@@ -466,7 +589,12 @@ export default function AdminPage() {
       setActionError('Please describe the damage');
       return;
     }
-    if (!confirm(`Charge $${amount} from the deposit? Remaining $${dep - amount} will be released back to the customer.`)) return;
+    if (
+      !confirm(
+        `Charge $${amount} from the deposit? Remaining $${dep - amount} will be released back to the customer.`
+      )
+    )
+      return;
 
     setActionLoading(true);
     setActionError(null);
@@ -479,7 +607,7 @@ export default function AdminPage() {
           action: 'capture',
           captureAmount: amount,
           damageReason,
-          password
+          password,
         }),
       });
       const data = await res.json();
@@ -489,7 +617,9 @@ export default function AdminPage() {
 
         if (stripeState === 'already_canceled') {
           // The hold is gone — we can't capture from it. Tell Travis clearly.
-          setActionError('⚠️ Hold was already released (likely in Stripe Dashboard). Can\'t capture from a released hold. To charge for damage, create a new charge in Stripe using the customer\'s saved card.');
+          setActionError(
+            "⚠️ Hold was already released (likely in Stripe Dashboard). Can't capture from a released hold. To charge for damage, create a new charge in Stripe using the customer's saved card."
+          );
           setActionLoading(false);
           return;
         }
@@ -499,7 +629,12 @@ export default function AdminPage() {
           await markReturnedInBackend(booking, `Capture already done in Stripe: ${damageReason}`);
           setActionSuccess('✅ Hold was already captured in Stripe. Rental marked complete.');
           await refreshBookings();
-          setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); }, 3000);
+          setTimeout(() => {
+            setSelectedBooking(null);
+            setActionSuccess(null);
+            setCaptureAmount('');
+            setDamageReason('');
+          }, 3000);
           setActionLoading(false);
           return;
         }
@@ -514,7 +649,12 @@ export default function AdminPage() {
       setPendingReturnToast(null);
       setActionSuccess(`✅ Captured $${amount} · $${dep - amount} released`);
       await refreshBookings();
-      setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); }, 3000);
+      setTimeout(() => {
+        setSelectedBooking(null);
+        setActionSuccess(null);
+        setCaptureAmount('');
+        setDamageReason('');
+      }, 3000);
     } catch (err) {
       setActionError('Connection error');
     }
@@ -543,7 +683,10 @@ export default function AdminPage() {
         setPendingReturnToast(null);
         setActionSuccess('💵 Cash deposit returned, rental closed');
         await refreshBookings();
-        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
+        setTimeout(() => {
+          setSelectedBooking(null);
+          setActionSuccess(null);
+        }, 2500);
       }
     } catch (err) {
       setActionError('Connection error');
@@ -567,9 +710,14 @@ export default function AdminPage() {
         setActionError(data.error);
       } else {
         const sheetNote = data.sheetUpdated ? '' : ' (Sheets row not found — mark manually)';
-        setActionSuccess(`✅ Refunded $${data.amountRefunded?.toLocaleString()} · Booking cancelled${sheetNote}`);
+        setActionSuccess(
+          `✅ Refunded $${data.amountRefunded?.toLocaleString()} · Booking cancelled${sheetNote}`
+        );
         await refreshBookings();
-        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 3500);
+        setTimeout(() => {
+          setSelectedBooking(null);
+          setActionSuccess(null);
+        }, 3500);
       }
     } catch {
       setActionError('Connection error');
@@ -586,7 +734,11 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/update-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentIntentId: booking.paymentIntentId, action: 'reset_to_booked', password }),
+        body: JSON.stringify({
+          paymentIntentId: booking.paymentIntentId,
+          action: 'reset_to_booked',
+          password,
+        }),
       });
       const data = await res.json();
       if (data.error) {
@@ -594,7 +746,10 @@ export default function AdminPage() {
       } else {
         setActionSuccess('↩ Booking reset — status reverted to Upcoming');
         await refreshBookings();
-        setTimeout(() => { setSelectedBooking(null); setActionSuccess(null); }, 2500);
+        setTimeout(() => {
+          setSelectedBooking(null);
+          setActionSuccess(null);
+        }, 2500);
       }
     } catch {
       setActionError('Connection error');
@@ -657,26 +812,79 @@ export default function AdminPage() {
 
   if (!authed) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0B1120', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }}>
-        <div style={{ background: '#fff', borderRadius: 16, padding: 32, width: '100%', maxWidth: 380 }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#0B1120',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 20,
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 16,
+            padding: 32,
+            width: '100%',
+            maxWidth: 380,
+          }}
+        >
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>🔒</div>
-            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Full Throttle Admin</div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
+              Full Throttle Admin
+            </div>
             <div style={{ fontSize: 13, color: '#64748B' }}>Enter password to continue</div>
           </div>
           <input
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
             placeholder="Password"
-            style={{ width: '100%', padding: '14px 16px', borderRadius: 10, border: '2px solid #E2E8F0', fontSize: 15, marginBottom: 12, boxSizing: 'border-box', outline: 'none' }}
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              borderRadius: 10,
+              border: '2px solid #E2E8F0',
+              fontSize: 15,
+              marginBottom: 12,
+              boxSizing: 'border-box',
+              outline: 'none',
+            }}
           />
-          {error && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{error}</div>}
+          {error && (
+            <div
+              style={{
+                background: '#FEE2E2',
+                color: '#991B1B',
+                padding: 10,
+                borderRadius: 8,
+                fontSize: 13,
+                marginBottom: 12,
+              }}
+            >
+              {error}
+            </div>
+          )}
           <button
             onClick={() => handleLogin()}
             disabled={loading || !password}
-            style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 15, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading || !password ? 0.5 : 1 }}
+            style={{
+              width: '100%',
+              padding: '14px',
+              borderRadius: 10,
+              border: 'none',
+              background: '#0C4A6E',
+              color: '#fff',
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading || !password ? 0.5 : 1,
+            }}
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
@@ -696,19 +904,31 @@ export default function AdminPage() {
       return { label: 'COMPLETED', color: '#16A34A', bg: 'rgba(22,163,74,0.1)' };
     }
     if (status === 'picked_up') {
-      if (depStatus === 'held') return { label: 'OUT · CARD HOLD', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' };
-      if (depStatus === 'cash_held') return { label: 'OUT · CASH HELD', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' };
+      if (depStatus === 'held')
+        return { label: 'OUT · CARD HOLD', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' };
+      if (depStatus === 'cash_held')
+        return { label: 'OUT · CASH HELD', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' };
       return { label: 'OUT', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' };
     }
 
-    const today = new Date(); today.setHours(0,0,0,0);
-    const startDate = booking.startDate ? new Date(booking.startDate + ' ' + new Date().getFullYear()) : null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = booking.startDate
+      ? new Date(booking.startDate + ' ' + new Date().getFullYear())
+      : null;
 
     return { label: 'UPCOMING', color: '#D97706', bg: 'rgba(217,119,6,0.1)' };
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'system-ui, sans-serif', paddingBottom: 40 }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#F8FAFC',
+        fontFamily: 'system-ui, sans-serif',
+        paddingBottom: 40,
+      }}
+    >
       {/* Keyframes — only inject when the relevant deep-link is active */}
       {(pendingInspectionToast || pendingReturnToast) && (
         <style>{`
@@ -727,55 +947,139 @@ export default function AdminPage() {
 
       {/* Checkout-inspection toast */}
       {pendingInspectionToast && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 60,
-          background: '#0C4A6E', color: '#fff',
-          padding: '14px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-          boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
-        }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 60,
+            background: '#0C4A6E',
+            color: '#fff',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+          }}
+        >
           <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>
-            ✅ Inspection complete for {pendingInspectionToast.renterName} — place the deposit hold to finish check-out.
+            ✅ Inspection complete for {pendingInspectionToast.renterName} — place the deposit hold
+            to finish check-out.
           </span>
           <button
             onClick={() => setPendingInspectionToast(null)}
-            style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}
-          >×</button>
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              fontSize: 22,
+              cursor: 'pointer',
+              padding: 0,
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
 
       {/* Return-inspection toast — stacks below checkout toast if both are active */}
       {pendingReturnToast && (
-        <div style={{
-          position: 'fixed', top: pendingInspectionToast ? 52 : 0, left: 0, right: 0, zIndex: 59,
-          background: '#166534', color: '#fff',
-          padding: '14px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-          boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
-        }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: pendingInspectionToast ? 52 : 0,
+            left: 0,
+            right: 0,
+            zIndex: 59,
+            background: '#166534',
+            color: '#fff',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+          }}
+        >
           <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>
-            ✅ Return inspection complete for {pendingReturnToast.renterName} — settle the security deposit below.
+            ✅ Return inspection complete for {pendingReturnToast.renterName} — settle the security
+            deposit below.
           </span>
           <button
             onClick={() => setPendingReturnToast(null)}
-            style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}
-          >×</button>
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              fontSize: 22,
+              cursor: 'pointer',
+              padding: 0,
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
 
-      <div style={{ background: '#0B1120', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: (pendingInspectionToast ? 52 : 0) + (pendingReturnToast ? 52 : 0) }}>
+      <div
+        style={{
+          background: '#0B1120',
+          color: '#fff',
+          padding: '16px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: (pendingInspectionToast ? 52 : 0) + (pendingReturnToast ? 52 : 0),
+        }}
+      >
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Full Throttle Admin</div>
-          <div style={{ fontSize: 11, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            {bookings.length} bookings · {bookings.filter(b => b.rentalStatus !== 'returned').length} active
+          <div
+            style={{
+              fontSize: 11,
+              color: '#94A3B8',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
+            }}
+          >
+            {bookings.length} bookings ·{' '}
+            {bookings.filter((b) => b.rentalStatus !== 'returned').length} active
             {unmatchedCount > 0 && (
-              <span style={{ background: '#EF4444', color: '#fff', padding: '1px 7px', borderRadius: 20, fontWeight: 700, fontSize: 10 }}>
+              <span
+                style={{
+                  background: '#EF4444',
+                  color: '#fff',
+                  padding: '1px 7px',
+                  borderRadius: 20,
+                  fontWeight: 700,
+                  fontSize: 10,
+                }}
+              >
                 {unmatchedCount} unmatched SMS
               </span>
             )}
           </div>
         </div>
-        <button onClick={refreshBookings} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
+        <button
+          onClick={refreshBookings}
+          style={{
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            color: '#fff',
+            padding: '8px 14px',
+            borderRadius: 8,
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
           {loading ? '...' : '↻ Refresh'}
         </button>
       </div>
@@ -784,9 +1088,19 @@ export default function AdminPage() {
         <input
           type="text"
           value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="🔍 Search by name, email, lake, date..."
-          style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '2px solid #E2E8F0', fontSize: 14, boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#fff' }}
+          style={{
+            width: '100%',
+            padding: '12px 14px',
+            borderRadius: 10,
+            border: '2px solid #E2E8F0',
+            fontSize: 14,
+            boxSizing: 'border-box',
+            outline: 'none',
+            fontFamily: 'inherit',
+            background: '#fff',
+          }}
         />
         <div style={{ display: 'flex', gap: 6, marginTop: 10, marginBottom: 4, flexWrap: 'wrap' }}>
           {[
@@ -794,59 +1108,156 @@ export default function AdminPage() {
             { id: 'upcoming', label: 'Upcoming' },
             { id: 'out', label: 'Out' },
             { id: 'completed', label: 'Completed' },
-          ].map(f => (
+          ].map((f) => (
             <button
               key={f.id}
               onClick={() => setStatusFilter(f.id)}
               style={{
-                padding: '6px 14px', borderRadius: 20,
+                padding: '6px 14px',
+                borderRadius: 20,
                 border: statusFilter === f.id ? '1.5px solid #0C4A6E' : '1.5px solid #E2E8F0',
                 background: statusFilter === f.id ? '#0C4A6E' : '#fff',
                 color: statusFilter === f.id ? '#fff' : '#475569',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
               }}
-            >{f.label}</button>
+            >
+              {f.label}
+            </button>
           ))}
           <button
             onClick={() => setHideTests(!hideTests)}
             style={{
-              padding: '6px 14px', borderRadius: 20,
+              padding: '6px 14px',
+              borderRadius: 20,
               border: '1.5px solid #E2E8F0',
               background: hideTests ? '#F1F5F9' : '#FEF3C7',
-              color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              whiteSpace: 'nowrap', marginLeft: 'auto',
+              color: '#475569',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              marginLeft: 'auto',
             }}
-          >{hideTests ? '🧪 Show tests' : '🧪 Hide tests'}</button>
+          >
+            {hideTests ? '🧪 Show tests' : '🧪 Hide tests'}
+          </button>
         </div>
       </div>
 
       {/* ── Review SMS Blast ───────────────────────────────────────────────── */}
       <div style={{ padding: '12px 16px 0' }}>
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Review Request — SMS Blast</div>
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 14,
+            border: '1px solid #E2E8F0',
+            padding: 16,
+            marginBottom: 12,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#94A3B8',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: 10,
+            }}
+          >
+            Review Request — SMS Blast
+          </div>
 
           {blastResult ? (
-            <div style={{ background: '#DCFCE7', color: '#166534', padding: 12, borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
-              ✅ Sent {blastResult.sent} texts{blastResult.failed > 0 ? ` · ${blastResult.failed} failed` : ''} (of {blastResult.total} eligible)
-              <button onClick={() => setBlastResult(null)} style={{ float: 'right', background: 'none', border: 'none', color: '#166534', cursor: 'pointer', fontSize: 13 }}>Dismiss</button>
+            <div
+              style={{
+                background: '#DCFCE7',
+                color: '#166534',
+                padding: 12,
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              ✅ Sent {blastResult.sent} texts
+              {blastResult.failed > 0 ? ` · ${blastResult.failed} failed` : ''} (of{' '}
+              {blastResult.total} eligible)
+              <button
+                onClick={() => setBlastResult(null)}
+                style={{
+                  float: 'right',
+                  background: 'none',
+                  border: 'none',
+                  color: '#166534',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                Dismiss
+              </button>
             </div>
           ) : blastPreview ? (
             <div>
               <div style={{ fontSize: 13, color: '#0F172A', marginBottom: 10 }}>
-                Ready to send to <strong>{blastPreview.count} customer{blastPreview.count !== 1 ? 's' : ''}</strong> who opted in and haven't reviewed yet.
+                Ready to send to{' '}
+                <strong>
+                  {blastPreview.count} customer{blastPreview.count !== 1 ? 's' : ''}
+                </strong>{' '}
+                who opted in and haven't reviewed yet.
               </div>
-              {blastError && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 10 }}>{blastError}</div>}
+              {blastError && (
+                <div
+                  style={{
+                    background: '#FEE2E2',
+                    color: '#991B1B',
+                    padding: 10,
+                    borderRadius: 8,
+                    fontSize: 12,
+                    marginBottom: 10,
+                  }}
+                >
+                  {blastError}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={handleBlastSend}
                   disabled={blastLoading || blastPreview.count === 0}
-                  style={{ flex: 1, padding: 11, borderRadius: 8, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: blastLoading || blastPreview.count === 0 ? 0.5 : 1 }}
+                  style={{
+                    flex: 1,
+                    padding: 11,
+                    borderRadius: 8,
+                    border: 'none',
+                    background: '#0C4A6E',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    opacity: blastLoading || blastPreview.count === 0 ? 0.5 : 1,
+                  }}
                 >
-                  {blastLoading ? 'Sending...' : `Send ${blastPreview.count} Text${blastPreview.count !== 1 ? 's' : ''}`}
+                  {blastLoading
+                    ? 'Sending...'
+                    : `Send ${blastPreview.count} Text${blastPreview.count !== 1 ? 's' : ''}`}
                 </button>
                 <button
-                  onClick={() => { setBlastPreview(null); setBlastError(null); }}
-                  style={{ padding: '11px 16px', borderRadius: 8, border: '1.5px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  onClick={() => {
+                    setBlastPreview(null);
+                    setBlastError(null);
+                  }}
+                  style={{
+                    padding: '11px 16px',
+                    borderRadius: 8,
+                    border: '1.5px solid #E2E8F0',
+                    background: '#fff',
+                    color: '#475569',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
                 >
                   Cancel
                 </button>
@@ -854,11 +1265,35 @@ export default function AdminPage() {
             </div>
           ) : (
             <div>
-              {blastError && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 10 }}>{blastError}</div>}
+              {blastError && (
+                <div
+                  style={{
+                    background: '#FEE2E2',
+                    color: '#991B1B',
+                    padding: 10,
+                    borderRadius: 8,
+                    fontSize: 12,
+                    marginBottom: 10,
+                  }}
+                >
+                  {blastError}
+                </div>
+              )}
               <button
                 onClick={handleBlastDryRun}
                 disabled={blastLoading}
-                style={{ width: '100%', padding: 11, borderRadius: 8, border: '1.5px solid #0C4A6E', background: '#fff', color: '#0C4A6E', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: blastLoading ? 0.5 : 1 }}
+                style={{
+                  width: '100%',
+                  padding: 11,
+                  borderRadius: 8,
+                  border: '1.5px solid #0C4A6E',
+                  background: '#fff',
+                  color: '#0C4A6E',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  opacity: blastLoading ? 0.5 : 1,
+                }}
               >
                 {blastLoading ? 'Checking...' : '📨 Preview & Send Review Request Texts'}
               </button>
@@ -876,7 +1311,7 @@ export default function AdminPage() {
         )}
 
         {bookings
-          .filter(b => {
+          .filter((b) => {
             if (hideTests && b.isTestBooking) return false;
             if (statusFilter !== 'all') {
               const s = b.rentalStatus;
@@ -886,74 +1321,249 @@ export default function AdminPage() {
             }
             if (searchQuery.trim()) {
               const q = searchQuery.toLowerCase();
-              const hay = [b.renterName, b.renterEmail, b.renterPhone, b.location, b.packageName, b.startDate, b.endDate].join(' ').toLowerCase();
+              const hay = [
+                b.renterName,
+                b.renterEmail,
+                b.renterPhone,
+                b.location,
+                b.packageName,
+                b.startDate,
+                b.endDate,
+              ]
+                .join(' ')
+                .toLowerCase();
               if (!hay.includes(q)) return false;
             }
             return true;
           })
-          .map(b => {
-          const badge = statusBadge(b);
-          return (
-            <div
-              key={b.sessionId}
-              onClick={() => { setSelectedBooking(b); setActionError(null); setActionErrorCode(null); setActionSuccess(null); setCaptureAmount(''); setDamageReason(''); setReturnNotes(''); setResetConfirmOpen(false); setCancelConfirmOpen(false); setShowBackupCardModal(false); setActiveTab('details'); setConversation([]); setChatInput(''); }}
-              style={{
-                background: '#fff',
-                borderRadius: 14,
-                padding: 16,
-                marginBottom: 10,
-                cursor: 'pointer',
-                border: '1px solid #E2E8F0',
-                transition: 'all 0.15s',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.renterName}</div>
-                    {b.isTestBooking && (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: '#92400E', background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em' }}>TEST</span>
-                    )}
-                    {b.inSheet === false && (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: '#991B1B', background: '#FEE2E2', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em', flexShrink: 0 }}>⚠ NO SHEET</span>
-                    )}
+          .map((b) => {
+            const badge = statusBadge(b);
+            return (
+              <div
+                key={b.sessionId}
+                onClick={() => {
+                  setSelectedBooking(b);
+                  setActionError(null);
+                  setActionErrorCode(null);
+                  setActionSuccess(null);
+                  setCaptureAmount('');
+                  setDamageReason('');
+                  setReturnNotes('');
+                  setResetConfirmOpen(false);
+                  setCancelConfirmOpen(false);
+                  setShowBackupCardModal(false);
+                  setActiveTab('details');
+                  setConversation([]);
+                  setChatInput('');
+                }}
+                style={{
+                  background: '#fff',
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 10,
+                  cursor: 'pointer',
+                  border: '1px solid #E2E8F0',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <div
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 700,
+                          color: '#0F172A',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {b.renterName}
+                      </div>
+                      {b.isTestBooking && (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: '#92400E',
+                            background: '#FEF3C7',
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          TEST
+                        </span>
+                      )}
+                      {b.inSheet === false && (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: '#991B1B',
+                            background: '#FEE2E2',
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            letterSpacing: '0.05em',
+                            flexShrink: 0,
+                          }}
+                        >
+                          ⚠ NO SHEET
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#64748B' }}>
+                      {b.packageName || '—'} {b.location ? `· ${b.location}` : ''}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>{b.packageName || '—'} {b.location ? `· ${b.location}` : ''}</div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: badge.color,
+                      background: badge.bg,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      letterSpacing: '0.05em',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {badge.label}
+                  </span>
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 700, color: badge.color, background: badge.bg, padding: '4px 8px', borderRadius: 6, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-                  {badge.label}
-                </span>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 12,
+                    fontSize: 11,
+                    color: '#64748B',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span>
+                    📅 {b.startDate || 'No date'}
+                    {b.endDate && b.endDate !== b.startDate ? ` → ${b.endDate}` : ''}
+                  </span>
+                  <span>
+                    · {b.days} day{b.days > 1 ? 's' : ''}
+                  </span>
+                  <span>· ${b.totalPaid}</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748B', flexWrap: 'wrap' }}>
-                <span>📅 {b.startDate || 'No date'}{b.endDate && b.endDate !== b.startDate ? ` → ${b.endDate}` : ''}</span>
-                <span>· {b.days} day{b.days > 1 ? 's' : ''}</span>
-                <span>· ${b.totalPaid}</span>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
 
       {/* Booking Detail Modal */}
       {selectedBooking && (
         <div
-          onClick={() => !actionLoading && (setSelectedBooking(null), setResetConfirmOpen(false), setCancelConfirmOpen(false), setShowBackupCardModal(false), setActionErrorCode(null), setActiveTab('details'), setConversation([]), setChatInput(''))}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(11,17,32,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50, padding: 0 }}
+          onClick={() =>
+            !actionLoading &&
+            (setSelectedBooking(null),
+            setResetConfirmOpen(false),
+            setCancelConfirmOpen(false),
+            setShowBackupCardModal(false),
+            setActionErrorCode(null),
+            setActiveTab('details'),
+            setConversation([]),
+            setChatInput(''))
+          }
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(11,17,32,0.6)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            zIndex: 50,
+            padding: 0,
+          }}
         >
           <div
-            onClick={e => e.stopPropagation()}
-            style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              borderRadius: '20px 20px 0 0',
+              width: '100%',
+              maxWidth: 480,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
           >
-            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, background: '#fff' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+            <div
+              style={{
+                padding: '20px 20px 16px',
+                borderBottom: '1px solid #E2E8F0',
+                position: 'sticky',
+                top: 0,
+                background: '#fff',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: 6,
+                }}
+              >
                 <div style={{ fontSize: 19, fontWeight: 700 }}>{selectedBooking.renterName}</div>
-                <button onClick={() => { setSelectedBooking(null); setResetConfirmOpen(false); setCancelConfirmOpen(false); setShowBackupCardModal(false); setActionErrorCode(null); setActiveTab('details'); setConversation([]); setChatInput(''); }} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8', padding: 0 }}>×</button>
+                <button
+                  onClick={() => {
+                    setSelectedBooking(null);
+                    setResetConfirmOpen(false);
+                    setCancelConfirmOpen(false);
+                    setShowBackupCardModal(false);
+                    setActionErrorCode(null);
+                    setActiveTab('details');
+                    setConversation([]);
+                    setChatInput('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 24,
+                    cursor: 'pointer',
+                    color: '#94A3B8',
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
               </div>
-              <div style={{ fontSize: 13, color: '#64748B' }}>{selectedBooking.packageName} · {selectedBooking.location}</div>
-              <div style={{ display: 'flex', marginTop: 12, borderRadius: 10, overflow: 'hidden', border: '1.5px solid #E2E8F0' }}>
+              <div style={{ fontSize: 13, color: '#64748B' }}>
+                {selectedBooking.packageName} · {selectedBooking.location}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  marginTop: 12,
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  border: '1.5px solid #E2E8F0',
+                }}
+              >
                 <button
                   onClick={() => setActiveTab('details')}
-                  style={{ flex: 1, padding: '8px 0', border: 'none', borderRight: '1px solid #E2E8F0', background: activeTab === 'details' ? '#0C4A6E' : '#fff', color: activeTab === 'details' ? '#fff' : '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 0',
+                    border: 'none',
+                    borderRight: '1px solid #E2E8F0',
+                    background: activeTab === 'details' ? '#0C4A6E' : '#fff',
+                    color: activeTab === 'details' ? '#fff' : '#475569',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
                 >
                   Details
                 </button>
@@ -961,7 +1571,26 @@ export default function AdminPage() {
                   onClick={() => selectedBooking.smsOptIn && setActiveTab('chat')}
                   disabled={!selectedBooking.smsOptIn}
                   title={!selectedBooking.smsOptIn ? 'Renter did not opt in to SMS' : ''}
-                  style={{ flex: 1, padding: '8px 0', border: 'none', background: activeTab === 'chat' ? '#0C4A6E' : (selectedBooking.smsOptIn ? '#fff' : '#F8FAFC'), color: activeTab === 'chat' ? '#fff' : (selectedBooking.smsOptIn ? '#475569' : '#CBD5E1'), fontSize: 13, fontWeight: 600, cursor: selectedBooking.smsOptIn ? 'pointer' : 'not-allowed' }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 0',
+                    border: 'none',
+                    background:
+                      activeTab === 'chat'
+                        ? '#0C4A6E'
+                        : selectedBooking.smsOptIn
+                          ? '#fff'
+                          : '#F8FAFC',
+                    color:
+                      activeTab === 'chat'
+                        ? '#fff'
+                        : selectedBooking.smsOptIn
+                          ? '#475569'
+                          : '#CBD5E1',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: selectedBooking.smsOptIn ? 'pointer' : 'not-allowed',
+                  }}
                 >
                   💬 Chat{!selectedBooking.smsOptIn ? ' (no opt-in)' : ''}
                 </button>
@@ -969,278 +1598,697 @@ export default function AdminPage() {
             </div>
 
             <div style={{ padding: 20 }}>
-              {activeTab === 'details' && <>
-              {/* Booking Details */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Booking Details</div>
-                {[
-                  ['Email', selectedBooking.renterEmail],
-                  ['Phone', selectedBooking.renterPhone],
-                  ['Dates', `${selectedBooking.startDate}${selectedBooking.endDate !== selectedBooking.startDate ? ` → ${selectedBooking.endDate}` : ''}`],
-                  ['Days', selectedBooking.days],
-                  ['Pickup Time', selectedBooking.pickupTimeDisplay],
-                  ['Return Time', selectedBooking.returnTimeDisplay],
-                  ['Experience', selectedBooking.experience],
-                  ['Total Paid', `$${selectedBooking.totalPaid}`],
-                  ['White Glove', selectedBooking.whiteGlove ? 'Yes (+$200)' : 'No'],
-                  ['Lake Powell', selectedBooking.isLakePowell ? 'Yes — decon required' : 'No'],
-                  ['Waiver Signed', selectedBooking.waiverSigned ? '✓ Yes' : '✗ No'],
-                ].filter(([_, v]) => v !== undefined && v !== '').map(([k, v]) => (
-                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #F1F5F9', fontSize: 13 }}>
-                    <span style={{ color: '#64748B' }}>{k}</span>
-                    <span style={{ fontWeight: 600, color: '#0F172A' }}>{v}</span>
+              {activeTab === 'details' && (
+                <>
+                  {/* Booking Details */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: '#94A3B8',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        marginBottom: 10,
+                      }}
+                    >
+                      Booking Details
+                    </div>
+                    {[
+                      ['Email', selectedBooking.renterEmail],
+                      ['Phone', selectedBooking.renterPhone],
+                      [
+                        'Dates',
+                        `${selectedBooking.startDate}${selectedBooking.endDate !== selectedBooking.startDate ? ` → ${selectedBooking.endDate}` : ''}`,
+                      ],
+                      ['Days', selectedBooking.days],
+                      ['Pickup Time', selectedBooking.pickupTimeDisplay],
+                      ['Return Time', selectedBooking.returnTimeDisplay],
+                      ['Experience', selectedBooking.experience],
+                      ['Total Paid', `$${selectedBooking.totalPaid}`],
+                      ['White Glove', selectedBooking.whiteGlove ? 'Yes (+$200)' : 'No'],
+                      ['Lake Powell', selectedBooking.isLakePowell ? 'Yes — decon required' : 'No'],
+                      ['Waiver Signed', selectedBooking.waiverSigned ? '✓ Yes' : '✗ No'],
+                    ]
+                      .filter(([_, v]) => v !== undefined && v !== '')
+                      .map(([k, v]) => (
+                        <div
+                          key={k}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            padding: '8px 0',
+                            borderBottom: '1px solid #F1F5F9',
+                            fontSize: 13,
+                          }}
+                        >
+                          <span style={{ color: '#64748B' }}>{k}</span>
+                          <span style={{ fontWeight: 600, color: '#0F172A' }}>{v}</span>
+                        </div>
+                      ))}
                   </div>
-                ))}
-              </div>
 
-              {/* Action Status Messages */}
-              {actionError && (
-                <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 12 }}>{actionError}</div>
-              )}
-              {actionSuccess && (
-                <div style={{ background: '#DCFCE7', color: '#166534', padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{actionSuccess}</div>
-              )}
+                  {/* Action Status Messages */}
+                  {actionError && (
+                    <div
+                      style={{
+                        background: '#FEE2E2',
+                        color: '#991B1B',
+                        padding: 12,
+                        borderRadius: 10,
+                        fontSize: 13,
+                        marginBottom: 12,
+                      }}
+                    >
+                      {actionError}
+                    </div>
+                  )}
+                  {actionSuccess && (
+                    <div
+                      style={{
+                        background: '#DCFCE7',
+                        color: '#166534',
+                        padding: 12,
+                        borderRadius: 10,
+                        fontSize: 13,
+                        marginBottom: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {actionSuccess}
+                    </div>
+                  )}
 
-              {/* PICKUP ACTIONS - if booking is "booked" status */}
-              {selectedBooking.rentalStatus === 'booked' && !actionSuccess && (() => {
-                const depAmt = getDepositAmount(selectedBooking.packageName);
-                const depLabel = `$${depAmt.toLocaleString()}`;
-                const isCheckoutFocus = pendingInspectionToast?.sessionId === selectedBooking.sessionId;
-                return (
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Pickup — Security Deposit</div>
+                  {/* PICKUP ACTIONS - if booking is "booked" status */}
+                  {selectedBooking.rentalStatus === 'booked' &&
+                    !actionSuccess &&
+                    (() => {
+                      const depAmt = getDepositAmount(selectedBooking.packageName);
+                      const depLabel = `$${depAmt.toLocaleString()}`;
+                      const isCheckoutFocus =
+                        pendingInspectionToast?.sessionId === selectedBooking.sessionId;
+                      return (
+                        <div style={{ marginTop: 20 }}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: '#94A3B8',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.08em',
+                              marginBottom: 10,
+                            }}
+                          >
+                            Pickup — Security Deposit
+                          </div>
 
-                  <button
-                    className={isCheckoutFocus ? 'ftu-hold-pulse' : undefined}
-                    onClick={() => handleChargeDeposit(selectedBooking)}
-                    disabled={actionLoading}
-                    style={{
-                      width: '100%', padding: 16, borderRadius: 12, border: 'none',
-                      background: isCheckoutFocus ? '#0369A1' : '#0C4A6E',
-                      color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-                      marginBottom: 10, opacity: actionLoading ? 0.5 : 1,
-                    }}
-                  >
-                    {actionLoading ? 'Processing...' : `💳 Place ${depLabel} Card Hold`}
-                  </button>
+                          <button
+                            className={isCheckoutFocus ? 'ftu-hold-pulse' : undefined}
+                            onClick={() => handleChargeDeposit(selectedBooking)}
+                            disabled={actionLoading}
+                            style={{
+                              width: '100%',
+                              padding: 16,
+                              borderRadius: 12,
+                              border: 'none',
+                              background: isCheckoutFocus ? '#0369A1' : '#0C4A6E',
+                              color: '#fff',
+                              fontSize: 15,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              marginBottom: 10,
+                              opacity: actionLoading ? 0.5 : 1,
+                            }}
+                          >
+                            {actionLoading ? 'Processing...' : `💳 Place ${depLabel} Card Hold`}
+                          </button>
 
-                  <button
-                    onClick={() => handleCashDeposit(selectedBooking)}
-                    disabled={actionLoading}
-                    style={{ width: '100%', padding: 16, borderRadius: 12, border: '2px solid #16A34A', background: '#fff', color: '#16A34A', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
-                  >
-                    💵 Cash Deposit Received ({depLabel})
-                  </button>
+                          <button
+                            onClick={() => handleCashDeposit(selectedBooking)}
+                            disabled={actionLoading}
+                            style={{
+                              width: '100%',
+                              padding: 16,
+                              borderRadius: 12,
+                              border: '2px solid #16A34A',
+                              background: '#fff',
+                              color: '#16A34A',
+                              fontSize: 15,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              opacity: actionLoading ? 0.5 : 1,
+                            }}
+                          >
+                            💵 Cash Deposit Received ({depLabel})
+                          </button>
 
-                  {/* Backup card — shown ONLY after a card-decline error on this booking.
+                          {/* Backup card — shown ONLY after a card-decline error on this booking.
                       Never visible on a normal pickup; operator reaches for it only when
                       a hold actually failed. */}
-                  {actionError && ['card_declined', 'insufficient_funds', 'expired_card', 'processing_error'].includes(actionErrorCode) && (
-                    <button
-                      onClick={() => setShowBackupCardModal(true)}
-                      disabled={actionLoading}
-                      style={{ width: '100%', padding: 14, borderRadius: 10, border: '2px solid #0C4A6E', background: '#fff', color: '#0C4A6E', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 10, opacity: actionLoading ? 0.5 : 1 }}
+                          {actionError &&
+                            [
+                              'card_declined',
+                              'insufficient_funds',
+                              'expired_card',
+                              'processing_error',
+                            ].includes(actionErrorCode) && (
+                              <button
+                                onClick={() => setShowBackupCardModal(true)}
+                                disabled={actionLoading}
+                                style={{
+                                  width: '100%',
+                                  padding: 14,
+                                  borderRadius: 10,
+                                  border: '2px solid #0C4A6E',
+                                  background: '#fff',
+                                  color: '#0C4A6E',
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  marginTop: 10,
+                                  opacity: actionLoading ? 0.5 : 1,
+                                }}
+                              >
+                                💳 Add backup card
+                              </button>
+                            )}
+
+                          {/* Deep-link: Check Out button — opens Inspect with booking context */}
+                          <a
+                            href={`/inspect?sid=${selectedBooking.sessionId}&mode=checkout&returnUrl=${encodeURIComponent('/admin?focus=' + selectedBooking.sessionId + '&checkedOut=1')}`}
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              padding: 12,
+                              borderRadius: 10,
+                              border: '1.5px solid #E2E8F0',
+                              background: '#F8FAFC',
+                              color: '#0C4A6E',
+                              fontSize: 13,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              marginTop: 14,
+                              textAlign: 'center',
+                              textDecoration: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          >
+                            Check Out — Open Inspection →
+                          </a>
+
+                          {/* Cancel booking — two-step confirm, destructive */}
+                          <div
+                            style={{
+                              marginTop: 20,
+                              borderTop: '1px solid #E2E8F0',
+                              paddingTop: 16,
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: '#94A3B8',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.08em',
+                                marginBottom: 8,
+                              }}
+                            >
+                              Cancel Booking
+                            </div>
+                            {!cancelConfirmOpen ? (
+                              <button
+                                onClick={() => setCancelConfirmOpen(true)}
+                                disabled={actionLoading}
+                                style={{
+                                  width: '100%',
+                                  padding: 12,
+                                  borderRadius: 10,
+                                  border: '1.5px solid #FCA5A5',
+                                  background: '#FFF1F2',
+                                  color: '#991B1B',
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  opacity: actionLoading ? 0.5 : 1,
+                                }}
+                              >
+                                Cancel & Refund Customer
+                              </button>
+                            ) : (
+                              <div
+                                style={{
+                                  background: '#FFF1F2',
+                                  border: '1.5px solid #FCA5A5',
+                                  borderRadius: 10,
+                                  padding: 14,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    color: '#991B1B',
+                                    fontWeight: 600,
+                                    marginBottom: 6,
+                                  }}
+                                >
+                                  Full refund of ${selectedBooking.totalPaid?.toLocaleString()} to
+                                  customer's card.
+                                </div>
+                                <div style={{ fontSize: 12, color: '#7F1D1D', marginBottom: 12 }}>
+                                  Booking will be removed from the date picker. Google Calendar
+                                  event must be deleted manually.
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <button
+                                    onClick={() => handleCancelBooking(selectedBooking)}
+                                    disabled={actionLoading}
+                                    style={{
+                                      flex: 1,
+                                      padding: 10,
+                                      borderRadius: 8,
+                                      border: 'none',
+                                      background: '#DC2626',
+                                      color: '#fff',
+                                      fontSize: 13,
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      opacity: actionLoading ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {actionLoading ? 'Cancelling...' : 'Yes, Cancel & Refund'}
+                                  </button>
+                                  <button
+                                    onClick={() => setCancelConfirmOpen(false)}
+                                    style={{
+                                      flex: 1,
+                                      padding: 10,
+                                      borderRadius: 8,
+                                      border: '1.5px solid #E2E8F0',
+                                      background: '#fff',
+                                      color: '#475569',
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Keep Booking
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  {/* RETURN ACTIONS - if booking is "picked_up" */}
+                  {selectedBooking.rentalStatus === 'picked_up' &&
+                    !actionSuccess &&
+                    (() => {
+                      const depAmt = getDepositAmount(selectedBooking.packageName);
+                      const depLabel = `$${depAmt.toLocaleString()}`;
+                      return (
+                        <div style={{ marginTop: 20 }}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: '#94A3B8',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.08em',
+                              marginBottom: 10,
+                            }}
+                          >
+                            Return — Handle Deposit
+                          </div>
+
+                          {selectedBooking.securityDepositMethod === 'card' &&
+                            selectedBooking.securityDepositHoldId && (
+                              <>
+                                <button
+                                  className={
+                                    pendingReturnToast?.sessionId === selectedBooking.sessionId
+                                      ? 'ftu-return-pulse'
+                                      : undefined
+                                  }
+                                  onClick={() => handleReleaseHold(selectedBooking)}
+                                  disabled={actionLoading}
+                                  style={{
+                                    width: '100%',
+                                    padding: 16,
+                                    borderRadius: 12,
+                                    border: 'none',
+                                    background: '#16A34A',
+                                    color: '#fff',
+                                    fontSize: 15,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    marginBottom: 10,
+                                    opacity: actionLoading ? 0.5 : 1,
+                                  }}
+                                >
+                                  ✓ Release {depLabel} Hold (clean return)
+                                </button>
+
+                                <div
+                                  style={{
+                                    background: '#FEF3C7',
+                                    borderRadius: 12,
+                                    padding: 14,
+                                    marginTop: 14,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      color: '#92400E',
+                                      marginBottom: 10,
+                                    }}
+                                  >
+                                    Or charge for damage:
+                                  </div>
+                                  <input
+                                    type="number"
+                                    placeholder={`Amount to charge (max ${depLabel})`}
+                                    value={captureAmount}
+                                    onChange={(e) => setCaptureAmount(e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '10px 12px',
+                                      borderRadius: 8,
+                                      border: '1.5px solid #FCD34D',
+                                      fontSize: 14,
+                                      marginBottom: 8,
+                                      boxSizing: 'border-box',
+                                      outline: 'none',
+                                    }}
+                                  />
+                                  <textarea
+                                    placeholder="Describe the damage..."
+                                    value={damageReason}
+                                    onChange={(e) => setDamageReason(e.target.value)}
+                                    rows={2}
+                                    style={{
+                                      width: '100%',
+                                      padding: '10px 12px',
+                                      borderRadius: 8,
+                                      border: '1.5px solid #FCD34D',
+                                      fontSize: 13,
+                                      marginBottom: 10,
+                                      boxSizing: 'border-box',
+                                      outline: 'none',
+                                      resize: 'vertical',
+                                      fontFamily: 'inherit',
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => handleCaptureHold(selectedBooking)}
+                                    disabled={actionLoading || !captureAmount || !damageReason}
+                                    style={{
+                                      width: '100%',
+                                      padding: 12,
+                                      borderRadius: 10,
+                                      border: 'none',
+                                      background: '#DC2626',
+                                      color: '#fff',
+                                      fontSize: 14,
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      opacity:
+                                        actionLoading || !captureAmount || !damageReason ? 0.5 : 1,
+                                    }}
+                                  >
+                                    Charge ${captureAmount || '0'} for damage
+                                  </button>
+                                </div>
+                              </>
+                            )}
+
+                          {selectedBooking.securityDepositMethod === 'cash' && (
+                            <>
+                              <textarea
+                                placeholder="Return notes (optional)"
+                                value={returnNotes}
+                                onChange={(e) => setReturnNotes(e.target.value)}
+                                rows={2}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 12px',
+                                  borderRadius: 8,
+                                  border: '1.5px solid #E2E8F0',
+                                  fontSize: 13,
+                                  marginBottom: 10,
+                                  boxSizing: 'border-box',
+                                  outline: 'none',
+                                  resize: 'vertical',
+                                  fontFamily: 'inherit',
+                                }}
+                              />
+                              <button
+                                onClick={() => handleCashReturn(selectedBooking)}
+                                disabled={actionLoading}
+                                style={{
+                                  width: '100%',
+                                  padding: 16,
+                                  borderRadius: 12,
+                                  border: 'none',
+                                  background: '#16A34A',
+                                  color: '#fff',
+                                  fontSize: 15,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  opacity: actionLoading ? 0.5 : 1,
+                                }}
+                              >
+                                💵 Cash Returned — Close Rental
+                              </button>
+                            </>
+                          )}
+
+                          {/* Deep-link: Return Inspection button — opens Inspect with booking context */}
+                          <a
+                            href={`/inspect?sid=${selectedBooking.sessionId}&mode=return&returnUrl=${encodeURIComponent('/admin?focus=' + selectedBooking.sessionId + '&returned=1')}`}
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              padding: 12,
+                              borderRadius: 10,
+                              border: '1.5px solid #E2E8F0',
+                              background: '#F8FAFC',
+                              color: '#166534',
+                              fontSize: 13,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              marginTop: 14,
+                              textAlign: 'center',
+                              textDecoration: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          >
+                            Return Inspection →
+                          </a>
+                        </div>
+                      );
+                    })()}
+
+                  {/* COMPLETED - no actions */}
+                  {selectedBooking.rentalStatus === 'returned' && (
+                    <div
+                      style={{
+                        background: '#DCFCE7',
+                        color: '#166534',
+                        padding: 14,
+                        borderRadius: 12,
+                        textAlign: 'center',
+                        fontSize: 14,
+                        fontWeight: 600,
+                      }}
                     >
-                      💳 Add backup card
-                    </button>
-                  )}
-
-                  {/* Deep-link: Check Out button — opens Inspect with booking context */}
-                  <a
-                    href={`/inspect?sid=${selectedBooking.sessionId}&mode=checkout&returnUrl=${encodeURIComponent('/admin?focus=' + selectedBooking.sessionId + '&checkedOut=1')}`}
-                    style={{ display: 'block', width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#F8FAFC', color: '#0C4A6E', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 14, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}
-                  >
-                    Check Out — Open Inspection →
-                  </a>
-
-                  {/* Cancel booking — two-step confirm, destructive */}
-                  <div style={{ marginTop: 20, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Cancel Booking</div>
-                    {!cancelConfirmOpen ? (
-                      <button
-                        onClick={() => setCancelConfirmOpen(true)}
-                        disabled={actionLoading}
-                        style={{ width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #FCA5A5', background: '#FFF1F2', color: '#991B1B', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
-                      >
-                        Cancel & Refund Customer
-                      </button>
-                    ) : (
-                      <div style={{ background: '#FFF1F2', border: '1.5px solid #FCA5A5', borderRadius: 10, padding: 14 }}>
-                        <div style={{ fontSize: 13, color: '#991B1B', fontWeight: 600, marginBottom: 6 }}>
-                          Full refund of ${selectedBooking.totalPaid?.toLocaleString()} to customer's card.
+                      ✓ Rental Complete
+                      {selectedBooking.returnTimestamp && (
+                        <div style={{ fontSize: 11, fontWeight: 400, marginTop: 4 }}>
+                          Returned {new Date(selectedBooking.returnTimestamp).toLocaleString()}
                         </div>
-                        <div style={{ fontSize: 12, color: '#7F1D1D', marginBottom: 12 }}>
-                          Booking will be removed from the date picker. Google Calendar event must be deleted manually.
-                        </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button
-                            onClick={() => handleCancelBooking(selectedBooking)}
-                            disabled={actionLoading}
-                            style={{ flex: 1, padding: 10, borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
-                          >
-                            {actionLoading ? 'Cancelling...' : 'Yes, Cancel & Refund'}
-                          </button>
-                          <button
-                            onClick={() => setCancelConfirmOpen(false)}
-                            style={{ flex: 1, padding: 10, borderRadius: 8, border: '1.5px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                          >
-                            Keep Booking
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                );
-              })()}
-
-              {/* RETURN ACTIONS - if booking is "picked_up" */}
-              {selectedBooking.rentalStatus === 'picked_up' && !actionSuccess && (() => {
-                const depAmt = getDepositAmount(selectedBooking.packageName);
-                const depLabel = `$${depAmt.toLocaleString()}`;
-                return (
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Return — Handle Deposit</div>
-
-                  {selectedBooking.securityDepositMethod === 'card' && selectedBooking.securityDepositHoldId && (
-                    <>
-                      <button
-                        className={pendingReturnToast?.sessionId === selectedBooking.sessionId ? 'ftu-return-pulse' : undefined}
-                        onClick={() => handleReleaseHold(selectedBooking)}
-                        disabled={actionLoading}
-                        style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', background: '#16A34A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10, opacity: actionLoading ? 0.5 : 1 }}
-                      >
-                        ✓ Release {depLabel} Hold (clean return)
-                      </button>
-
-                      <div style={{ background: '#FEF3C7', borderRadius: 12, padding: 14, marginTop: 14 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#92400E', marginBottom: 10 }}>Or charge for damage:</div>
-                        <input
-                          type="number"
-                          placeholder={`Amount to charge (max ${depLabel})`}
-                          value={captureAmount}
-                          onChange={e => setCaptureAmount(e.target.value)}
-                          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #FCD34D', fontSize: 14, marginBottom: 8, boxSizing: 'border-box', outline: 'none' }}
-                        />
-                        <textarea
-                          placeholder="Describe the damage..."
-                          value={damageReason}
-                          onChange={e => setDamageReason(e.target.value)}
-                          rows={2}
-                          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #FCD34D', fontSize: 13, marginBottom: 10, boxSizing: 'border-box', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-                        />
-                        <button
-                          onClick={() => handleCaptureHold(selectedBooking)}
-                          disabled={actionLoading || !captureAmount || !damageReason}
-                          style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: '#DC2626', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: actionLoading || !captureAmount || !damageReason ? 0.5 : 1 }}
-                        >
-                          Charge ${captureAmount || '0'} for damage
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {selectedBooking.securityDepositMethod === 'cash' && (
-                    <>
-                      <textarea
-                        placeholder="Return notes (optional)"
-                        value={returnNotes}
-                        onChange={e => setReturnNotes(e.target.value)}
-                        rows={2}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #E2E8F0', fontSize: 13, marginBottom: 10, boxSizing: 'border-box', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-                      />
-                      <button
-                        onClick={() => handleCashReturn(selectedBooking)}
-                        disabled={actionLoading}
-                        style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', background: '#16A34A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
-                      >
-                        💵 Cash Returned — Close Rental
-                      </button>
-                    </>
-                  )}
-
-                  {/* Deep-link: Return Inspection button — opens Inspect with booking context */}
-                  <a
-                    href={`/inspect?sid=${selectedBooking.sessionId}&mode=return&returnUrl=${encodeURIComponent('/admin?focus=' + selectedBooking.sessionId + '&returned=1')}`}
-                    style={{ display: 'block', width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#F8FAFC', color: '#166534', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 14, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}
-                  >
-                    Return Inspection →
-                  </a>
-                </div>
-                );
-              })()}
-
-              {/* COMPLETED - no actions */}
-              {selectedBooking.rentalStatus === 'returned' && (
-                <div style={{ background: '#DCFCE7', color: '#166534', padding: 14, borderRadius: 12, textAlign: 'center', fontSize: 14, fontWeight: 600 }}>
-                  ✓ Rental Complete
-                  {selectedBooking.returnTimestamp && (
-                    <div style={{ fontSize: 11, fontWeight: 400, marginTop: 4 }}>
-                      Returned {new Date(selectedBooking.returnTimestamp).toLocaleString()}
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* DANGER ZONE — reset to booked (shown for picked_up or returned) */}
-              {selectedBooking.rentalStatus !== 'booked' && !actionSuccess && (
-                <div style={{ marginTop: 24, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Admin — Correct a Mistake</div>
-                  {!resetConfirmOpen ? (
-                    <button
-                      onClick={() => setResetConfirmOpen(true)}
-                      disabled={actionLoading}
-                      style={{ width: '100%', padding: 12, borderRadius: 10, border: '1.5px solid #FCA5A5', background: '#FFF1F2', color: '#991B1B', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
-                    >
-                      ↩ Reset to Booked (undo deposit / return)
-                    </button>
-                  ) : (
-                    <div style={{ background: '#FFF1F2', border: '1.5px solid #FCA5A5', borderRadius: 10, padding: 14 }}>
-                      <div style={{ fontSize: 13, color: '#991B1B', fontWeight: 600, marginBottom: 10 }}>
-                        This clears all deposit and return data from Stripe. Use only to correct a mistake — it cannot be undone automatically.
+                  {/* DANGER ZONE — reset to booked (shown for picked_up or returned) */}
+                  {selectedBooking.rentalStatus !== 'booked' && !actionSuccess && (
+                    <div style={{ marginTop: 24, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: '#94A3B8',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
+                          marginBottom: 8,
+                        }}
+                      >
+                        Admin — Correct a Mistake
                       </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      {!resetConfirmOpen ? (
                         <button
-                          onClick={() => handleResetToBooked(selectedBooking)}
+                          onClick={() => setResetConfirmOpen(true)}
                           disabled={actionLoading}
-                          style={{ flex: 1, padding: 10, borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.5 : 1 }}
+                          style={{
+                            width: '100%',
+                            padding: 12,
+                            borderRadius: 10,
+                            border: '1.5px solid #FCA5A5',
+                            background: '#FFF1F2',
+                            color: '#991B1B',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            opacity: actionLoading ? 0.5 : 1,
+                          }}
                         >
-                          {actionLoading ? 'Resetting...' : 'Yes, Reset'}
+                          ↩ Reset to Booked (undo deposit / return)
                         </button>
-                        <button
-                          onClick={() => setResetConfirmOpen(false)}
-                          style={{ flex: 1, padding: 10, borderRadius: 8, border: '1.5px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                      ) : (
+                        <div
+                          style={{
+                            background: '#FFF1F2',
+                            border: '1.5px solid #FCA5A5',
+                            borderRadius: 10,
+                            padding: 14,
+                          }}
                         >
-                          Cancel
-                        </button>
-                      </div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              color: '#991B1B',
+                              fontWeight: 600,
+                              marginBottom: 10,
+                            }}
+                          >
+                            This clears all deposit and return data from Stripe. Use only to correct
+                            a mistake — it cannot be undone automatically.
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => handleResetToBooked(selectedBooking)}
+                              disabled={actionLoading}
+                              style={{
+                                flex: 1,
+                                padding: 10,
+                                borderRadius: 8,
+                                border: 'none',
+                                background: '#DC2626',
+                                color: '#fff',
+                                fontSize: 13,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                opacity: actionLoading ? 0.5 : 1,
+                              }}
+                            >
+                              {actionLoading ? 'Resetting...' : 'Yes, Reset'}
+                            </button>
+                            <button
+                              onClick={() => setResetConfirmOpen(false)}
+                              style={{
+                                flex: 1,
+                                padding: 10,
+                                borderRadius: 8,
+                                border: '1.5px solid #E2E8F0',
+                                background: '#fff',
+                                color: '#475569',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
+                </>
               )}
-              </>}
 
               {activeTab === 'chat' && (
                 <div style={{ display: 'flex', flexDirection: 'column', height: 420 }}>
                   {actionError && (
-                    <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 10 }}>{actionError}</div>
+                    <div
+                      style={{
+                        background: '#FEE2E2',
+                        color: '#991B1B',
+                        padding: 10,
+                        borderRadius: 8,
+                        fontSize: 13,
+                        marginBottom: 10,
+                      }}
+                    >
+                      {actionError}
+                    </div>
                   )}
-                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingBottom: 4 }}>
+                  <div
+                    style={{
+                      flex: 1,
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      paddingBottom: 4,
+                    }}
+                  >
                     {conversation.length === 0 ? (
-                      <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: 13, paddingTop: 40 }}>No messages yet — send one below</div>
+                      <div
+                        style={{
+                          textAlign: 'center',
+                          color: '#94A3B8',
+                          fontSize: 13,
+                          paddingTop: 40,
+                        }}
+                      >
+                        No messages yet — send one below
+                      </div>
                     ) : (
-                      conversation.map(msg => (
-                        <div key={msg.twilioSid} style={{ display: 'flex', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', padding: '3px 0' }}>
-                          <div style={{
-                            maxWidth: '78%', padding: '9px 13px',
-                            borderRadius: msg.direction === 'outbound' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                            background: msg.direction === 'outbound' ? '#0C4A6E' : '#F1F5F9',
-                            color: msg.direction === 'outbound' ? '#fff' : '#0F172A',
-                            fontSize: 14, lineHeight: 1.45,
-                          }}>
-                            <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.body}</div>
-                            <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3, textAlign: 'right' }}>
-                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      conversation.map((msg) => (
+                        <div
+                          key={msg.twilioSid}
+                          style={{
+                            display: 'flex',
+                            justifyContent:
+                              msg.direction === 'outbound' ? 'flex-end' : 'flex-start',
+                            padding: '3px 0',
+                          }}
+                        >
+                          <div
+                            style={{
+                              maxWidth: '78%',
+                              padding: '9px 13px',
+                              borderRadius:
+                                msg.direction === 'outbound'
+                                  ? '16px 16px 4px 16px'
+                                  : '16px 16px 16px 4px',
+                              background: msg.direction === 'outbound' ? '#0C4A6E' : '#F1F5F9',
+                              color: msg.direction === 'outbound' ? '#fff' : '#0F172A',
+                              fontSize: 14,
+                              lineHeight: 1.45,
+                            }}
+                          >
+                            <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {msg.body}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                opacity: 0.6,
+                                marginTop: 3,
+                                textAlign: 'right',
+                              }}
+                            >
+                              {new Date(msg.timestamp).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
                             </div>
                           </div>
                         </div>
@@ -1248,19 +2296,46 @@ export default function AdminPage() {
                     )}
                     <div ref={chatBottomRef} />
                   </div>
-                  <div style={{ display: 'flex', gap: 8, paddingTop: 10, borderTop: '1px solid #E2E8F0' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      paddingTop: 10,
+                      borderTop: '1px solid #E2E8F0',
+                    }}
+                  >
                     <input
                       value={chatInput}
-                      onChange={e => setChatInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                       placeholder="Type a message…"
                       disabled={chatSending}
-                      style={{ flex: 1, padding: '10px 13px', borderRadius: 10, border: '1.5px solid #E2E8F0', fontSize: 14, outline: 'none', fontFamily: 'inherit', background: chatSending ? '#F8FAFC' : '#fff' }}
+                      style={{
+                        flex: 1,
+                        padding: '10px 13px',
+                        borderRadius: 10,
+                        border: '1.5px solid #E2E8F0',
+                        fontSize: 14,
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        background: chatSending ? '#F8FAFC' : '#fff',
+                      }}
                     />
                     <button
                       onClick={handleSendMessage}
                       disabled={!chatInput.trim() || chatSending}
-                      style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#0C4A6E', color: '#fff', fontSize: 13, fontWeight: 700, cursor: !chatInput.trim() || chatSending ? 'not-allowed' : 'pointer', opacity: !chatInput.trim() || chatSending ? 0.4 : 1, whiteSpace: 'nowrap' }}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: 10,
+                        border: 'none',
+                        background: '#0C4A6E',
+                        color: '#fff',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: !chatInput.trim() || chatSending ? 'not-allowed' : 'pointer',
+                        opacity: !chatInput.trim() || chatSending ? 0.4 : 1,
+                        whiteSpace: 'nowrap',
+                      }}
                     >
                       {chatSending ? '…' : 'Send'}
                     </button>

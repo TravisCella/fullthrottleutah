@@ -107,7 +107,9 @@ export async function GET(request) {
       now < r.expiresAt
   );
 
-  console.log(`[win-back] ${Object.keys(allRecords).length} total records, ${candidates.length} candidates`);
+  console.log(
+    `[win-back] ${Object.keys(allRecords).length} total records, ${candidates.length} candidates`
+  );
 
   if (candidates.length === 0) {
     return NextResponse.json({ nudged: 0, skipped: 0, message: 'No eligible records this run' });
@@ -127,7 +129,12 @@ export async function GET(request) {
       try {
         session = await stripe.checkout.sessions.retrieve(record.sessionId);
       } catch (stripeErr) {
-        console.warn('[win-back] Could not retrieve session', record.sessionId, ':', stripeErr.message);
+        console.warn(
+          '[win-back] Could not retrieve session',
+          record.sessionId,
+          ':',
+          stripeErr.message
+        );
         skippedCount++;
         continue;
       }
@@ -135,7 +142,9 @@ export async function GET(request) {
       if (session.status !== 'open') {
         const newStatus = session.status === 'complete' ? 'completed' : 'expired';
         await patchPendingRecord(record.sessionId, fbSecret, { status: newStatus });
-        console.log(`[win-back] Session ${record.sessionId} is ${session.status} — marked ${newStatus}, no nudge`);
+        console.log(
+          `[win-back] Session ${record.sessionId} is ${session.status} — marked ${newStatus}, no nudge`
+        );
         skippedCount++;
         continue;
       }
@@ -177,7 +186,12 @@ export async function GET(request) {
         try {
           await sendSMS(record.renterPhone, buildRenterSMS(record, dates));
         } catch (smsErr) {
-          console.error('[win-back] Renter SMS failed for', record.renterPhone, ':', smsErr.message);
+          console.error(
+            '[win-back] Renter SMS failed for',
+            record.renterPhone,
+            ':',
+            smsErr.message
+          );
         }
       }
 
@@ -200,7 +214,12 @@ export async function GET(request) {
       console.log('[win-back] Nudged:', record.sessionId, record.renterEmail);
       nudgedCount++;
     } catch (recordErr) {
-      console.error('[win-back] Unexpected error processing', record.sessionId, ':', recordErr.message);
+      console.error(
+        '[win-back] Unexpected error processing',
+        record.sessionId,
+        ':',
+        recordErr.message
+      );
       skippedCount++;
     }
   }

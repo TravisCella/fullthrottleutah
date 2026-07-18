@@ -23,8 +23,12 @@ const DB_URL = 'https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com';
 // so existing inspection records and new ones look identical.
 function serverTimestamp() {
   return new Date().toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: 'numeric', minute: '2-digit', hour12: true,
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
   });
 }
 
@@ -83,7 +87,6 @@ export async function POST(request) {
     );
 
     return NextResponse.json({ ok: true, id, timestamp });
-
   } catch (err) {
     console.error('[save-inspection] Fatal error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });

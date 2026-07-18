@@ -39,6 +39,7 @@ There are no tests or linters configured.
 ### Key data flows
 
 **Booking → Payment:**
+
 1. Customer completes the 7-step wizard in `app/booking.js` (single large client component)
 2. On submit, `handleCheckout()` POSTs to `/api/checkout/route.js`
 3. Checkout creates/finds a Stripe Customer, creates a Stripe Checkout Session with all booking data stuffed into `payment_intent.metadata`, and returns the hosted checkout URL
@@ -50,6 +51,7 @@ There are no tests or linters configured.
 ### Google Sheets schema
 
 **Sheet1** (bookings, cols A–W — do not reorder):
+
 ```
 A=booking_id, B=date_booked, C=package, D=location, E=start_date, F=end_date,
 G=days, H=total_price, I=deposit_paid, J=renter_name, K=renter_email,
@@ -65,6 +67,7 @@ Dates from Sheets come back as `"5/22/2026"` or `"2026-05-22"` — always route 
 ### Booking wizard steps (`app/booking.js`)
 
 `step === -1` = landing page. Steps 0–6:
+
 - 0: Package (Spark Duo or GTX Limited Duo)
 - 1: Lake + optional White Glove delivery add-on
 - 2: Dates + pickup/return times

@@ -237,7 +237,7 @@ export async function POST(request) {
 
     // Filter out "clear" findings — they shouldn't appear in the UI
     const findings = (parsed.findings || []).filter(
-      f => f && f.severity && f.severity !== 'clear'
+      (f) => f && f.severity && f.severity !== 'clear'
     );
 
     // Layer in the manual fuel check from the check-in inspection
@@ -245,7 +245,8 @@ export async function POST(request) {
       findings.push({
         zone: 'Fuel',
         severity: 'fee',
-        description: 'Watercraft returned without a full tank — refuel fee applies (actual cost + 20%)',
+        description:
+          'Watercraft returned without a full tank — refuel fee applies (actual cost + 20%)',
         confidence: 'high',
         note: 'Watercraft returned without a full tank — refuel fee applies (actual cost + 20%)',
       });
@@ -258,13 +259,15 @@ export async function POST(request) {
 
     // Recompute verdict if fuel fee was added and AI said CLEAR
     let verdict = parsed.verdict || 'CLEAR';
-    if (verdict === 'CLEAR' && findings.some(f => f.severity === 'fee')) {
+    if (verdict === 'CLEAR' && findings.some((f) => f.severity === 'fee')) {
       verdict = 'FEES_APPLY';
     }
-    if (findings.some(f => f.severity === 'critical')) verdict = 'CRITICAL';
-    else if (findings.some(f => f.severity === 'damage')) verdict = 'DAMAGE_FOUND';
+    if (findings.some((f) => f.severity === 'critical')) verdict = 'CRITICAL';
+    else if (findings.some((f) => f.severity === 'damage')) verdict = 'DAMAGE_FOUND';
 
-    console.log(`[ai-compare] ${out.customerName} · ${out.machineName} → ${verdict} (${findings.length} findings)`);
+    console.log(
+      `[ai-compare] ${out.customerName} · ${out.machineName} → ${verdict} (${findings.length} findings)`
+    );
 
     return NextResponse.json({
       ok: true,
@@ -282,7 +285,6 @@ export async function POST(request) {
         output: aiResponse.usage?.output_tokens,
       },
     });
-
   } catch (err) {
     console.error('[ai-compare] Fatal error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });

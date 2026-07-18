@@ -46,14 +46,14 @@ function rateLimitOk(ip) {
   // Opportunistic cleanup to keep the Map bounded.
   if (hits.size > MAX_TRACKED_IPS) {
     for (const [k, arr] of hits) {
-      const kept = arr.filter(t => t > hourAgo);
+      const kept = arr.filter((t) => t > hourAgo);
       if (kept.length === 0) hits.delete(k);
       else hits.set(k, kept);
     }
   }
 
-  const arr = (hits.get(ip) || []).filter(t => t > hourAgo);
-  const inLastMin = arr.filter(t => t > minAgo).length;
+  const arr = (hits.get(ip) || []).filter((t) => t > hourAgo);
+  const inLastMin = arr.filter((t) => t > minAgo).length;
   if (inLastMin >= RATE_PER_MIN || arr.length >= RATE_PER_HOUR) {
     hits.set(ip, arr); // persist the pruned array
     return false;
@@ -75,8 +75,7 @@ function hostFromHeader(value) {
 
 function originAllowed(request) {
   const host =
-    hostFromHeader(request.headers.get('origin')) ||
-    hostFromHeader(request.headers.get('referer'));
+    hostFromHeader(request.headers.get('origin')) || hostFromHeader(request.headers.get('referer'));
 
   // No Origin/Referer present (some privacy tools strip them) → don't hard-block;
   // the rate limit still applies.
@@ -208,7 +207,10 @@ export async function POST(request) {
   try {
     // ── Layer 4: origin/referer ──────────────────────────────────────────────
     if (!originAllowed(request)) {
-      console.warn('[chat] Blocked disallowed origin:', request.headers.get('origin') || request.headers.get('referer'));
+      console.warn(
+        '[chat] Blocked disallowed origin:',
+        request.headers.get('origin') || request.headers.get('referer')
+      );
       return friendlyBlock(403);
     }
 

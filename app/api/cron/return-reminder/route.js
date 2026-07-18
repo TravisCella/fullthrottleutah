@@ -40,9 +40,10 @@ function buildReturnReminderSMS(booking) {
 function buildReturnReminderEmailHTML(booking) {
   const firstName = (booking.renter_name || '').split(' ')[0] || 'there';
   const returnTime = booking.return_time_display || '8:00 PM';
-  const dateDisplay = booking.end_date && booking.end_date !== booking.start_date
-    ? `${booking.start_date} → ${booking.end_date}`
-    : booking.start_date || '';
+  const dateDisplay =
+    booking.end_date && booking.end_date !== booking.start_date
+      ? `${booking.start_date} → ${booking.end_date}`
+      : booking.start_date || '';
 
   const returnSection = booking.white_glove
     ? `<div style="background:#EFF6FF;padding:16px;border-radius:8px;margin:16px 0;">
@@ -179,7 +180,13 @@ export async function GET(request) {
 
     if (returns.length === 0) {
       console.log('[return-reminder] No returns tomorrow, nothing to do');
-      return NextResponse.json({ ok: true, processed: 0, smsSent: 0, emailsSent: 0, ownerSmsSent: 0 });
+      return NextResponse.json({
+        ok: true,
+        processed: 0,
+        smsSent: 0,
+        emailsSent: 0,
+        ownerSmsSent: 0,
+      });
     }
 
     for (const booking of returns) {
@@ -187,7 +194,9 @@ export async function GET(request) {
         if (booking.sms_opt_in && booking.renter_phone) {
           const msg = buildReturnReminderSMS(booking);
           await sendSMS(booking.renter_phone, msg);
-          console.log(`[return-reminder] SMS sent → ${booking.renter_name} (${booking.renter_phone})`);
+          console.log(
+            `[return-reminder] SMS sent → ${booking.renter_name} (${booking.renter_phone})`
+          );
           smsSent++;
         } else if (booking.renter_email) {
           const result = await sendReturnReminderEmail(booking);
@@ -218,9 +227,10 @@ export async function GET(request) {
       }
     }
 
-    console.log(`[return-reminder] Done — ${smsSent} SMS, ${emailsSent} emails, ${ownerSmsSent} owner SMS, ${errors} errors`);
+    console.log(
+      `[return-reminder] Done — ${smsSent} SMS, ${emailsSent} emails, ${ownerSmsSent} owner SMS, ${errors} errors`
+    );
     return NextResponse.json({ ok: true, processed, smsSent, emailsSent, ownerSmsSent, errors });
-
   } catch (err) {
     console.error('[return-reminder] Fatal error:', err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

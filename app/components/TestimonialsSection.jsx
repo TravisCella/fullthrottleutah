@@ -77,7 +77,7 @@ export default async function TestimonialsSection() {
 
   // Featured = most recent 5-star reviews, max 4. Fall back to whatever
   // is available if we don't have at least 2 five-star reviews yet.
-  const featured = allReviews.filter(r => r.rating === 5).slice(0, 4);
+  const featured = allReviews.filter((r) => r.rating === 5).slice(0, 4);
   const display = featured.length >= 2 ? featured : allReviews.slice(0, 4);
 
   const jsonLd = {
@@ -162,7 +162,7 @@ export default async function TestimonialsSection() {
             marginBottom: 40,
           }}
         >
-          {display.map(r => (
+          {display.map((r) => (
             <ReviewCard key={r.review_id} review={r} />
           ))}
         </div>
@@ -232,7 +232,7 @@ function ReviewCard({ review }) {
 function Stars({ rating, size = 16 }) {
   return (
     <div style={{ display: 'flex', gap: 2 }}>
-      {[1, 2, 3, 4, 5].map(n => (
+      {[1, 2, 3, 4, 5].map((n) => (
         <span
           key={n}
           style={{

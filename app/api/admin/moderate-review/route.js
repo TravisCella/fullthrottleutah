@@ -10,15 +10,11 @@
 //              you'd prefer first + last initial)
 
 import { NextResponse } from 'next/server';
-import {
-  updateReviewStatus,
-  updateReviewDisplayName,
-} from '../../../../lib/sheets';
+import { updateReviewStatus, updateReviewDisplayName } from '../../../../lib/sheets';
 
 export async function POST(request) {
   try {
-    const { password, reviewId, action, moderatorNotes, newDisplayName } =
-      await request.json();
+    const { password, reviewId, action, moderatorNotes, newDisplayName } = await request.json();
 
     if (password !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

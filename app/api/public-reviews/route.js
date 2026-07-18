@@ -44,9 +44,9 @@ export async function GET(request) {
     let reviews = data.reviews;
 
     // Apply per-request filters AFTER aggregate stats were computed
-    if (minRating > 0) reviews = reviews.filter(r => r.rating >= minRating);
+    if (minRating > 0) reviews = reviews.filter((r) => r.rating >= minRating);
     if (location) {
-      reviews = reviews.filter(r => (r.location || '').toLowerCase().includes(location));
+      reviews = reviews.filter((r) => (r.location || '').toLowerCase().includes(location));
     }
     if (limit > 0) reviews = reviews.slice(0, limit);
 

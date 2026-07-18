@@ -79,7 +79,7 @@ export default async function ReviewsPage() {
         ratingCount: count,
         reviewCount: count,
       },
-      review: reviews.slice(0, 50).map(r => ({
+      review: reviews.slice(0, 50).map((r) => ({
         '@type': 'Review',
         author: { '@type': 'Person', name: r.display_name },
         datePublished: toISODate(r.timestamp_submitted),
@@ -95,22 +95,57 @@ export default async function ReviewsPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: BG, color: TEXT, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: BG,
+        color: TEXT,
+        fontFamily: "'Outfit', system-ui, sans-serif",
+      }}
+    >
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div style={{ background: BG, borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '16px 24px' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <a href="/" style={{ color: '#fff', fontSize: 16, fontWeight: 700, letterSpacing: '-0.5px', textDecoration: 'none' }}>
+      <div
+        style={{
+          background: BG,
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          padding: '16px 24px',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1100,
+            margin: '0 auto',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <a
+            href="/"
+            style={{
+              color: '#fff',
+              fontSize: 16,
+              fontWeight: 700,
+              letterSpacing: '-0.5px',
+              textDecoration: 'none',
+            }}
+          >
             ← FULL THROTTLE UTAH
           </a>
           <a
             href="/"
             style={{
-              background: ORANGE, color: '#fff', padding: '8px 18px', borderRadius: 8,
-              fontSize: 13, fontWeight: 600, textDecoration: 'none',
+              background: ORANGE,
+              color: '#fff',
+              padding: '8px 18px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: 'none',
             }}
           >
             Book Now
@@ -120,7 +155,15 @@ export default async function ReviewsPage() {
 
       <div style={{ padding: '60px 24px 40px', textAlign: 'center' }}>
         <div style={{ maxWidth: 800, margin: '0 auto' }}>
-          <h1 style={{ color: '#fff', fontSize: 'clamp(32px, 6vw, 48px)', fontWeight: 700, margin: '0 0 12px', letterSpacing: '-1px' }}>
+          <h1
+            style={{
+              color: '#fff',
+              fontSize: 'clamp(32px, 6vw, 48px)',
+              fontWeight: 700,
+              margin: '0 0 12px',
+              letterSpacing: '-1px',
+            }}
+          >
             What Our Riders Say
           </h1>
           <p style={{ color: '#94A3B8', fontSize: 16, lineHeight: 1.6, margin: '0 0 32px' }}>
@@ -130,11 +173,18 @@ export default async function ReviewsPage() {
           {count > 0 && (
             <div
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 16, padding: '20px 28px',
-                background: 'rgba(255,255,255,0.05)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 16,
+                padding: '20px 28px',
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: 16,
+                border: '1px solid rgba(255,255,255,0.1)',
               }}
             >
-              <div style={{ fontSize: 48, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{aggregateRating}</div>
+              <div style={{ fontSize: 48, fontWeight: 700, color: '#fff', lineHeight: 1 }}>
+                {aggregateRating}
+              </div>
               <div style={{ textAlign: 'left' }}>
                 <Stars rating={Math.round(avg)} size={20} />
                 <div style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>
@@ -154,7 +204,15 @@ export default async function ReviewsPage() {
               <div style={{ fontSize: 18, fontWeight: 600, color: TEXT, marginBottom: 8 }}>
                 Be our first reviewer
               </div>
-              <div style={{ fontSize: 14, color: MUTED, maxWidth: 400, margin: '0 auto', lineHeight: 1.6 }}>
+              <div
+                style={{
+                  fontSize: 14,
+                  color: MUTED,
+                  maxWidth: 400,
+                  margin: '0 auto',
+                  lineHeight: 1.6,
+                }}
+              >
                 Just finished a rental? We'd love to hear about your experience.
               </div>
             </div>
@@ -167,7 +225,7 @@ export default async function ReviewsPage() {
               gap: 20,
             }}
           >
-            {reviews.map(r => (
+            {reviews.map((r) => (
               <ReviewCard key={r.review_id} review={r} />
             ))}
           </div>
@@ -184,8 +242,14 @@ export default async function ReviewsPage() {
         <a
           href="/"
           style={{
-            display: 'inline-block', background: ORANGE, color: '#fff', padding: '14px 32px',
-            borderRadius: 10, fontSize: 16, fontWeight: 700, textDecoration: 'none',
+            display: 'inline-block',
+            background: ORANGE,
+            color: '#fff',
+            padding: '14px 32px',
+            borderRadius: 10,
+            fontSize: 16,
+            fontWeight: 700,
+            textDecoration: 'none',
           }}
         >
           Book Your Ride →
@@ -235,7 +299,7 @@ function ReviewCard({ review }) {
 function Stars({ rating, size = 16 }) {
   return (
     <div style={{ display: 'flex', gap: 2 }}>
-      {[1, 2, 3, 4, 5].map(n => (
+      {[1, 2, 3, 4, 5].map((n) => (
         <span
           key={n}
           style={{

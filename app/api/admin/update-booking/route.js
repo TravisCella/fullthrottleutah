@@ -17,7 +17,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // Fire-and-forget review email
 function fireReviewRequestForBooking(piId) {
   if (!piId) return;
-  sendReviewRequest(piId).catch(err => {
+  sendReviewRequest(piId).catch((err) => {
     console.error('[update-booking] Review email fire-and-forget failed:', err.message);
   });
 }
@@ -52,7 +52,9 @@ export async function POST(request) {
       updates.securityDepositMethod = 'cash';
       updates.rentalStatus = 'picked_up';
       updates.pickupTimestamp = new Date().toISOString();
-      updates.cashDepositAmount = String(getDepositAmount(pi.metadata?.packageName || pi.metadata?.package));
+      updates.cashDepositAmount = String(
+        getDepositAmount(pi.metadata?.packageName || pi.metadata?.package)
+      );
     } else if (action === 'cash_deposit_returned') {
       updates.securityDepositStatus = 'released';
       updates.rentalStatus = 'returned';
