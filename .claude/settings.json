@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx prettier --write $CLAUDE_FILE_PATHS"
+            "command": "python3 -c \"import sys,json,os,subprocess;d=json.load(sys.stdin);p=(d.get('tool_input') or {}).get('file_path','');ext=os.path.splitext(p)[1].lower();(bool(p) and ext in {'.js','.jsx','.ts','.tsx','.json','.css','.scss','.md','.mdx','.html','.yml','.yaml'}) and subprocess.run(['npx','prettier','--write','--log-level','warn',p])\" 2>/dev/null || true"
           }
         ]
       }
