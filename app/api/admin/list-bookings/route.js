@@ -252,6 +252,13 @@ export async function POST(request) {
         createdAt:        new Date(s.created * 1000).toISOString(),
         pickupTimestamp:  meta.pickupTimestamp  || null,
         returnTimestamp:  meta.returnTimestamp  || null,
+
+        // Customer-selected pickup/return times from checkout (distinct from the
+        // *Timestamp fields above, which are set at actual check-out/return).
+        // camelCase first, snake_case fallback for older bookings (CLAUDE.md #5);
+        // same 8 AM/8 PM defaults used in the webhook/SMS/email for pre-feature rows.
+        pickupTimeDisplay: meta.pickupTimeDisplay || meta.pickup_time_display || '8:00 AM',
+        returnTimeDisplay: meta.returnTimeDisplay || meta.return_time_display || '8:00 PM',
       };
     });
 

@@ -977,6 +977,8 @@ export default function AdminPage() {
                   ['Phone', selectedBooking.renterPhone],
                   ['Dates', `${selectedBooking.startDate}${selectedBooking.endDate !== selectedBooking.startDate ? ` → ${selectedBooking.endDate}` : ''}`],
                   ['Days', selectedBooking.days],
+                  ['Pickup Time', selectedBooking.pickupTimeDisplay],
+                  ['Return Time', selectedBooking.returnTimeDisplay],
                   ['Experience', selectedBooking.experience],
                   ['Total Paid', `$${selectedBooking.totalPaid}`],
                   ['White Glove', selectedBooking.whiteGlove ? 'Yes (+$200)' : 'No'],
