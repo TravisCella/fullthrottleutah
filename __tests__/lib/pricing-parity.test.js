@@ -130,8 +130,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const d = new Date(2026, 5, 9); // Jun 9 = Tuesday
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW });
-    // expected: $269 weekday
-    expect(old).toBe(269);
+    // expected: $299 weekday
+    expect(old).toBe(299);
     expect(neu).toBe(old);
   });
 
@@ -148,8 +148,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const d = new Date(2026, 4, 22); // May 22 = Friday → isWeekend = true
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW });
-    // expected: $299 weekend (Friday qualifies)
-    expect(old).toBe(299);
+    // expected: $329 weekend (Friday qualifies)
+    expect(old).toBe(329);
     expect(neu).toBe(old);
   });
 
@@ -157,8 +157,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const d = new Date(2026, 5, 9); // Jun 9 = Tuesday → isWeekend = false
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW });
-    // expected: $269 weekday
-    expect(old).toBe(269);
+    // expected: $299 weekday
+    expect(old).toBe(299);
     expect(neu).toBe(old);
   });
 
@@ -166,8 +166,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const d = new Date(2026, 4, 23); // May 23 = Saturday, start of Memorial Day window
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW });
-    // expected: $299 weekend + $75 holiday = $374
-    expect(old).toBe(374);
+    // expected: $329 weekend + $75 holiday = $404
+    expect(old).toBe(404);
     expect(neu).toBe(old);
   });
 
@@ -175,8 +175,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const d = new Date(2026, 4, 27); // May 27 = Wednesday, last day of Memorial Day window
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW });
-    // expected: $269 weekday + $75 holiday = $344
-    expect(old).toBe(344);
+    // expected: $299 weekday + $75 holiday = $374
+    expect(old).toBe(374);
     expect(neu).toBe(old);
   });
 
@@ -194,8 +194,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const end   = new Date(2026, 5, 11); // Thu
     const old = oldTotal(SPARK, start, end, { loc: ECHO });
     const neu = newTotal(SPARK, start, end, { loc: ECHO });
-    // expected: $237/day × 3 = $711 (multi-day ignores weekday/weekend)
-    expect(old).toBe(711);
+    // expected: $267/day × 3 = $801 (multi-day ignores weekday/weekend)
+    expect(old).toBe(801);
     expect(neu).toBe(old);
   });
 
@@ -204,8 +204,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const end   = new Date(2026, 6, 5); // Sun Jul 5
     const old = oldTotal(SPARK, start, end, { loc: PINEVIEW });
     const neu = newTotal(SPARK, start, end, { loc: PINEVIEW });
-    // expected: $256/day × 2 = $512 base + ($75 + $75) holiday = $662
-    expect(old).toBe(662);
+    // expected: $286/day × 2 = $572 base + ($75 + $75) holiday = $722
+    expect(old).toBe(722);
     expect(neu).toBe(old);
   });
 
@@ -213,8 +213,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const d = new Date(2026, 5, 9); // Tue
     const old = oldTotal(SPARK, d, d, { loc: DEER_CREEK, whiteGlove: true });
     const neu = newTotal(SPARK, d, d, { loc: DEER_CREEK, whiteGlove: true });
-    // expected: $269 + $250 white glove = $519
-    expect(old).toBe(519);
+    // expected: $299 + $250 white glove = $549
+    expect(old).toBe(549);
     expect(neu).toBe(old);
   });
 
@@ -229,11 +229,11 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
   });
 
   test('1-day weekday, Spark, Pineview — loyalty discount (Math.round of 10%)', () => {
-    const d = new Date(2026, 5, 9); // Tue, $269 base
+    const d = new Date(2026, 5, 9); // Tue, $299 base
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW, repeatCustomer: true });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW, repeatCustomer: true });
-    // expected: $269 base; Math.round(269 * 0.10) = Math.round(26.9) = 27; total = $242
-    expect(old).toBe(242);
+    // expected: $299 base; Math.round(299 * 0.10) = Math.round(29.9) = 30; total = $269
+    expect(old).toBe(269);
     expect(neu).toBe(old);
   });
 

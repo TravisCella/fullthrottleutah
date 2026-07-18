@@ -99,9 +99,9 @@ IMPORTANT: Keep responses SHORT — 2-3 sentences max for simple questions. Only
 FLEET & PRICING:
 
 Spark Duo — 2 × 2014 Sea-Doo Spark 900 ACE HO
-- Weekday (Mon-Thu): $269/day
-- Weekend (Fri-Sun): $299/day
-- Multi-day discounts: 2-day $256/day, 3-day $237/day, 4-day $229/day, 5+ day $215/day
+- Weekday (Mon-Thu): $299/day
+- Weekend (Fri-Sun): $329/day
+- Multi-day discounts: 2-day $286/day, 3-day $267/day, 4-day $259/day, 5+ day $245/day
 - 90 HP, lightweight, nimble, fun for beginners and experienced riders
 - Includes: 2 jet skis on single trailer, 4 life preservers, 2 anchoring systems, safety flags
 - Security deposit: $1,000
