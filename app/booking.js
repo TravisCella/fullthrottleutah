@@ -1497,6 +1497,32 @@ export default function JetSkiBooking() {
               </div>
             )}
 
+            {loc?.advisory && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 14,
+                  background: '#FEE2E2',
+                  borderRadius: 14,
+                  border: '2px solid #DC2626',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>⚠️</span>
+                  <div>
+                    <div
+                      style={{ fontSize: 13, fontWeight: 700, color: '#991B1B', marginBottom: 4 }}
+                    >
+                      {loc.advisory.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#991B1B', lineHeight: 1.6 }}>
+                      {loc.advisory.body}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {loc?.minDays && loc?.aisStatus !== 'infested' && !overrideMinDays && (
               <div
                 style={{
