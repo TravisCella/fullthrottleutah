@@ -42,6 +42,7 @@ const OWNER_ZONES = [
 ];
 
 const MACHINES = [
+  { id: "trixx-1", name: "Trixx", subtitle: "2018 Sea-Doo Spark Trixx (3-up)" },
   { id: "spark-1", name: "Spark #1", subtitle: "2014 Sea-Doo Spark 900 ACE" },
   { id: "spark-2", name: "Spark #2", subtitle: "2014 Sea-Doo Spark 900 ACE" },
   { id: "gtx-1", name: "GTX 325 #1", subtitle: "2026 Sea-Doo GTX Limited 325" },
