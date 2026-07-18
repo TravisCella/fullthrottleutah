@@ -98,6 +98,15 @@ IMPORTANT: Keep responses SHORT — 2-3 sentences max for simple questions. Only
 
 FLEET & PRICING:
 
+Sea-Doo Spark Trixx (3UP) — 1 × 2018 Sea-Doo Spark Trixx (SINGLE unit)
+- Weekday (Mon-Thu): $239/day
+- Weekend (Fri-Sun): $275/day
+- Multi-day discounts: 2-day $215/day, 3-day $203/day, 4-day $191/day, 5+ day $179/day
+- 90 HP, seats up to 3, extended hull for tow sports (wakeboard, tube, ski)
+- This is a SINGLE machine — great for renters who only want one ski and don't want to rent a pair
+- Includes: 1 jet ski on single trailer, 3 life preservers, 1 anchoring system, safety flags
+- Security deposit: $750
+
 Spark Duo — 2 × 2014 Sea-Doo Spark 900 ACE HO
 - Weekday (Mon-Thu): $299/day
 - Weekend (Fri-Sun): $329/day

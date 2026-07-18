@@ -27,6 +27,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { getDepositAmount } from '../../lib/deposit';
 
 // Initialized once at module level — avoids recreating the Stripe object on every render.
 // NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY must be live-mode if STRIPE_SECRET_KEY is live-mode
@@ -393,7 +394,7 @@ export default function AdminPage() {
   };
 
   const handleReleaseHold = async (booking) => {
-    const dep = booking.packageName?.includes('GTX') ? 2000 : 1000;
+    const dep = getDepositAmount(booking.packageName);
     if (!confirm(`Release the $${dep.toLocaleString()} hold? This refunds the customer entirely.`)) return;
     setActionLoading(true);
     setActionError(null);
@@ -455,7 +456,7 @@ export default function AdminPage() {
   };
 
   const handleCaptureHold = async (booking) => {
-    const dep = booking.packageName?.includes('GTX') ? 2000 : 1000;
+    const dep = getDepositAmount(booking.packageName);
     const amount = parseFloat(captureAmount);
     if (!amount || amount < 1 || amount > dep) {
       setActionError(`Enter a valid amount between $1 and $${dep.toLocaleString()}`);
@@ -1002,7 +1003,7 @@ export default function AdminPage() {
 
               {/* PICKUP ACTIONS - if booking is "booked" status */}
               {selectedBooking.rentalStatus === 'booked' && !actionSuccess && (() => {
-                const depAmt = selectedBooking.packageName?.includes('GTX') ? 2000 : 1000;
+                const depAmt = getDepositAmount(selectedBooking.packageName);
                 const depLabel = `$${depAmt.toLocaleString()}`;
                 const isCheckoutFocus = pendingInspectionToast?.sessionId === selectedBooking.sessionId;
                 return (
@@ -1095,7 +1096,7 @@ export default function AdminPage() {
 
               {/* RETURN ACTIONS - if booking is "picked_up" */}
               {selectedBooking.rentalStatus === 'picked_up' && !actionSuccess && (() => {
-                const depAmt = selectedBooking.packageName?.includes('GTX') ? 2000 : 1000;
+                const depAmt = getDepositAmount(selectedBooking.packageName);
                 const depLabel = `$${depAmt.toLocaleString()}`;
                 return (
                 <div style={{ marginTop: 20 }}>
