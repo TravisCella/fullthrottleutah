@@ -45,11 +45,11 @@ const IMAGES = {
   sparkOverhead: "/images/spark-overhead.png",
   sparkProfile: "/images/spark-profile.png",
   gtxHero: "/images/gtx-hero.png",
-  // Sea-Doo Spark Trixx (3UP) — drop these files into /public/images/
-  trixxHero: "/images/trixx-hero.png",
-  trixxFront: "/images/trixx-front.png",
-  trixxSide: "/images/trixx-side.png",
-  trixxAction: "/images/trixx-action.png",
+  // Sea-Doo Spark Trixx (3UP)
+  trixxHero: "/images/trixx-hero.jpg",
+  trixxFront: "/images/trixx-front.jpg",
+  trixxSide: "/images/trixx-side.jpg",
+  trixxAction: "/images/trixx-action.jpg",
 };
 
 // ── Life vest sizes (matches inventory) ──
