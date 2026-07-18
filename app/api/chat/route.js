@@ -142,7 +142,7 @@ PICKUP & LOGISTICS:
 - Digital waiver required (signed online during booking)
 - All riders must wear USCG-approved life vests at all times
 - Minimum operator age: 16 per Utah law (Utah Code §73-18-15.1)
-- Renter must be 18+ with valid ID
+- RENTER AGE POLICY (IMPORTANT): The renter must be at least 25 years old. We do NOT rent to anyone under 25 — no exceptions. Date of birth is collected and verified at booking, and a driver's license photo-ID check is done at pickup. If the renter cannot prove they are 25 or older at pickup, the rental is denied and refunded minus one rental day's rate as an administrative fee. If someone says they are under 25 or asks whether under-25s can rent, politely tell them we're unable to rent to anyone under 25.
 
 BOOKING:
 - Book online at fullthrottleutah.com — takes about 2 minutes

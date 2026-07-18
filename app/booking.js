@@ -339,7 +339,7 @@ export default function JetSkiBooking() {
   const [dates, setDates] = useState([]);
   const [mo, setMo] = useState(new Date().getMonth());
   const [yr, setYr] = useState(new Date().getFullYear());
-  const [info, setInfo] = useState({ name: "", email: "", phone: "", experience: "", smsOptIn: false });
+  const [info, setInfo] = useState({ name: "", email: "", phone: "", experience: "", smsOptIn: false, dob: "" });
   const [done, setDone] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState(null);
@@ -512,6 +512,7 @@ export default function JetSkiBooking() {
           renterName: info.name,
           renterEmail: info.email,
           renterPhone: info.phone,
+          renterDob: info.dob,
           experience: info.experience,
           smsOptIn: info.smsOptIn,
           whiteGlove: whiteGlove,
@@ -564,6 +565,23 @@ export default function JetSkiBooking() {
   const totalPrice = Math.max(0, basePrice + holidayInfo.total + whiteGloveFee + deconFee + extraVestFee - loyaltyDiscount + promoAdjustment);
   const minDaysRequired = loc?.minDays || 1;
   const meetsMinimum = overrideMinDays || days >= minDaysRequired;
+
+  // ── Renter age policy: renters must be at least 25 as of the rental start date.
+  // Client-side gate only — the authoritative check lives in /api/checkout. ──
+  const MIN_RENTER_AGE = 25;
+  const renterAge = (() => {
+    if (!info.dob) return null;
+    const [by, bm, bd] = info.dob.split('-').map(Number);
+    if (!by || !bm || !bd) return null;
+    const born = new Date(by, bm - 1, bd);
+    if (isNaN(born.getTime())) return null;
+    const ref = dates.length > 0 ? dates[0] : new Date(); // age as of rental start date
+    let age = ref.getFullYear() - born.getFullYear();
+    const mo = ref.getMonth() - born.getMonth();
+    if (mo < 0 || (mo === 0 && ref.getDate() < born.getDate())) age--;
+    return age;
+  })();
+  const isOldEnough = renterAge != null && renterAge >= MIN_RENTER_AGE;
   // For same-day rentals, pickup must come before return. Multi-day has no
   // constraint (pickup Day 1 AM, return Day N PM regardless of clock time).
   const timesValid = days <= 1
@@ -574,7 +592,7 @@ export default function JetSkiBooking() {
     if (step === 0) return pkg;
     if (step === 1) return loc;
     if (step === 2) return dates.length >= 1 && meetsMinimum && timesValid;
-    if (step === 3) return info.name && info.email && info.phone && info.experience && totalVests <= maxTotalVests;
+    if (step === 3) return info.name && info.email && info.phone && info.experience && info.dob && isOldEnough && totalVests <= maxTotalVests;
     if (step === 4) return Object.values(waiverChecks).every(Boolean) && signature;
     // Step 5 (NEW): scroll-gated rental agreement
     if (step === 5) return agreementScrollComplete
@@ -1171,6 +1189,32 @@ export default function JetSkiBooking() {
               </div>
             ))}
             <div style={{ marginBottom: 14 }}>
+              <label style={labelSt}>Date of Birth</label>
+              <input
+                type="date"
+                value={info.dob}
+                max={new Date().toISOString().split("T")[0]}
+                onChange={e => setInfo({ ...info, dob: e.target.value })}
+                style={inputSt}
+              />
+              {info.dob && !isOldEnough && (
+                <div style={{ marginTop: 8, padding: 12, background: "rgba(220,38,38,0.08)", borderRadius: 8, border: "1px solid #DC2626" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B", marginBottom: 2 }}>Renters must be 25 or older</div>
+                  <div style={{ fontSize: 12, color: "#991B1B", lineHeight: 1.4 }}>
+                    We're sorry — Full Throttle Utah rents only to renters who are at least 25 years old, so we're unable to complete this booking.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 14, background: "#FEF3C7", borderRadius: 12, padding: 14, display: "flex", gap: 10 }}>
+              <span style={{ fontSize: 18 }}>🪪</span>
+              <div style={{ fontSize: 12, color: "#92400E", lineHeight: 1.5 }}>
+                <strong>Renters must be 25 or older.</strong> Bring a valid driver's license — we verify age with a photo-ID check at pickup. If the renter is not 25+, the rental is denied and refunded minus one rental day's rate as an administrative fee.
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
               <label style={labelSt}>Jet Ski Experience</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {["First timer", "A few times", "Experienced", "Expert"].map(lv => (
@@ -1345,7 +1389,7 @@ export default function JetSkiBooking() {
               { key: "indemnify", title: "Indemnification",
                 text: "I agree to indemnify, defend, and hold harmless TW Assets LLC from any claims, damages, or expenses brought by any person arising from my rental, use, or transport of the PWC and equipment." },
               { key: "rules", title: "Renter Obligations",
-                text: "I confirm that: I am at least 18 years old with valid ID. All operators will be 16+ per Utah Code §73-18-15.1. All riders will wear USCG-approved life vests at all times. I will not operate under the influence of alcohol or drugs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable boating laws." },
+                text: "I confirm that: I am the renter and am at least 25 years old with a valid driver's license, and I understand my ID will be verified at pickup. All operators will be 16+ per Utah Code §73-18-15.1. All riders will wear USCG-approved life vests at all times. I will not operate under the influence of alcohol or drugs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable boating laws." },
               { key: "damage", title: "Damage & Security Deposit",
                 text: `I accept financial responsibility for all damage to, loss of, or theft of the PWC and equipment during the rental period, regardless of fault. A $${(pkg?.deposit || 1000).toLocaleString()} security deposit will be collected and refunded upon satisfactory return.` },
               { key: "noInsurance", title: "No Insurance Provided",
@@ -1834,7 +1878,7 @@ export default function JetSkiBooking() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setAgreementChecks(initialAgreementChecks); setAgreementSignature(null); setAgreementScrollComplete(false); setDone(false); setWhiteGlove(false); setIsRepeatCustomer(false); setVestSizes(EMPTY_VESTS); setPickupTime("08:00"); setReturnTime("20:00"); }}
+            <button onClick={() => { setStep(-1); setPkg(null); setLoc(null); setDates([]); setInfo({ name:"", email:"", phone:"", experience:"", smsOptIn: false, dob:"" }); setWaiverChecks({risks: false, release: false, indemnify: false, rules: false, damage: false, noInsurance: false, ais: false, noLakePowell: false}); setSignature(null); setAgreementChecks(initialAgreementChecks); setAgreementSignature(null); setAgreementScrollComplete(false); setDone(false); setWhiteGlove(false); setIsRepeatCustomer(false); setVestSizes(EMPTY_VESTS); setPickupTime("08:00"); setReturnTime("20:00"); }}
               style={{ ...btnPrimary, marginTop: 20, background: "#fff", color: "#0C4A6E", border: "2px solid #0C4A6E", boxShadow: "none" }}>
               Book Another Rental
             </button>
