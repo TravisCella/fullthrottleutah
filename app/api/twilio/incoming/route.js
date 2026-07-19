@@ -275,8 +275,9 @@ export async function POST(request) {
       normalizedFrom,
       '— written to unmatched'
     );
+    const preview = body.length > 120 ? `${body.slice(0, 120)}…` : body;
     await sendOwnerAlert(
-      `FTU Chat: Unknown # ${normalizedFrom} messaged. Check admin: fullthrottleutah.com/admin`
+      `FTU Chat: Text from ${normalizedFrom} (not matched to a booking): "${preview}" — reply at fullthrottleutah.com/admin`
     );
   }
 
