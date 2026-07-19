@@ -108,7 +108,7 @@ Sea-Doo Spark Trixx (3UP) — 1 × 2018 Sea-Doo Spark Trixx (SINGLE unit)
 
 Spark Duo — 2 × 2014 Sea-Doo Spark 900 ACE HO
 - Weekday (Mon-Thu): $299/day
-- Weekend (Fri-Sun): $329/day
+- Weekend (Fri-Sun): $335/day
 - Multi-day discounts: 2-day $286/day, 3-day $267/day, 4-day $259/day, 5+ day $245/day
 - 90 HP, lightweight, nimble, fun for beginners and experienced riders
 - Includes: 2 jet skis on single trailer, 4 life preservers, 2 anchoring systems, safety flags
