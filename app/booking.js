@@ -480,15 +480,12 @@ function Calendar({
           <span style={{ color: '#1E293B', fontWeight: 600 }}>${pkg.weekday}</span> weekday
           <span style={{ margin: '0 6px', color: '#CBD5E1' }}>·</span>
           <span style={{ color: '#D97706', fontWeight: 600 }}>${pkg.weekend}</span> weekend
-          <span style={{ margin: '0 6px', color: '#CBD5E1' }}>·</span>
-          <span style={{ color: '#DC2626', fontWeight: 600 }}>+$75</span> holiday
           <div style={{ marginTop: 2, fontSize: 9 }}>Multi-day discounts apply automatically</div>
         </div>
       )}
       {!pkg && (
         <div style={{ marginTop: 8, display: 'flex', gap: 12, justifyContent: 'center' }}>
           <span style={{ fontSize: 10, color: '#D97706', fontWeight: 600 }}>● Weekend</span>
-          <span style={{ fontSize: 10, color: '#DC2626', fontWeight: 600 }}>● Holiday</span>
         </div>
       )}
     </div>

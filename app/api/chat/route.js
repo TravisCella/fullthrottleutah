@@ -123,13 +123,7 @@ GTX Limited Duo — 2 × 2026 Sea-Doo GTX Limited 325
 - Includes: 2 jet skis on single trailer, 4 life preservers, 2 anchoring systems, safety flags, Bluetooth audio
 - Security deposit: $2,000
 
-HOLIDAY SURCHARGES:
-- July 4th (July 1-5): +$75/day
-- Pioneer Day (July 20-25): +$75/day
-- Labor Day (Aug 29 - Sept 2): +$75/day
-- Memorial Day (May 23-27): +$75/day
-
-WEEKEND PREMIUM: Already included in the weekend pricing above.
+WEEKEND PREMIUM: Already included in the weekend pricing above. There is NO holiday surcharge — holiday dates cost the same as any other weekend/weekday.
 
 WHITE GLOVE DELIVERY: $200 flat fee — we deliver the watercraft to your chosen lake, launch it, and pick it up when you're done. Available within 45 minutes of Farmington. No towing needed.
 
@@ -163,7 +157,7 @@ WHEN ASKED ABOUT AVAILABILITY:
 
 WHEN CALCULATING PRICES:
 - For multi-day rentals, use the appropriate multi-day rate × number of days
-- Add holiday surcharge if dates overlap a holiday period
+- Do NOT add any holiday surcharge — we no longer charge one
 - Add $200 if they want white glove delivery
 - Always mention tax is additional (8.65% Utah sales tax)
 

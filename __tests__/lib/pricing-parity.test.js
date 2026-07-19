@@ -15,12 +15,8 @@ import { PACKAGES, LOCATIONS, computeTotal } from '../../lib/pricing.js';
 
 // ─── OLD: verbatim inline functions from booking.js ──────────────────────────
 
-const OLD_HOLIDAYS = [
-  { start: '07-01', end: '07-05', name: 'July 4th', premium: 75 },
-  { start: '07-20', end: '07-25', name: 'Pioneer Day', premium: 75 },
-  { start: '08-29', end: '09-02', name: 'Labor Day', premium: 75 },
-  { start: '05-23', end: '05-27', name: 'Memorial Day', premium: 75 },
-];
+// Holiday surcharge removed 2026-07-18 — matches lib/pricing.js HOLIDAYS = [].
+const OLD_HOLIDAYS = [];
 
 function OLD_isWeekend(d) {
   const day = new Date(d).getDay();
@@ -162,8 +158,8 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     const d = new Date(2026, 4, 22); // May 22 = Friday → isWeekend = true
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW });
-    // expected: $329 weekend (Friday qualifies)
-    expect(old).toBe(329);
+    // expected: $335 weekend (Friday qualifies)
+    expect(old).toBe(335);
     expect(neu).toBe(old);
   });
 
@@ -176,30 +172,30 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     expect(neu).toBe(old);
   });
 
-  test('1-day May 23 (Sat, HOLIDAY WINDOW START), Spark Duo — weekend + holiday', () => {
-    const d = new Date(2026, 4, 23); // May 23 = Saturday, start of Memorial Day window
+  test('1-day May 23 (Sat, former holiday window), Spark Duo — weekend, NO holiday surcharge', () => {
+    const d = new Date(2026, 4, 23); // May 23 = Saturday, formerly Memorial Day window
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW });
-    // expected: $329 weekend + $75 holiday = $404
-    expect(old).toBe(404);
+    // expected: $335 weekend, no holiday surcharge (removed 2026-07-18)
+    expect(old).toBe(335);
     expect(neu).toBe(old);
   });
 
-  test('1-day May 27 (Wed, HOLIDAY WINDOW END), Spark Duo — weekday + holiday', () => {
-    const d = new Date(2026, 4, 27); // May 27 = Wednesday, last day of Memorial Day window
+  test('1-day May 27 (Wed, former holiday window), Spark Duo — weekday, NO holiday surcharge', () => {
+    const d = new Date(2026, 4, 27); // May 27 = Wednesday, formerly last day of Memorial Day window
     const old = oldTotal(SPARK, d, d, { loc: PINEVIEW });
     const neu = newTotal(SPARK, d, d, { loc: PINEVIEW });
-    // expected: $299 weekday + $75 holiday = $374
-    expect(old).toBe(374);
+    // expected: $299 weekday, no holiday surcharge (removed 2026-07-18)
+    expect(old).toBe(299);
     expect(neu).toBe(old);
   });
 
-  test('1-day Jul 3 (Fri, holiday window mid), GTX — weekend + holiday BOUNDARY', () => {
-    const d = new Date(2026, 6, 3); // Jul 3 = Friday → weekend + in 07-01→07-05
+  test('1-day Jul 3 (Fri, former holiday window), GTX — weekend, NO holiday surcharge', () => {
+    const d = new Date(2026, 6, 3); // Jul 3 = Friday → weekend, formerly in 07-01→07-05
     const old = oldTotal(GTX, d, d, { loc: PINEVIEW });
     const neu = newTotal(GTX, d, d, { loc: PINEVIEW });
-    // expected: $649 weekend + $75 holiday = $724
-    expect(old).toBe(724);
+    // expected: $649 weekend, no holiday surcharge (removed 2026-07-18)
+    expect(old).toBe(649);
     expect(neu).toBe(old);
   });
 
@@ -213,13 +209,13 @@ describe('pricing parity: old booking.js inline === new computeTotal', () => {
     expect(neu).toBe(old);
   });
 
-  test('2-day Jul 4-5 (Sat-Sun), Spark Duo — multi-day + holiday surcharge', () => {
+  test('2-day Jul 4-5 (Sat-Sun), Spark Duo — multi-day, NO holiday surcharge', () => {
     const start = new Date(2026, 6, 4); // Sat Jul 4
     const end = new Date(2026, 6, 5); // Sun Jul 5
     const old = oldTotal(SPARK, start, end, { loc: PINEVIEW });
     const neu = newTotal(SPARK, start, end, { loc: PINEVIEW });
-    // expected: $286/day × 2 = $572 base + ($75 + $75) holiday = $722
-    expect(old).toBe(722);
+    // expected: $286/day × 2 = $572, no holiday surcharge (removed 2026-07-18)
+    expect(old).toBe(572);
     expect(neu).toBe(old);
   });
 
