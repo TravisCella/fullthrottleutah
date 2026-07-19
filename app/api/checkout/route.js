@@ -22,7 +22,7 @@
 // Builds on: 2026-06-06 Phase 2 agreement metadata
 
 import Stripe from 'stripe';
-import { computeTotal, getPackage, MAX_EXTRA_VESTS } from '../../../lib/pricing';
+import { computeTotal, getPackage, getLocation, MAX_EXTRA_VESTS } from '../../../lib/pricing';
 import { isRepeatCustomer, getPremiumDates } from '../../../lib/sheets';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -96,6 +96,20 @@ export async function POST(request) {
       );
       return Response.json(
         { error: 'Renters must be at least 25 years old. We are unable to complete this booking.' },
+        { status: 400 }
+      );
+    }
+
+    // ─── Disabled-lake guard ──────────────────────────────────────────────
+    // A lake marked `disabled` in LOCATIONS is not bookable (e.g. Pineview
+    // when drawn down/unboatable). Reject server-side so a stale client bundle
+    // or a saved deep link can't slip a booking through after we pull it.
+    const bookingLocation = getLocation(locationId || location);
+    if (bookingLocation?.disabled) {
+      return Response.json(
+        {
+          error: `${bookingLocation.name} is not currently available for booking. Please choose another lake.`,
+        },
         { status: 400 }
       );
     }

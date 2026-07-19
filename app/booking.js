@@ -1089,7 +1089,7 @@ export default function JetSkiBooking() {
               We Serve
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {LOCATIONS.map((l) => (
+              {LOCATIONS.filter((l) => !l.disabled).map((l) => (
                 <span
                   key={l.id}
                   style={{
@@ -1402,7 +1402,7 @@ export default function JetSkiBooking() {
         {step === 1 && !done && (
           <div>
             <h2 style={secTitle}>Pick Your Lake</h2>
-            {LOCATIONS.map((l) => (
+            {LOCATIONS.filter((l) => !l.disabled).map((l) => (
               <div
                 key={l.id}
                 onClick={() => setLoc(l)}
