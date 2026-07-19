@@ -284,6 +284,11 @@ export default function AdminPage() {
   const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
   const [unmatchedCount, setUnmatchedCount] = useState(0);
+  const [unmatchedOpen, setUnmatchedOpen] = useState(false);
+  const [unmatchedThreads, setUnmatchedThreads] = useState([]);
+  const [replyDrafts, setReplyDrafts] = useState({}); // phone -> draft text
+  const [linkTargets, setLinkTargets] = useState({}); // phone -> sessionId
+  const [unmatchedBusy, setUnmatchedBusy] = useState('');
   const chatBottomRef = useRef(null);
 
   // Check for saved password on mount
@@ -810,6 +815,77 @@ export default function AdminPage() {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversation]);
 
+  // ─── Unmatched inbox (texts from numbers not tied to a booking) ──────────────
+  const fetchUnmatched = async () => {
+    try {
+      const res = await fetch('/api/admin/get-unmatched', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setUnmatchedThreads(data.threads || []);
+        setUnmatchedCount(data.total || 0);
+      }
+    } catch {}
+  };
+
+  const handleReplyUnmatched = async (phone) => {
+    const body = (replyDrafts[phone] || '').trim();
+    if (!body || unmatchedBusy) return;
+    setUnmatchedBusy(phone);
+    try {
+      const res = await fetch('/api/admin/reply-unmatched', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, to: phone, body }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setActionError(data.error);
+      } else {
+        setReplyDrafts((d) => ({ ...d, [phone]: '' }));
+        await fetchUnmatched();
+      }
+    } catch {
+      setActionError('Connection error');
+    }
+    setUnmatchedBusy('');
+  };
+
+  const handleLinkUnmatched = async (phone) => {
+    const sessionId = linkTargets[phone];
+    if (!sessionId || unmatchedBusy) return;
+    setUnmatchedBusy(phone);
+    try {
+      const res = await fetch('/api/admin/link-unmatched', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, phone, sessionId }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setActionError(data.error);
+      } else {
+        setActionSuccess(`✅ Linked ${phone} to the booking (${data.moved} message(s) moved)`);
+        setLinkTargets((t) => ({ ...t, [phone]: '' }));
+        await fetchUnmatched();
+      }
+    } catch {
+      setActionError('Connection error');
+    }
+    setUnmatchedBusy('');
+  };
+
+  // Keep the unmatched badge current; poll faster while the inbox is open.
+  useEffect(() => {
+    if (!authed) return;
+    fetchUnmatched();
+    const interval = setInterval(fetchUnmatched, unmatchedOpen ? 5000 : 30000);
+    return () => clearInterval(interval);
+  }, [authed, unmatchedOpen]);
+
   if (!authed) {
     return (
       <div
@@ -1054,6 +1130,7 @@ export default function AdminPage() {
             {bookings.filter((b) => b.rentalStatus !== 'returned').length} active
             {unmatchedCount > 0 && (
               <span
+                onClick={() => setUnmatchedOpen(true)}
                 style={{
                   background: '#EF4444',
                   color: '#fff',
@@ -1061,9 +1138,10 @@ export default function AdminPage() {
                   borderRadius: 20,
                   fontWeight: 700,
                   fontSize: 10,
+                  cursor: 'pointer',
                 }}
               >
-                {unmatchedCount} unmatched SMS
+                {unmatchedCount} unmatched SMS →
               </span>
             )}
           </div>
@@ -2359,6 +2437,242 @@ export default function AdminPage() {
             onClose={() => setShowBackupCardModal(false)}
           />
         </Elements>
+      )}
+
+      {/* Unmatched inbox — texts from numbers not tied to a booking */}
+      {unmatchedOpen && (
+        <div
+          onClick={() => setUnmatchedOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.55)',
+            zIndex: 80,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              width: '100%',
+              maxWidth: 560,
+              maxHeight: '90vh',
+              borderRadius: '16px 16px 0 0',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 18px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 12,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>Unmatched texts</div>
+                <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                  Texts from numbers not tied to a booking. Reply directly, or link one to a booking
+                  to auto-route that number next time.
+                </div>
+              </div>
+              <button
+                onClick={() => setUnmatchedOpen(false)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: 24,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  color: '#64748B',
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              style={{
+                overflowY: 'auto',
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14,
+              }}
+            >
+              {unmatchedThreads.length === 0 ? (
+                <div
+                  style={{ textAlign: 'center', color: '#94A3B8', fontSize: 13, padding: '30px 0' }}
+                >
+                  No unmatched texts 🎉
+                </div>
+              ) : (
+                unmatchedThreads.map((t) => (
+                  <div
+                    key={t.phone}
+                    style={{ border: '1px solid #E2E8F0', borderRadius: 12, padding: 12 }}
+                  >
+                    <div
+                      style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}
+                    >
+                      {t.phone}
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        marginBottom: 10,
+                      }}
+                    >
+                      {t.messages.map((m) => (
+                        <div
+                          key={m.sid}
+                          style={{
+                            display: 'flex',
+                            justifyContent: m.direction === 'outbound' ? 'flex-end' : 'flex-start',
+                          }}
+                        >
+                          <div
+                            style={{
+                              maxWidth: '80%',
+                              padding: '8px 12px',
+                              borderRadius:
+                                m.direction === 'outbound'
+                                  ? '14px 14px 4px 14px'
+                                  : '14px 14px 14px 4px',
+                              background: m.direction === 'outbound' ? '#0C4A6E' : '#F1F5F9',
+                              color: m.direction === 'outbound' ? '#fff' : '#0F172A',
+                              fontSize: 13.5,
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {m.body}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                opacity: 0.6,
+                                marginTop: 2,
+                                textAlign: 'right',
+                              }}
+                            >
+                              {m.timestamp
+                                ? new Date(m.timestamp).toLocaleString([], {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })
+                                : ''}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <input
+                        value={replyDrafts[t.phone] || ''}
+                        onChange={(e) =>
+                          setReplyDrafts((d) => ({ ...d, [t.phone]: e.target.value }))
+                        }
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' && !e.shiftKey && handleReplyUnmatched(t.phone)
+                        }
+                        placeholder="Reply…"
+                        disabled={unmatchedBusy === t.phone}
+                        style={{
+                          flex: 1,
+                          padding: '9px 12px',
+                          borderRadius: 9,
+                          border: '1.5px solid #E2E8F0',
+                          fontSize: 13.5,
+                          outline: 'none',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <button
+                        onClick={() => handleReplyUnmatched(t.phone)}
+                        disabled={!(replyDrafts[t.phone] || '').trim() || unmatchedBusy === t.phone}
+                        style={{
+                          padding: '9px 16px',
+                          borderRadius: 9,
+                          border: 'none',
+                          background: '#0C4A6E',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          opacity:
+                            !(replyDrafts[t.phone] || '').trim() || unmatchedBusy === t.phone
+                              ? 0.5
+                              : 1,
+                        }}
+                      >
+                        Send
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <select
+                        value={linkTargets[t.phone] || ''}
+                        onChange={(e) =>
+                          setLinkTargets((s) => ({ ...s, [t.phone]: e.target.value }))
+                        }
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: 9,
+                          border: '1.5px solid #E2E8F0',
+                          fontSize: 12.5,
+                          background: '#fff',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        <option value="">Link to booking…</option>
+                        {bookings.map((b) => (
+                          <option key={b.sessionId} value={b.sessionId}>
+                            {[b.renterName, b.packageName, b.startDate].filter(Boolean).join(' · ')}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleLinkUnmatched(t.phone)}
+                        disabled={!linkTargets[t.phone] || unmatchedBusy === t.phone}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: 9,
+                          border: '1.5px solid #0C4A6E',
+                          background: '#fff',
+                          color: '#0C4A6E',
+                          fontWeight: 600,
+                          fontSize: 12.5,
+                          cursor: 'pointer',
+                          opacity: !linkTargets[t.phone] || unmatchedBusy === t.phone ? 0.5 : 1,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Link
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

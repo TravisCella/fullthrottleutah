@@ -266,6 +266,8 @@ export async function POST(request) {
   } else {
     await fbPut(`/conversations/unmatched/${messageSid}`, {
       from: normalizedFrom,
+      phone: normalizedFrom, // grouping key for the admin unmatched inbox
+      direction: 'inbound',
       body,
       timestamp,
       twilioSid: messageSid,
