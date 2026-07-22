@@ -289,6 +289,9 @@ export default function AdminPage() {
   const [replyDrafts, setReplyDrafts] = useState({}); // phone -> draft text
   const [linkTargets, setLinkTargets] = useState({}); // phone -> sessionId
   const [unmatchedBusy, setUnmatchedBusy] = useState('');
+  const [rescheduleStart, setRescheduleStart] = useState('');
+  const [rescheduleEnd, setRescheduleEnd] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
   const chatBottomRef = useRef(null);
 
   // Check for saved password on mount
@@ -878,6 +881,46 @@ export default function AdminPage() {
     setUnmatchedBusy('');
   };
 
+  const handleReschedule = async () => {
+    if (!selectedBooking || !rescheduleStart || rescheduling) return;
+    const end = rescheduleEnd || rescheduleStart;
+    const label = end !== rescheduleStart ? `${rescheduleStart} → ${end}` : rescheduleStart;
+    if (
+      !confirm(
+        `Move ${selectedBooking.renterName}'s booking to ${label} and notify them by email${selectedBooking.smsOptIn ? ' + text' : ''}? No new charge.`
+      )
+    )
+      return;
+    setRescheduling(true);
+    setActionError(null);
+    try {
+      const res = await fetch('/api/admin/reschedule-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: selectedBooking.sessionId,
+          password,
+          newStartDate: rescheduleStart,
+          newEndDate: end,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setActionError(data.error);
+      } else {
+        setActionSuccess(
+          `✅ Rescheduled to ${label} — customer notified.${data.sheetUpdated ? '' : ' (Sheet row not found — verify.)'} Remember to move the Google Calendar event.`
+        );
+        setRescheduleStart('');
+        setRescheduleEnd('');
+        await refreshBookings();
+      }
+    } catch {
+      setActionError('Connection error');
+    }
+    setRescheduling(false);
+  };
+
   // Keep the unmatched badge current; poll faster while the inbox is open.
   useEffect(() => {
     if (!authed) return;
@@ -885,6 +928,12 @@ export default function AdminPage() {
     const interval = setInterval(fetchUnmatched, unmatchedOpen ? 5000 : 30000);
     return () => clearInterval(interval);
   }, [authed, unmatchedOpen]);
+
+  // Clear reschedule inputs when switching bookings so dates don't carry over.
+  useEffect(() => {
+    setRescheduleStart('');
+    setRescheduleEnd('');
+  }, [selectedBooking?.sessionId]);
 
   if (!authed) {
     return (
@@ -1725,6 +1774,106 @@ export default function AdminPage() {
                         </div>
                       ))}
                   </div>
+
+                  {/* Reschedule (booked rentals only) */}
+                  {selectedBooking.rentalStatus === 'booked' && !actionSuccess && (
+                    <div
+                      style={{
+                        marginBottom: 16,
+                        padding: 14,
+                        border: '1px solid #E2E8F0',
+                        borderRadius: 12,
+                        background: '#F8FAFC',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: '#0F172A',
+                          marginBottom: 6,
+                        }}
+                      >
+                        📅 Reschedule
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748B', marginBottom: 10 }}>
+                        Move to a new date and notify the customer by email
+                        {selectedBooking.smsOptIn ? ' + text' : ''}. No new charge. (You'll still
+                        need to move the Google Calendar event.)
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 130 }}>
+                          <label
+                            style={{
+                              fontSize: 10,
+                              color: '#64748B',
+                              display: 'block',
+                              marginBottom: 3,
+                            }}
+                          >
+                            New start
+                          </label>
+                          <input
+                            type="date"
+                            value={rescheduleStart}
+                            onChange={(e) => setRescheduleStart(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: '1.5px solid #E2E8F0',
+                              fontSize: 13,
+                              fontFamily: 'inherit',
+                            }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 130 }}>
+                          <label
+                            style={{
+                              fontSize: 10,
+                              color: '#64748B',
+                              display: 'block',
+                              marginBottom: 3,
+                            }}
+                          >
+                            New end (optional)
+                          </label>
+                          <input
+                            type="date"
+                            value={rescheduleEnd}
+                            min={rescheduleStart || undefined}
+                            onChange={(e) => setRescheduleEnd(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: '1.5px solid #E2E8F0',
+                              fontSize: 13,
+                              fontFamily: 'inherit',
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleReschedule}
+                        disabled={!rescheduleStart || rescheduling}
+                        style={{
+                          width: '100%',
+                          padding: '10px 0',
+                          borderRadius: 9,
+                          border: 'none',
+                          background: '#0C4A6E',
+                          color: '#fff',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: !rescheduleStart || rescheduling ? 'not-allowed' : 'pointer',
+                          opacity: !rescheduleStart || rescheduling ? 0.5 : 1,
+                        }}
+                      >
+                        {rescheduling ? 'Rescheduling…' : 'Reschedule & notify customer'}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Action Status Messages */}
                   {actionError && (
