@@ -1,0 +1,27 @@
+name: Booking health monitor
+
+on:
+  schedule:
+    # Daily 15:00 UTC (~9 AM MT) — low-volume alert: pings only if 0 paid bookings in 72h.
+    - cron: '0 15 * * *'
+    # Monday 15:30 UTC — weekly funnel snapshot (started vs paid, conversion).
+    - cron: '30 15 * * 1'
+  # Manual trigger (runs daily mode) — gh workflow run booking-health.yml
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: booking-health
+      cancel-in-progress: false
+
+    steps:
+      - name: Fire booking-health cron
+        run: |
+          QS=""
+          if [ "${{ github.event.schedule }}" = "30 15 * * 1" ]; then QS="?weekly=1"; fi
+          curl --fail \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://fullthrottleutah.com/api/cron/booking-health${QS}"
