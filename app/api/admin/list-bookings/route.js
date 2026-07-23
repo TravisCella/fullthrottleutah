@@ -162,6 +162,25 @@ export async function POST(request) {
       const pi = s.payment_intent;
       const piObj = pi && typeof pi === 'object' ? pi : null;
 
+      // Exclude non-booking sessions. Manual deposit-hold sessions
+      // (create-deposit-hold, type='manual_deposit_hold') and any session with
+      // no package metadata are not rentals — they were showing as "Unknown
+      // Customer" upcoming ghosts. Real bookings ALWAYS carry packageName in
+      // metadata (written to both session and PI by checkout), so this can't
+      // hide a genuine booking. Non-destructive — the sessions still exist in
+      // Stripe; they're just not rendered as bookings.
+      const piMeta = piObj?.metadata || {};
+      const sessMeta = s.metadata || {};
+      const isDepositHold =
+        piMeta.type === 'manual_deposit_hold' || sessMeta.type === 'manual_deposit_hold';
+      const hasPackage = !!(
+        piMeta.packageName ||
+        piMeta.package ||
+        sessMeta.packageName ||
+        sessMeta.package
+      );
+      if (isDepositHold || !hasPackage) return false;
+
       // Exclude canceled payment intents
       if (piObj?.status === 'canceled') return false;
 
