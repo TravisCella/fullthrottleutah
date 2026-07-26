@@ -553,6 +553,7 @@ export default function JetSkiBooking() {
   const agreementSigCanvasRef = useRef(null);
   // ─────────────────────────────────────────────────────────────────────
   const sigCanvasRef = useRef(null);
+  const whiteGloveRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [bookedDates, setBookedDates] = useState([]);
   const [premiumDates, setPremiumDates] = useState([]);
@@ -603,6 +604,18 @@ export default function JetSkiBooking() {
       setWhiteGlove(false);
     }
   }, [loc]);
+
+  // When a lake with White Glove available is picked on the lake step, scroll the
+  // delivery add-on into view so renters don't miss it below the lake list.
+  useEffect(() => {
+    if (step === 1 && loc && loc.whiteGloveFee !== null) {
+      const t = setTimeout(
+        () => whiteGloveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+        120
+      );
+      return () => clearTimeout(t);
+    }
+  }, [loc?.id, step]);
 
   // If user switches packages and has more vests selected than the new package
   // can accommodate (including spare vest cap), clear the vest selection.
@@ -1550,7 +1563,7 @@ export default function JetSkiBooking() {
             )}
 
             {loc && (
-              <div style={{ marginTop: 20 }}>
+              <div ref={whiteGloveRef} style={{ marginTop: 20 }}>
                 <div
                   style={{
                     fontSize: 10,
@@ -1743,6 +1756,56 @@ export default function JetSkiBooking() {
                 premiumDates={premiumDates}
               />
             </div>
+
+            {/* White Glove reminder — second touchpoint so the delivery upsell
+                isn't missed on the lake step. Hidden for Lake Powell (quote-only). */}
+            {loc?.whiteGloveFee ? (
+              <div
+                onClick={() => setWhiteGlove(!whiteGlove)}
+                style={{
+                  marginTop: 14,
+                  border: whiteGlove ? '2px solid #16A34A' : '2px solid #E2E8F0',
+                  borderRadius: 14,
+                  padding: '14px 16px',
+                  background: whiteGlove ? 'rgba(22,163,74,0.04)' : '#fff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>🤝</span>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>
+                      {whiteGlove ? 'White Glove delivery added' : 'Add White Glove delivery?'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                      We deliver to {loc.name}, launch it, and pick it up — +${loc.whiteGloveFee}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    flexShrink: 0,
+                    border: whiteGlove ? '2px solid #16A34A' : '2px solid #CBD5E1',
+                    background: whiteGlove ? '#16A34A' : '#fff',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 15,
+                    fontWeight: 700,
+                  }}
+                >
+                  {whiteGlove ? '✓' : ''}
+                </div>
+              </div>
+            ) : null}
 
             {loc?.minDays && days > 0 && days < loc.minDays && !overrideMinDays && (
               <div
