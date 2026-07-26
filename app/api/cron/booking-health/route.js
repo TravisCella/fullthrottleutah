@@ -14,6 +14,37 @@ import Stripe from 'stripe';
 import { sendSMS } from '../../../../lib/sms';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const FIREBASE_DB_URL = 'https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com';
+// Throttle the daily low-volume alert so a sustained drought pings at most once
+// every 3 days instead of every day. State resets when bookings resume, so the
+// next drought alerts immediately.
+const ALERT_THROTTLE_MS = 3 * 24 * 60 * 60 * 1000;
+
+async function fbGet(path) {
+  const secret = process.env.FIREBASE_DATABASE_SECRET;
+  if (!secret) return null;
+  try {
+    const res = await fetch(`${FIREBASE_DB_URL}${path}.json?auth=${encodeURIComponent(secret)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function fbPut(path, value) {
+  const secret = process.env.FIREBASE_DATABASE_SECRET;
+  if (!secret) return;
+  try {
+    await fetch(`${FIREBASE_DB_URL}${path}.json?auth=${encodeURIComponent(secret)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(value),
+    });
+  } catch (err) {
+    console.warn('[booking-health] Firebase write failed:', err.message);
+  }
+}
 
 // Count booking checkout sessions created since `sinceSec`. Returns { started, paid }.
 async function countBookingSessions(sinceSec) {
@@ -82,13 +113,28 @@ export async function GET(request) {
     const since = now - hours * 60 * 60;
     const { paid } = await countBookingSessions(since);
 
+    const state = (await fbGet('/monitoring/lowVolume')) || {};
+    const lastAlertMs = state.lastAlertAt ? new Date(state.lastAlertAt).getTime() : 0;
+    let alerted = false;
+    let throttled = false;
+
     if (paid === 0) {
-      await alertOwners(
-        `⚠️ FTU: 0 paid bookings in the last ${hours}h. The booking system is up — likely a traffic/demand dip. ` +
-          `Do a quick test booking at fullthrottleutah.com if you want to be sure.`
-      );
+      if (Date.now() - lastAlertMs >= ALERT_THROTTLE_MS) {
+        await alertOwners(
+          `⚠️ FTU: 0 paid bookings in the last ${hours}h. The booking system is up — likely a traffic/demand dip. ` +
+            `Do a quick test booking at fullthrottleutah.com if you want to be sure. (Next alert in ~3 days if still quiet.)`
+        );
+        await fbPut('/monitoring/lowVolume', { lastAlertAt: new Date().toISOString(), hours });
+        alerted = true;
+      } else {
+        throttled = true; // still quiet, but within the 3-day window — stay silent
+      }
+    } else if (state.lastAlertAt) {
+      // Bookings resumed — clear state so the next drought alerts immediately.
+      await fbPut('/monitoring/lowVolume', { lastAlertAt: '' });
     }
-    return Response.json({ mode: 'daily', hours, paid, alerted: paid === 0 });
+
+    return Response.json({ mode: 'daily', hours, paid, alerted, throttled });
   } catch (err) {
     console.error('[booking-health] error:', err.message);
     return Response.json({ error: err.message }, { status: 500 });

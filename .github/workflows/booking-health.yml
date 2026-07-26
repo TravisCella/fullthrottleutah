@@ -6,8 +6,16 @@ on:
     - cron: '0 15 * * *'
     # Monday 15:30 UTC — weekly funnel snapshot (started vs paid, conversion).
     - cron: '30 15 * * 1'
-  # Manual trigger (runs daily mode) — gh workflow run booking-health.yml
+  # Manual trigger — pick which check to run (defaults to daily).
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Which check to run'
+        type: choice
+        options:
+          - daily
+          - weekly
+        default: daily
 
 jobs:
   check:
@@ -20,8 +28,18 @@ jobs:
     steps:
       - name: Fire booking-health cron
         run: |
+          # Weekly if the Monday schedule fired OR a manual run picked "weekly".
           QS=""
-          if [ "${{ github.event.schedule }}" = "30 15 * * 1" ]; then QS="?weekly=1"; fi
-          curl --fail \
+          if [ "${{ github.event.schedule }}" = "30 15 * * 1" ] || [ "${{ inputs.mode }}" = "weekly" ]; then
+            QS="?weekly=1"
+          fi
+          echo "Calling booking-health${QS}"
+          RESP=$(curl -sS -w $'\n%{http_code}' \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://fullthrottleutah.com/api/cron/booking-health${QS}"
+            "https://fullthrottleutah.com/api/cron/booking-health${QS}")
+          BODY=$(echo "$RESP" | sed '$d')
+          CODE=$(echo "$RESP" | tail -n1)
+          echo "HTTP $CODE"
+          echo "Response: $BODY"
+          # Fail the run on a non-2xx so a broken monitor is visible in Actions.
+          [ "$CODE" -ge 200 ] && [ "$CODE" -lt 300 ]
