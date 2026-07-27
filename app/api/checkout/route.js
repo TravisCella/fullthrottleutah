@@ -23,7 +23,7 @@
 
 import Stripe from 'stripe';
 import { computeTotal, getPackage, getLocation, MAX_EXTRA_VESTS } from '../../../lib/pricing';
-import { isRepeatCustomer, getPremiumDates } from '../../../lib/sheets';
+import { isRepeatCustomer, getPremiumDates, getBookedDates } from '../../../lib/sheets';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const FIREBASE_DB_URL = 'https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com';
@@ -112,6 +112,101 @@ export async function POST(request) {
         },
         { status: 400 }
       );
+    }
+
+    // ─── Availability guard: NEVER allow overlapping dates for a package ──
+    // Authoritative double-booking prevention. The client calendar is UX only
+    // (and previously let a multi-day range straddle a booked day). Each package
+    // is a single physical set of skis, so any date overlap with a live booking
+    // is a conflict. Two sources, so a booking whose Sheet write failed is still
+    // caught:
+    //   1. Google Sheet bookings + manual Blocks (getBookedDates) — fast.
+    //   2. Live Stripe paid sessions for the same package — authoritative.
+    // Fails CLOSED on an unexpected error — we never risk a double-book.
+    {
+      const reqStart = startDate;
+      const reqEnd = endDate || startDate;
+      if (!reqStart) {
+        return Response.json({ error: 'Missing rental dates' }, { status: 400 });
+      }
+      // Inclusive overlap on YYYY-MM-DD strings (lexicographic === chronological).
+      const overlaps = (bStart, bEnd) => {
+        if (!bStart) return false;
+        const be = bEnd || bStart;
+        return reqStart <= be && bStart <= reqEnd;
+      };
+
+      let conflict = null;
+      try {
+        // 1. Sheet bookings + Blocks (getBookedDates filters CANCELLED + matches package).
+        try {
+          const sheetRanges = await getBookedDates(packageName);
+          conflict = sheetRanges.find((b) => overlaps(b.start, b.end)) || null;
+        } catch (sheetErr) {
+          // Non-fatal — Stripe scan below is the authoritative source.
+          console.warn(
+            '[checkout] availability: Sheet read failed, relying on Stripe:',
+            sheetErr.message
+          );
+        }
+
+        // 2. Stripe paid sessions (authoritative — catches NO-SHEET bookings).
+        if (!conflict) {
+          const since = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
+          const wantPkg = (packageName || '').toLowerCase();
+          let scanned = 0;
+          let page = await stripe.checkout.sessions.list({
+            created: { gte: since },
+            limit: 100,
+            expand: ['data.payment_intent'],
+          });
+          while (!conflict) {
+            for (const s of page.data) {
+              scanned++;
+              if (s.payment_status !== 'paid') continue;
+              const spi = s.payment_intent;
+              const sm = spi && typeof spi === 'object' ? spi.metadata || {} : s.metadata || {};
+              if (sm.rentalStatus === 'cancelled') continue;
+              const spkg = (sm.packageName || sm.package || '').toLowerCase();
+              if (spkg !== wantPkg) continue; // same physical set only
+              if (overlaps(sm.startDate || sm.start_date, sm.endDate || sm.end_date)) {
+                conflict = { start: sm.startDate || sm.start_date, end: sm.endDate || sm.end_date };
+                break;
+              }
+            }
+            if (conflict || !page.has_more || scanned >= 500) break;
+            page = await stripe.checkout.sessions.list({
+              created: { gte: since },
+              limit: 100,
+              starting_after: page.data[page.data.length - 1].id,
+              expand: ['data.payment_intent'],
+            });
+          }
+        }
+      } catch (availErr) {
+        console.error('[checkout] Availability check failed — failing closed:', availErr.message);
+        return Response.json(
+          {
+            error:
+              'We could not verify date availability just now. Please try again in a moment, or call/text us at (801) 548-1273.',
+          },
+          { status: 503 }
+        );
+      }
+
+      if (conflict) {
+        console.warn(
+          `[checkout] OVERLAP BLOCKED: ${packageName} ${reqStart}..${reqEnd} conflicts with ` +
+            `${conflict.start}..${conflict.end || conflict.start}. renter=${renterEmail}`
+        );
+        return Response.json(
+          {
+            error:
+              'Sorry — those dates are no longer available for this package (they overlap an existing booking). Please choose different dates.',
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // ─── Vest hard-reject (unchanged logic) ──────────────────────────────

@@ -511,6 +511,7 @@ export default function JetSkiBooking() {
   const [pkg, setPkg] = useState(null);
   const [loc, setLoc] = useState(null);
   const [dates, setDates] = useState([]);
+  const [dateError, setDateError] = useState(null);
   const [mo, setMo] = useState(new Date().getMonth());
   const [yr, setYr] = useState(new Date().getFullYear());
   const [info, setInfo] = useState({
@@ -651,7 +652,45 @@ export default function JetSkiBooking() {
     return () => observer.disconnect();
   }, [step, agreementScrollComplete]);
 
+  // True if ANY day in the inclusive [start, end] span is a booked/blocked day.
+  // Guards against selecting a multi-day range that straddles a booked day —
+  // the calendar blocks clicking ON a booked day, but a range could still span
+  // one (this caused a real double-booking). Mirrors isBooked()'s range logic.
+  const rangeHasBooked = (start, end) => {
+    if (!bookedDates?.length) return false;
+    const s = start <= end ? start : end;
+    const e = start <= end ? end : start;
+    const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+    const last = new Date(e.getFullYear(), e.getMonth(), e.getDate());
+    while (cur <= last) {
+      const cd = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
+      const hit = bookedDates.some((b) => {
+        if (!b.start) return false;
+        const [sy, sm, sd] = b.start.split('-').map(Number);
+        const bs = new Date(sy, sm - 1, sd);
+        const [ey, em, ed] = (b.end || b.start).split('-').map(Number);
+        const be = new Date(ey, em - 1, ed);
+        return cd >= bs && cd <= be;
+      });
+      if (hit) return true;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return false;
+  };
+
   const handleDate = (d) => {
+    // Completing a range (start already chosen, tapping a later end date):
+    // reject it if the span crosses a booked day instead of selecting over it.
+    const wouldExtend =
+      (dates.length === 1 && d >= dates[0]) || (dates.length === 2 && d > dates[1]);
+    if (wouldExtend && rangeHasBooked(dates[0], d)) {
+      setDateError(
+        "Those dates cross a day that's already booked (shown in red). Please pick a range that doesn't include a booked date."
+      );
+      return;
+    }
+
+    setDateError(null);
     if (dates.length === 0) {
       setDates([d]);
     } else if (dates.length === 2 && d > dates[1]) {
@@ -1756,6 +1795,24 @@ export default function JetSkiBooking() {
                 premiumDates={premiumDates}
               />
             </div>
+
+            {dateError && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  background: '#FEE2E2',
+                  borderRadius: 10,
+                  border: '2px solid #DC2626',
+                  fontSize: 12,
+                  color: '#991B1B',
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                }}
+              >
+                ⚠️ {dateError}
+              </div>
+            )}
 
             {/* White Glove reminder — second touchpoint so the delivery upsell
                 isn't missed on the lake step. Hidden for Lake Powell (quote-only). */}
