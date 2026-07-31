@@ -35,6 +35,7 @@ import {
   isWeekend,
   daysBetween,
   calculateBasePrice,
+  dailyDiscountRate,
   getHolidaySurcharge,
   computePremiumAdjustment,
 } from '../lib/pricing';
@@ -1433,15 +1434,23 @@ export default function JetSkiBooking() {
                     textAlign: 'center',
                   }}
                 >
-                  {Object.entries(pkg.multiDay).map(([d, r]) => (
-                    <div key={d}>
-                      <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>
-                        {d}+ days
+                  {[1, 2, 3, 4].map((d) => {
+                    const disc = dailyDiscountRate(d);
+                    const rate = Math.round(pkg.weekday * (1 - disc));
+                    return (
+                      <div key={d}>
+                        <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>
+                          {d === 4 ? 'Day 4+' : `Day ${d}`}
+                        </div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
+                          ${rate}
+                        </div>
+                        <div style={{ fontSize: 9, color: '#94A3B8' }}>
+                          {disc === 0 ? 'full price' : `${Math.round(disc * 100)}% off`}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>${r}</div>
-                      <div style={{ fontSize: 9, color: '#94A3B8' }}>/day</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
