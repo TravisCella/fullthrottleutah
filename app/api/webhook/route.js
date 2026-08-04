@@ -15,6 +15,7 @@ import { addBooking } from '../../../lib/sheets';
 import { createBookingEvent } from '../../../lib/calendar';
 import { sendSMS, buildBookingConfirmationSMS } from '../../../lib/sms';
 import { getDepositAmount } from '../../../lib/deposit';
+import { PICKUP_ADDRESS, PICKUP_MAPS_URL } from '../../../lib/business';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -42,6 +43,30 @@ async function sendConfirmationEmail(booking) {
   const agreementRow = booking.rental_agreement_signed
     ? `<tr><td style="padding: 8px; color: #64748b; font-size: 13px;">📜 Rental Agreement</td><td style="padding: 8px; font-weight: 600;"><a href="https://www.fullthrottleutah.com/agreement/${booking.booking_id}" style="color: #0C4A6E; text-decoration: underline;">Signed ${booking.rental_agreement_version || 'v1.0.0'} — View</a></td></tr>`
     : '';
+
+  // Pickup vs. delivery block. White-glove customers get their gear delivered
+  // to the lake, so we must NOT show them a pickup address. Everyone else picks
+  // up at the shop — show the full formatted address + a Google Maps link so the
+  // confirmation is obviously legitimate.
+  const pickupBlock = booking.white_glove
+    ? `<div style="background: #EFF6FF; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #BFDBFE;">
+                <div style="font-size: 12px; font-weight: 700; color: #1E40AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">🤝 White Glove Delivery</div>
+                <div style="font-weight: 600; color: #0F172A;">We deliver, launch &amp; retrieve at ${booking.location}.</div>
+                <div style="font-size: 13px; color: #475569; margin-top: 6px;">No pickup needed — we'll be in touch to confirm your delivery time and meeting point.</div>
+              </div>`
+    : `<div style="background: #F0F9FF; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #BAE6FD;">
+                <div style="font-size: 12px; font-weight: 700; color: #0C4A6E; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">📍 Pickup Location</div>
+                <div style="font-weight: 700; color: #0F172A;">${PICKUP_ADDRESS.name}</div>
+                <div style="color: #0F172A;">${PICKUP_ADDRESS.street}</div>
+                <div style="color: #0F172A;">${PICKUP_ADDRESS.city}, ${PICKUP_ADDRESS.state} ${PICKUP_ADDRESS.zip}</div>
+                <a href="${PICKUP_MAPS_URL}" style="display: inline-block; margin-top: 8px; color: #0C4A6E; font-weight: 600; text-decoration: underline; font-size: 14px;">📍 View on Google Maps</a>
+              </div>`;
+
+  // Checklist arrival line — pickup customers arrive at the shop; delivery
+  // customers do not travel to us at all.
+  const arriveLine = booking.white_glove
+    ? `We deliver to ${booking.location} — we'll confirm your delivery time; no need to come to us`
+    : `Arrive at ${PICKUP_ADDRESS.name} (${PICKUP_ADDRESS.street}, ${PICKUP_ADDRESS.city}) by ${booking.pickup_time_display || '8:00 AM'}`;
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -76,10 +101,12 @@ async function sendConfirmationEmail(booking) {
                 <tr style="background: #fff;"><td style="padding: 8px; color: #64748b; font-size: 13px;">Due at Pickup</td><td style="padding: 8px; font-weight: 700; font-size: 16px;">${depositDisplay} security deposit</td></tr>
               </table>
 
+              ${pickupBlock}
+
               <div style="background: #FEF3C7; padding: 16px; border-radius: 8px; margin: 16px 0;">
                 <strong style="color: #92400E;">Before Your Rental:</strong>
                 <ol style="color: #92400E; margin: 8px 0; padding-left: 20px; font-size: 14px;">
-                  <li>Arrive at Farmington pickup point by 8:00 AM</li>
+                  <li>${arriveLine}</li>
                   <li>Bring a valid driver's license — <strong>renters must be 25+</strong>; we verify ID at pickup and cannot rent to anyone under 25 (rental denied and refunded minus one rental day's rate)</li>
                   <li>Bring a vehicle with a 2" ball hitch and flat 4-prong light hookup</li>
                   <li>Bring ${depositDisplay} security deposit (card hold or cash)</li>
