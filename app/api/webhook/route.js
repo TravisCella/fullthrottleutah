@@ -107,7 +107,7 @@ async function sendConfirmationEmail(booking) {
                 <strong style="color: #92400E;">Before Your Rental:</strong>
                 <ol style="color: #92400E; margin: 8px 0; padding-left: 20px; font-size: 14px;">
                   <li>${arriveLine}</li>
-                  <li>Bring a valid driver's license — <strong>renters must be 25+</strong>; we verify ID at pickup and cannot rent to anyone under 25 (rental denied and refunded minus one rental day's rate)</li>
+                  <li>Bring a valid driver's license — <strong>renters must be 21+</strong>; we verify ID at pickup and cannot rent to anyone under 21 (rental denied and refunded minus one rental day's rate)</li>
                   <li>Bring a vehicle with a 2" ball hitch and flat 4-prong light hookup</li>
                   <li>Bring ${depositDisplay} security deposit (card hold or cash)</li>
                 </ol>
