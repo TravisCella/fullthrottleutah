@@ -849,9 +849,9 @@ export default function JetSkiBooking() {
   const minDaysRequired = loc?.minDays || 1;
   const meetsMinimum = overrideMinDays || days >= minDaysRequired;
 
-  // ── Renter age policy: renters must be at least 25 as of the rental start date.
+  // ── Renter age policy: renters must be at least 21 as of the rental start date.
   // Client-side gate only — the authoritative check lives in /api/checkout. ──
-  const MIN_RENTER_AGE = 25;
+  const MIN_RENTER_AGE = 21;
   const renterAge = (() => {
     if (!info.dob) return null;
     const [by, bm, bd] = info.dob.split('-').map(Number);
@@ -2273,10 +2273,10 @@ export default function JetSkiBooking() {
                   }}
                 >
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#991B1B', marginBottom: 2 }}>
-                    Renters must be 25 or older
+                    Renters must be 21 or older
                   </div>
                   <div style={{ fontSize: 12, color: '#991B1B', lineHeight: 1.4 }}>
-                    We're sorry — Full Throttle Utah rents only to renters who are at least 25 years
+                    We're sorry — Full Throttle Utah rents only to renters who are at least 21 years
                     old, so we're unable to complete this booking.
                   </div>
                 </div>
@@ -2295,8 +2295,8 @@ export default function JetSkiBooking() {
             >
               <span style={{ fontSize: 18 }}>🪪</span>
               <div style={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
-                <strong>Renters must be 25 or older.</strong> Bring a valid driver's license — we
-                verify age with a photo-ID check at pickup. If the renter is not 25+, the rental is
+                <strong>Renters must be 21 or older.</strong> Bring a valid driver's license — we
+                verify age with a photo-ID check at pickup. If the renter is not 21+, the rental is
                 denied and refunded minus one rental day's rate as an administrative fee.
               </div>
             </div>
@@ -2672,7 +2672,7 @@ export default function JetSkiBooking() {
               {
                 key: 'rules',
                 title: 'Renter Obligations',
-                text: "I confirm that: I am the renter and am at least 25 years old with a valid driver's license, and I understand my ID will be verified at pickup. All operators will be 16+ per Utah Code §73-18-15.1. All riders will wear USCG-approved life vests at all times. I will not operate under the influence of alcohol or drugs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable boating laws.",
+                text: "I confirm that: I am the renter and am at least 21 years old with a valid driver's license, and I understand my ID will be verified at pickup. All operators will be 16+ per Utah Code §73-18-15.1. All riders will wear USCG-approved life vests at all times. I will not operate under the influence of alcohol or drugs. I have inspected the equipment and accept it in safe working condition. I will comply with all applicable boating laws.",
               },
               {
                 key: 'damage',

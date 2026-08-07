@@ -28,11 +28,11 @@ import { isRepeatCustomer, getPremiumDates, getBookedDates } from '../../../lib/
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const FIREBASE_DB_URL = 'https://full-throttle-utah-ac72b-default-rtdb.firebaseio.com';
 
-// Renters must be at least 25 as of the rental start date. This is the
+// Renters must be at least 21 as of the rental start date. This is the
 // AUTHORITATIVE age gate — the browser gate in booking.js is secondary.
 // Returns the renter's age in whole years as of refStr ('YYYY-MM-DD'), or null
 // if the DOB is missing/unparseable (treated as ineligible → rejected).
-const MIN_RENTER_AGE = 25;
+const MIN_RENTER_AGE = 21;
 function computeAgeAsOf(dobStr, refStr) {
   if (!dobStr || typeof dobStr !== 'string') return null;
   const [by, bm, bd] = dobStr.split('-').map(Number);
@@ -86,16 +86,16 @@ export async function POST(request) {
       agreementChecksJson,
     } = data;
 
-    // ─── Age hard-reject: renters must be 25+ as of the rental start date ──
-    // Authoritative server enforcement of the 25+ policy. A missing/invalid DOB
-    // or an age under 25 is rejected before any Stripe object is created.
+    // ─── Age hard-reject: renters must be 21+ as of the rental start date ──
+    // Authoritative server enforcement of the 21+ policy. A missing/invalid DOB
+    // or an age under 21 is rejected before any Stripe object is created.
     const renterAge = computeAgeAsOf(renterDob, startDate);
     if (renterAge == null || renterAge < MIN_RENTER_AGE) {
       console.warn(
         `[checkout] Age gate rejected booking: renter=${renterEmail}, dob=${renterDob || 'missing'}, computedAge=${renterAge}`
       );
       return Response.json(
-        { error: 'Renters must be at least 25 years old. We are unable to complete this booking.' },
+        { error: 'Renters must be at least 21 years old. We are unable to complete this booking.' },
         { status: 400 }
       );
     }
